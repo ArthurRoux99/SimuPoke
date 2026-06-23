@@ -12,7 +12,7 @@ from .stats import (
     LEVEL, IV, SP_CAP_PER_STAT, SP_TOTAL_BUDGET, STAT_KEYS, NATURES,
     Build, compute_stat, compute_all_stats, nature_multipliers, validate_sp,
 )
-from .basestats import get_base_stats, is_known
+from .basestats import get_base_stats, get_species, get_types, is_known, to_id
 from .model import (
     OwnedPokemon, PokemonState, SideState, FieldState, BattleState,
 )
@@ -23,7 +23,7 @@ __all__ = [
     "__version__",
     "LEVEL", "IV", "SP_CAP_PER_STAT", "SP_TOTAL_BUDGET", "STAT_KEYS", "NATURES",
     "Build", "compute_stat", "compute_all_stats", "nature_multipliers", "validate_sp",
-    "get_base_stats", "is_known",
+    "get_base_stats", "get_species", "get_types", "is_known", "to_id",
     "OwnedPokemon", "PokemonState", "SideState", "FieldState", "BattleState",
     "load_my_roster", "load_regulation",
     "i18n",

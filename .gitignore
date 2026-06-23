@@ -16,6 +16,10 @@ env/
 .coverage
 htmlcov/
 
+# Node (scripts de génération de données)
+node_modules/
+npm-debug.log*
+
 # OS / éditeurs
 .DS_Store
 *.swp

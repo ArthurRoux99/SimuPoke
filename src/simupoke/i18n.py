@@ -51,10 +51,18 @@ def label(category: str, ident: str, lang: str = DEFAULT_LANG) -> str:
     table = cat.get(lang, {})
     if ident in table:
         return table[ident]
-    # Fallback : autre langue connue, sinon l'ID brut « joliment » capitalisé.
+    # Fallback : autre langue connue.
     for other in cat.values():
         if ident in other:
             return other[ident]
+    # Pour une espèce non traduite, on récupère le nom anglais du Pokédex
+    # (couche de données) plutôt qu'un ID brut.
+    if category == "species":
+        from .basestats import get_species
+        try:
+            return get_species(ident)["name"]
+        except KeyError:
+            pass
     return ident.replace("-", " ").capitalize()
 
 

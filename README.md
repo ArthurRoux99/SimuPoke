@@ -42,6 +42,7 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 SimuPoke/
 ├── docs/conception_socle.md      # document socle de conception (v0.4)
 ├── data/
+│   ├── pokedex.json              # base stats + méta (généré depuis @pkmn/dex)
 │   ├── my_roster.json            # « mon Box » (Pokémon possédés)
 │   └── reg_m_b/                  # données de la régulation courante (M-B)
 │       ├── roster.json           # espèces légales + flags (peut méga ?)
@@ -49,14 +50,36 @@ SimuPoke/
 │       ├── items.json
 │       ├── moves_overrides.json  # exceptions de moves vs VGC classique
 │       └── clauses.json          # Species/Item Clause, formats
+├── scripts/
+│   ├── gen_pokedex.mjs           # génère data/pokedex.json (hors-ligne, via npm)
+│   └── package.json
 ├── src/simupoke/
 │   ├── stats.py                  # modèle de stats figé (conversion SP→stats)
-│   ├── basestats.py              # base stats (stub Phase 0)
+│   ├── basestats.py              # base stats + méta (lit data/pokedex.json)
 │   ├── model.py                  # OwnedPokemon + état de combat (Doubles-ready)
 │   ├── i18n.py                   # couche d'affichage FR/EN
 │   ├── loaders.py                # chargement roster + régulation
 │   └── cli.py                    # CLI de validation du pipeline
 └── tests/                        # tests pytest
+```
+
+## Données de base (base stats)
+
+Les base stats proviennent de **`@pkmn/dex`** (source nommée au §12), alignées
+sur les IDs Showdown utilisés en interne. Elles sont **figées dans un fichier
+versionné** `data/pokedex.json` (1300+ espèces, formes Méga incluses), de sorte
+que le runtime reste **100 % hors-ligne** (§3) — aucune requête réseau pendant
+l'utilisation de l'outil.
+
+> Les base stats sont identiques à celles du jeu principal : Champions ne change
+> que le système IV/SP, pas les stats de base (§4.3).
+
+Pour **régénérer** le fichier (mise à jour `@pkmn/dex`, nouvelle régulation) :
+
+```bash
+cd scripts
+npm install
+node gen_pokedex.mjs   # réécrit ../data/pokedex.json
 ```
 
 ## Démarrage rapide
@@ -94,8 +117,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 
 ## Prochaines étapes (Phase 0 → Phase 1)
 
-- [ ] Brancher une vraie source de base stats (`@pkmn/dex` / PokéAPI) en
-      remplacement du stub `basestats.py`.
+- [x] Brancher une vraie source de base stats (`@pkmn/dex`) → `data/pokedex.json`.
 - [ ] Calculateur de dégâts intégrant le delta Champions (Méga + talents §7.2).
 - [ ] Importeur de stats d'usage (limitless / pokedata) → priors adversaire (§0.2).
 - [ ] B2 — Aide au tirage (saisie des 10, scoring, classement).
