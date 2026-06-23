@@ -1,0 +1,19 @@
+{
+  "_help": {
+    "description": "Règles d'équipe de la régulation (§4.5).",
+    "champs": {
+      "species_clause": "pas deux fois la même espèce (même n° National Dex)",
+      "item_clause": "pas deux fois le même objet tenu",
+      "level": "auto-nivellement",
+      "team_size": "Pokémon amenés",
+      "bring": "Pokémon sélectionnés en team preview"
+    }
+  },
+  "species_clause": true,
+  "item_clause": true,
+  "level": 50,
+  "formats": {
+    "singles": { "team_size": 6, "bring": 3 },
+    "doubles": { "team_size": 6, "bring": 4 }
+  }
+}

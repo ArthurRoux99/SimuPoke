@@ -1,0 +1,18 @@
+{
+  "_help": {
+    "description": "Espèces légales de la régulation M-B + flags. À compléter (~251 espèces).",
+    "regulation": "M-B (depuis le 17 juin 2026)",
+    "format_level": 50,
+    "champs": {
+      "species": "ID anglais minuscule (Showdown)",
+      "can_mega": "true si une Méga-Évolution est autorisée (Omni Ring)",
+      "mega_form": "ID de la forme méga si applicable, sinon null"
+    },
+    "todo": "Source : pokemon-zone / game8 / Victory Road + @pkmn/dex pour les base stats."
+  },
+  "species": [
+    { "species": "tyranitar", "can_mega": true, "mega_form": "tyranitarmega" },
+    { "species": "garchomp", "can_mega": true, "mega_form": "garchompmega" },
+    { "species": "incineroar", "can_mega": false, "mega_form": null }
+  ]
+}

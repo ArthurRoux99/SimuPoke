@@ -1,0 +1,11 @@
+{
+  "_help": {
+    "description": "Exceptions de moves propres à Champions (§7.2). Champions a retouché certains moves vs VGC classique. À vérifier au cas par cas.",
+    "champs": {
+      "id": "ID anglais du move",
+      "override": "champs modifiés vs Showdown vanilla (basePower, accuracy, type, pp, ...)",
+      "note": "raison / source"
+    }
+  },
+  "overrides": []
+}

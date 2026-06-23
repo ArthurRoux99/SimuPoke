@@ -1,0 +1,47 @@
+{
+  "_help": {
+    "description": "Talents custom Champions (le « delta », §7.2). Catégorisés par effort d'intégration.",
+    "categories": {
+      "A": "Déjà présent dans le moteur — simple mapping, rien à coder.",
+      "B": "Clone d'un template existant — code trivial (changer un paramètre).",
+      "C": "Talent réellement neuf — vrai code à écrire."
+    },
+    "champs": {
+      "id": "ID anglais (Showdown) du talent",
+      "category": "'A' | 'B' | 'C'",
+      "template": "talent existant servant de patron (catégorie B)",
+      "params": "paramètres du clone (catégorie B)",
+      "note": "description / spec pour catégorie C"
+    }
+  },
+  "abilities": [
+    {
+      "id": "dragonize",
+      "category": "B",
+      "template": "pixilate",
+      "params": { "from_type": "Normal", "to_type": "Dragon", "boost": 1.2 },
+      "note": "M. Feraligatr : moves Normal -> Dragon, +20%."
+    },
+    {
+      "id": "megasol",
+      "category": "C",
+      "template": null,
+      "params": {},
+      "note": "M. Meganium : soleil intense 'personnel' (Solar Beam en 1 tour, etc.)."
+    },
+    {
+      "id": "piercingdrill",
+      "category": "C",
+      "template": "unseenfist",
+      "params": { "protect_damage_pct": 0.25 },
+      "note": "M. Excadrill : attaques contact passent Protect/Detect à 25% des dégâts."
+    },
+    {
+      "id": "spicyspray",
+      "category": "C",
+      "template": null,
+      "params": {},
+      "note": "M. Scovillain : brûlure garantie sur l'attaquant qui le touche au contact."
+    }
+  ]
+}

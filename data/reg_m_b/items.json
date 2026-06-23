@@ -1,0 +1,16 @@
+{
+  "_help": {
+    "description": "Objets tenus légaux en régulation M-B + delta éventuel (Omni Ring, etc.). À compléter.",
+    "champs": {
+      "id": "ID anglais (Showdown) de l'objet",
+      "note": "particularité Champions si applicable"
+    }
+  },
+  "items": [
+    { "id": "leftovers", "note": null },
+    { "id": "choiceband", "note": null },
+    { "id": "choicescarf", "note": null },
+    { "id": "focussash", "note": null },
+    { "id": "assaultvest", "note": null }
+  ]
+}

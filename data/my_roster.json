@@ -1,0 +1,35 @@
+{
+  "_help": {
+    "description": "Mon roster réel Pokémon Champions. IDs en anglais (style Showdown).",
+    "champs": {
+      "species": "ID anglais minuscule, ex. 'tyranitar', 'incineroar'",
+      "display_fr": "nom FR pour l'affichage (optionnel)",
+      "nature": "ID anglais, ex. 'jolly', 'adamant', 'modest'",
+      "stat_points": "SP par stat (hp/atk/def/spa/spd/spe), 0..32, total <= 66",
+      "item": "ID anglais ou null, ex. 'leftovers', 'choiceband'",
+      "ability": "ID anglais ou null, ex. 'sandstream'",
+      "moves": "liste d'IDs anglais, ex. ['rockslide','crunch','earthquake','dragondance']",
+      "status_ownership": "'permanent' | 'trial' | 'home_visitor'",
+      "trial_expires_in_days": "entier si trial, sinon null",
+      "source": "'ranch' | 'home' | 'event'",
+      "is_shiny": "true/false",
+      "has_title": "true/false"
+    }
+  },
+  "owned": [
+    {
+      "species": "tyranitar",
+      "display_fr": "Tyranocif",
+      "nature": "jolly",
+      "stat_points": { "hp": 2, "atk": 32, "def": 0, "spa": 0, "spd": 0, "spe": 32 },
+      "item": null,
+      "ability": null,
+      "moves": [],
+      "status_ownership": "permanent",
+      "trial_expires_in_days": null,
+      "source": "home",
+      "is_shiny": false,
+      "has_title": false
+    }
+  ]
+}
