@@ -26,6 +26,7 @@ from .stats import STAT_KEYS, compute_stat, nature_multipliers
 from .moves import Move, get_move
 from .typechart import effectiveness
 from .model import PokemonState, FieldState
+from .delta import type_change_for, personal_weather_for, ATE_POWER_MOD
 
 LEVEL = 50
 
@@ -226,6 +227,13 @@ def calculate(attacker: PokemonState, defender: PokemonState,
     def_types = get_species(defender.species).get("types") or []
     atk_types = get_species(attacker.species).get("types") or []
 
+    # --- Delta Champions : type effectif du move (-ate) ---
+    move_type = mv.type
+    ate_type = type_change_for(atk_ability)
+    type_changed = bool(ate_type and mv.type == "Normal")
+    if type_changed:
+        move_type = ate_type
+
     physical = mv.is_physical
     atk_key = "atk" if physical else "spa"
     def_key = "def" if physical else "spd"
@@ -244,9 +252,9 @@ def calculate(attacker: PokemonState, defender: PokemonState,
     if atk_ability == "guts" and attacker.status:
         at_mods.append(6144)
     # Talents défensifs réduisant la stat offensive (Thick Fat, Heatproof).
-    if def_ability == "thickfat" and mv.type in ("Fire", "Ice"):
+    if def_ability == "thickfat" and move_type in ("Fire", "Ice"):
         at_mods.append(2048)
-    if def_ability == "heatproof" and mv.type == "Fire":
+    if def_ability == "heatproof" and move_type == "Fire":
         at_mods.append(2048)
     if at_mods:
         attack = _apply_mod(attack, _chain_mods(at_mods))
@@ -273,6 +281,8 @@ def calculate(attacker: PokemonState, defender: PokemonState,
     bp_mods: list[int] = []
     if atk_ability == "technician" and base_power <= 60:
         bp_mods.append(6144)
+    if type_changed:                       # -ate / Dragonize : ×1.2
+        bp_mods.append(ATE_POWER_MOD)
     if bp_mods:
         base_power = max(1, _apply_mod(base_power, _chain_mods(bp_mods)))
 
@@ -283,28 +293,30 @@ def calculate(attacker: PokemonState, defender: PokemonState,
     if apply_spread:
         base_damage = _apply_mod(base_damage, 3072)
 
-    # Météo (offensive : soleil/Feu, pluie/Eau, et inversement)
-    if weather == "sun":
-        if mv.type == "Fire":
+    # Météo offensive. Mega Sol (talent custom) accorde un soleil « personnel »
+    # à l'attaquant, qui prime pour le calcul de SES dégâts (§7.2, catégorie C).
+    off_weather = personal_weather_for(atk_ability) or weather
+    if off_weather == "sun":
+        if move_type == "Fire":
             base_damage = _apply_mod(base_damage, 6144)
-        elif mv.type == "Water":
+        elif move_type == "Water":
             base_damage = _apply_mod(base_damage, 2048)
-    elif weather == "rain":
-        if mv.type == "Water":
+    elif off_weather == "rain":
+        if move_type == "Water":
             base_damage = _apply_mod(base_damage, 6144)
-        elif mv.type == "Fire":
+        elif move_type == "Fire":
             base_damage = _apply_mod(base_damage, 2048)
 
     # Terrain (attaquant au sol)
     terrain = _terrain(field)
     if terrain and _is_grounded(attacker):
-        if terrain == "electric" and mv.type == "Electric":
+        if terrain == "electric" and move_type == "Electric":
             base_damage = _apply_mod(base_damage, 5325)
-        elif terrain == "grassy" and mv.type == "Grass":
+        elif terrain == "grassy" and move_type == "Grass":
             base_damage = _apply_mod(base_damage, 5325)
-        elif terrain == "psychic" and mv.type == "Psychic":
+        elif terrain == "psychic" and move_type == "Psychic":
             base_damage = _apply_mod(base_damage, 5325)
-    if terrain == "misty" and mv.type == "Dragon" and _is_grounded(defender):
+    if terrain == "misty" and move_type == "Dragon" and _is_grounded(defender):
         base_damage = _apply_mod(base_damage, 2048)
 
     # Coup critique
@@ -312,15 +324,15 @@ def calculate(attacker: PokemonState, defender: PokemonState,
         base_damage = int(base_damage * 1.5)
 
     # --- Facteurs finaux ---
-    is_stab = mv.type in atk_types
+    is_stab = move_type in atk_types
     if is_stab:
         stab_mod = 8192 if atk_ability == "adaptability" else 6144
     else:
         stab_mod = 4096
 
-    eff = effectiveness(mv.type, def_types)
+    eff = effectiveness(move_type, def_types)
     # Immunités de talent du défenseur (annulent les dégâts).
-    if _ABILITY_IMMUNITY.get(def_ability) == mv.type:
+    if _ABILITY_IMMUNITY.get(def_ability) == move_type:
         eff = 0.0
     is_burned = (physical and defender is not None and attacker.status == "brn"
                  and atk_ability != "guts")

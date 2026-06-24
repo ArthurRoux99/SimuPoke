@@ -78,5 +78,13 @@ add('levitate_eq', { species: 'Garchomp', nature: 'Adamant', evs: { atk: 248 } }
 // 16. Immunité de talent : Torche (Flash Fire)
 add('flashfire', { species: 'Garchomp', nature: 'Modest', evs: { spa: 248 } },
   { species: 'Heatran', ability: 'Flash Fire' }, { name: 'Fire Blast' });
+// 17. Famille -ate : Pixilate (Normal -> Fée, x1.2, STAB) — patron de Dragonize
+add('pixilate_hypervoice', { species: 'Sylveon', nature: 'Modest', evs: { spa: 248 },
+  ability: 'Pixilate' },
+  { species: 'Garchomp', nature: 'Jolly', evs: { hp: 0 } }, { name: 'Hyper Voice' });
+// 18. Même move sans -ate (référence Normal)
+add('plain_hypervoice', { species: 'Sylveon', nature: 'Modest', evs: { spa: 248 },
+  ability: 'Cute Charm' },
+  { species: 'Garchomp', nature: 'Jolly', evs: { hp: 0 } }, { name: 'Hyper Voice' });
 
 console.log(JSON.stringify(scen, null, 1));

@@ -55,6 +55,10 @@ CASES = [
      mk("rotomwash", "serious", {}, ability="levitate"), "earthquake", {}, 0, 0),
     ("flashfire",          CHOMP_SP(),
      mk("heatran", "serious", {}, ability="flashfire"), "fireblast", {}, 0, 0),
+    ("pixilate_hypervoice", mk("sylveon", "modest", {"spa": 31}, ability="pixilate"),
+     mk("garchomp", "jolly"), "hypervoice", {}, 206, 246),
+    ("plain_hypervoice",   mk("sylveon", "modest", {"spa": 31}, ability="cutecharm"),
+     mk("garchomp", "jolly"), "hypervoice", {}, 57, 68),
 ]
 
 

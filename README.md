@@ -66,6 +66,7 @@ SimuPoke/
 │   ├── moves.py                 # données de moves
 │   ├── typechart.py             # efficacité des types
 │   ├── damage.py                # calculateur de dégâts (Gen 5+, parité @smogon/calc)
+│   ├── delta.py                 # delta Champions : talents custom (§7.2) au calc
 │   ├── analysis.py              # typage défensif/offensif + inférence de rôle
 │   ├── draft.py                 # B2 — scoring/classement du tirage
 │   ├── team.py                  # B3 — analyse d'équipe + assistant team preview
@@ -112,8 +113,25 @@ brûlure, météo, terrains, esquive multi-cibles, boosts ; items Choice
 Band/Specs, Life Orb, Expert Belt, Assault Vest ; talents Huge/Pure Power,
 Guts, Technician, Tinted Lens, Neuroforce, Multiscale, Filter & co. ; **talents
 défensifs** : immunités (Lévitation, Torche, Absorbe-Volt/Eau, etc.) et
-réductions (Thick Fat, Heatproof). Le « delta » Champions (§7.2) s'ajoutera via
-les mêmes listes de modificateurs.
+réductions (Thick Fat, Heatproof).
+
+### Delta Champions (§7.2)
+
+`simupoke.delta` branche les **talents custom de Champions** sur le calc, en
+combinant des templates intégrés et les données de régulation
+(`data/<reg>/abilities.json`) — ajouter un clone de template est ainsi une
+opération **de données**, sans toucher au moteur :
+
+- **Famille -ate** (Pixilate/Aerilate/Refrigerate/Galvanize) + le custom
+  **Dragonize** (M. Feraligatr, « Normal → Dragon, +20 % ») : chargé depuis les
+  données. Le chemin générique -ate est validé à l'identique contre `@smogon/calc`.
+- **Mega Sol** (M. Meganium) : soleil « personnel » (boost ×1.5 des moves Feu).
+
+Les talents purement « moteur » (Piercing Drill = passe Protect, Spicy Spray =
+brûlure au contact) ne sont pas des modificateurs de dégâts et relèveront du
+simulateur de tour. Les **nouvelles Méga** absentes de `@pkmn/dex` (Feraligatr,
+Meganium…) ont leur *mécanique* en place ; il reste à saisir leurs **base stats
+réelles** dans les données de régulation (pas de valeurs inventées).
 
 ## B2 — Aide au tirage (Roster Ranch)
 
@@ -221,6 +239,8 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] B3 — Team builder + assistant team preview v1 (clauses, trous, matchups).
 - [x] Talents défensifs dans le calc (immunités + Thick Fat/Heatproof).
 - [x] B1 — Assistant de combat, mode analyse v1 (analyse 1 tour, §10.1).
+- [x] Delta Champions au calc : talents -ate (dont Dragonize, piloté par données) + Mega Sol.
+- [ ] Saisir les base stats des nouvelles Méga Champions dans les données de régulation.
 - [ ] Importeur de stats d'usage (limitless / pokedata) → priors B2 + adversaire (§0.2).
-- [ ] Intégrer le delta Champions au calc (Méga + talents §7.2) via les modificateurs.
 - [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.
+- [ ] UI v2 — page HTML autonome (thème sombre, §12).
