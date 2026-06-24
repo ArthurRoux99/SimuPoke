@@ -17,6 +17,7 @@ dev = ["pytest>=8"]
 [project.scripts]
 simupoke = "simupoke.cli:main"
 simupoke-server = "simupoke.server:main"
+simupoke-import-usage = "simupoke.usage_import:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

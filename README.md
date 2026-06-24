@@ -167,10 +167,27 @@ justification et reco **essai 7 j vs permanent (2 500 VP)**.
   de l'onglet Combat.
 
 > ⚠️ Le fichier `data/usage/reg_m_b.json` fourni est un **échantillon manuel
-> illustratif** (valeurs non officielles), destiné à être remplacé par un import
-> réel depuis limitlesstcg / pokedata — aucune connexion réseau n'est faite ici.
-> Le format est documenté en tête de `src/simupoke/usage.py` ; le joueur peut
-> toujours surcharger un prior dès qu'il observe une info réelle.
+> illustratif** (valeurs non officielles). Le joueur peut toujours surcharger un
+> prior dès qu'il observe une info réelle.
+
+### Importer de vraies stats d'usage (partie réseau)
+
+`simupoke.usage_import` récupère et convertit des stats d'usage au format
+**Showdown « chaos » JSON** (le standard de fait). Le téléchargement utilise
+`urllib` (proxy-aware) ; il s'exécute là où le réseau est ouvert (ton PC).
+
+```bash
+# depuis une URL (ex. un dump chaos Showdown/Smogon)
+python -m simupoke.usage_import https://example/chaos/gen9vgc.json --reg reg_m_b
+# ou, après `pip install -e .` :
+simupoke-import-usage chemin/vers/chaos.json --reg reg_m_b
+```
+
+Les comptes bruts sont normalisés en probabilités conditionnelles, filtrés et
+écrits dans `data/usage/<reg>.json` — directement consommé par B2 (priors) et le
+modèle d'adversaire. Le parseur est testé hors-ligne (`tests/test_usage_import.py`) ;
+si une source bloque l'accès réseau, télécharge le fichier puis importe-le en
+local. Format détaillé en tête de `src/simupoke/usage_import.py`.
 
 ## B3 — Team builder & assistant team preview
 
@@ -319,7 +336,8 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Modèle d'usage (§0.2) : importeur/format local + priors B2 + set probable adverse.
 - [x] B3 : immunités de talent (Lévitation…) dans le profil défensif.
 - [x] B1 : menace adverse estimée via l'usage quand les coups ne sont pas saisis.
-- [ ] Remplacer l'échantillon d'usage par un import réel limitless/pokedata (réseau, plus tard).
+- [x] Importeur réseau de stats d'usage (Showdown chaos) → `usage_import` / `simupoke-import-usage`.
+- [ ] Lancer l'import sur une vraie source (sur PC, réseau ouvert) pour remplacer l'échantillon.
 - [ ] Saisir les base stats des nouvelles Méga Champions dans les données de régulation.
 - [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.
 - [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.
