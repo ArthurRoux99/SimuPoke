@@ -191,11 +191,48 @@ def api_preview(body: dict) -> dict:
             "lines": res.lines()}
 
 
+def _roster_path() -> Path:
+    return DATA_DIR / "my_roster.json"
+
+
+def api_roster_get() -> dict:
+    """Renvoie le contenu de « Mon Box » (liste `owned`)."""
+    path = _roster_path()
+    if not path.exists():
+        return {"roster": []}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return {"roster": raw.get("owned", [])}
+
+
+def api_roster_save(body: dict, path: Path | None = None) -> dict:
+    """Écrit « Mon Box » sur le disque (saisie manuelle, §3). Local uniquement."""
+    path = Path(path) if path else _roster_path()
+    entries = body.get("roster", [])
+    if not isinstance(entries, list):
+        raise ValueError("`roster` doit être une liste.")
+    unknown = [e.get("species") for e in entries
+               if e.get("species") and not is_known(e["species"])]
+    out: dict = {}
+    if path.exists():
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+            if "_help" in existing:
+                out["_help"] = existing["_help"]
+        except (ValueError, OSError):
+            pass
+    out["owned"] = entries
+    path.write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8")
+    return {"ok": True, "count": len(entries), "unknown": unknown}
+
+
 _POST_ROUTES = {
     "/api/stats": api_stats, "/api/damage": api_damage, "/api/analyze": api_analyze,
     "/api/draft": api_draft, "/api/team": api_team, "/api/preview": api_preview,
+    "/api/roster": api_roster_save,
 }
-_GET_API = {"/api/meta": api_meta, "/api/samples": api_samples}
+_GET_API = {"/api/meta": api_meta, "/api/samples": api_samples,
+            "/api/roster": api_roster_get}
 
 _CONTENT_TYPES = {".html": "text/html", ".css": "text/css",
                   ".js": "application/javascript", ".json": "application/json"}

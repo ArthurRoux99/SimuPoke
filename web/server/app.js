@@ -7,6 +7,7 @@
   const SP_FR = { hp: 'PV', atk: 'Atq', def: 'Déf', spa: 'A.Sp', spd: 'D.Sp', spe: 'Vit' };
   let META = { species: [], moves: [], natures: [] };
   let SAMPLES = {};
+  const builders = {};
 
   async function api(path, body) {
     const opt = body ? { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -17,23 +18,58 @@
     return data;
   }
 
-  function fillNatures(sel) {
-    sel.innerHTML = META.natures.map((n) => `<option value="${n}">${n}</option>`).join('');
-  }
-  function fillBoost(sel) {
-    let h = '';
-    for (let i = 6; i >= -6; i--) h += `<option value="${i}"${i === 0 ? ' selected' : ''}>${i > 0 ? '+' + i : i}</option>`;
-    sel.innerHTML = h;
-  }
-  function fillSP(container, prefix) {
-    container.innerHTML = SP.map((k) =>
-      `<div class="cell"><label>${SP_FR[k]}</label><input id="${prefix}-sp-${k}" type="number" min="0" max="32" value="0"></div>`).join('');
-  }
-  function readSP(prefix) {
-    const sp = {}; SP.forEach((k) => { sp[k] = parseInt($(`${prefix}-sp-${k}`).value || '0', 10); });
-    return sp;
-  }
+  const esc = (s) => String(s == null ? '' : s).replace(/"/g, '&quot;');
   const splitMoves = (s) => s.split(',').map((x) => x.trim()).filter(Boolean);
+  function natureOptions(sel) { return META.natures.map((n) => `<option value="${n}"${n === sel ? ' selected' : ''}>${n}</option>`).join(''); }
+
+  function fillBoost(s) { let h = ''; for (let i = 6; i >= -6; i--) h += `<option value="${i}"${i === 0 ? ' selected' : ''}>${i > 0 ? '+' + i : i}</option>`; s.innerHTML = h; }
+  function fillSP(c, p) { c.innerHTML = SP.map((k) => `<div class="cell"><label>${SP_FR[k]}</label><input id="${p}-sp-${k}" type="number" min="0" max="32" value="0"></div>`).join(''); }
+  function readSP(p) { const sp = {}; SP.forEach((k) => { sp[k] = parseInt($(`${p}-sp-${k}`).value || '0', 10); }); return sp; }
+
+  // ---------- Composant builder (lignes éditables) ----------
+  function makeBuilder(container, opts) {
+    opts = Object.assign({ withRarity: false, withSP: false }, opts || {});
+    const list = document.createElement('div');
+    const add = document.createElement('button');
+    add.type = 'button'; add.textContent = '+ Ajouter un Pokémon';
+    add.addEventListener('click', () => addRow({}));
+    container.innerHTML = ''; container.appendChild(list); container.appendChild(add);
+
+    function spStr(sp) { return sp ? Object.entries(sp).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join(',') : ''; }
+    function parseSP(s) { const o = {}; (s || '').split(',').forEach((p) => { const [k, v] = p.split('='); if (k && v) o[k.trim()] = parseInt(v, 10); }); return o; }
+
+    function addRow(d) {
+      const row = document.createElement('div');
+      row.className = 'builder-row';
+      row.innerHTML =
+        `<input class="b-species" list="species-list" placeholder="espèce" value="${esc(d.species)}">` +
+        `<select class="b-nature">${natureOptions(d.nature || 'serious')}</select>` +
+        `<input class="b-item" placeholder="objet" value="${esc(d.item)}">` +
+        `<input class="b-ability" placeholder="talent" value="${esc(d.ability)}">` +
+        `<input class="b-moves" placeholder="capacités (a, b, c)" value="${esc((d.moves || []).join(', '))}">` +
+        (opts.withSP ? `<input class="b-sp" placeholder="SP atk=32,spe=32" value="${esc(spStr(d.stat_points))}">` : '') +
+        (opts.withRarity ? `<label class="b-rar"><input type="checkbox" class="b-shiny"${d.is_shiny ? ' checked' : ''}>✨</label>` : '') +
+        `<button class="b-del" type="button" title="retirer">✕</button>`;
+      row.querySelector('.b-del').addEventListener('click', () => list.removeChild(row));
+      list.appendChild(row);
+    }
+    function getEntries() {
+      return Array.from(list.querySelectorAll('.builder-row')).map((row) => {
+        const e = {
+          species: row.querySelector('.b-species').value.trim(),
+          nature: row.querySelector('.b-nature').value,
+          item: row.querySelector('.b-item').value.trim() || null,
+          ability: row.querySelector('.b-ability').value.trim() || null,
+          moves: splitMoves(row.querySelector('.b-moves').value),
+        };
+        if (opts.withSP) e.stat_points = parseSP(row.querySelector('.b-sp').value);
+        if (opts.withRarity) e.is_shiny = row.querySelector('.b-shiny').checked;
+        return e;
+      }).filter((e) => e.species);
+    }
+    function setEntries(arr) { list.innerHTML = ''; (arr || []).forEach(addRow); }
+    return { getEntries, setEntries, addRow, el: container };
+  }
 
   // ---------- Onglets ----------
   function initTabs() {
@@ -41,13 +77,12 @@
       b.addEventListener('click', () => {
         document.querySelectorAll('#tabs button').forEach((x) => x.classList.remove('active'));
         document.querySelectorAll('.tab-panel').forEach((x) => x.classList.remove('active'));
-        b.classList.add('active');
-        $('tab-' + b.dataset.tab).classList.add('active');
+        b.classList.add('active'); $('tab-' + b.dataset.tab).classList.add('active');
       });
     });
   }
 
-  // ---------- Onglet Dégâts ----------
+  // ---------- Dégâts ----------
   function readMon(prefix) {
     const boosts = {};
     document.querySelectorAll(`#${prefix}-boost-atk, #${prefix}-boost-spa, #${prefix}-boost-def, #${prefix}-boost-spd`)
@@ -88,27 +123,25 @@
     } catch (e) { $('dmg-result').innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
   }
 
-  // ---------- Onglet Combat ----------
+  // ---------- Combat ----------
   async function runCombat() {
     try {
       const me = { species: $('c-me-species').value, nature: $('c-me-nature').value,
         sp: readSP('c-me'), moves: splitMoves($('c-me-moves').value),
         hpPct: parseFloat($('c-me-hp').value || '100') / 100 };
       const opp = { species: $('c-opp-species').value, nature: $('c-opp-nature').value,
-        moves: splitMoves($('c-opp-moves').value),
-        hpPct: parseFloat($('c-opp-hp').value || '100') / 100 };
+        moves: splitMoves($('c-opp-moves').value), hpPct: parseFloat($('c-opp-hp').value || '100') / 100 };
       const r = await api('/api/analyze', { me, opp, opp_move: $('c-opp-move').value,
         field: { weather: $('c-weather').value, terrain: $('c-terrain').value } });
       $('combat-result').textContent = r.lines.join('\n');
     } catch (e) { $('combat-result').textContent = '⚠ ' + e.message; }
   }
 
-  // ---------- Onglet Tirage ----------
+  // ---------- Tirage ----------
   async function runDraft() {
     const out = $('draft-result');
     try {
-      const lineup = JSON.parse($('draft-input').value).lineup;
-      const r = await api('/api/draft', { lineup });
+      const r = await api('/api/draft', { lineup: builders.draft.getEntries() });
       out.innerHTML = r.ranking.map((e, i) => `
         <div class="rank-row">
           <div class="rank">${i + 1}</div>
@@ -120,61 +153,87 @@
     } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
   }
 
-  // ---------- Onglet Équipe ----------
+  // ---------- Équipe ----------
   async function runTeam() {
-    try {
-      const team = JSON.parse($('team-input').value).team;
-      const r = await api('/api/team', { team });
+    try { const r = await api('/api/team', { team: builders.team.getEntries() });
       $('team-result').textContent = r.lines.join('\n');
     } catch (e) { $('team-result').textContent = '⚠ ' + e.message; }
   }
 
-  // ---------- Onglet Preview ----------
+  // ---------- Preview ----------
   async function runPreview() {
     try {
-      const my_team = JSON.parse($('prev-mine').value).team;
-      const opp_team = JSON.parse($('prev-opp').value).team;
-      const r = await api('/api/preview', { my_team, opp_team, format: $('prev-format').value });
+      const r = await api('/api/preview', { my_team: builders.prevMine.getEntries(),
+        opp_team: builders.prevOpp.getEntries(), format: $('prev-format').value });
       $('preview-result').textContent = r.lines.join('\n');
     } catch (e) { $('preview-result').textContent = '⚠ ' + e.message; }
   }
+
+  // ---------- Mon Box ----------
+  async function loadBox() {
+    try { const r = await api('/api/roster'); builders.box.setEntries(r.roster);
+      $('box-status').textContent = `${r.roster.length} Pokémon chargé(s).`;
+    } catch (e) { $('box-status').textContent = '⚠ ' + e.message; }
+  }
+  async function saveBox() {
+    try {
+      const r = await api('/api/roster', { roster: builders.box.getEntries() });
+      let msg = `Enregistré : ${r.count} Pokémon.`;
+      if (r.unknown && r.unknown.length) msg += ` ⚠ espèces inconnues : ${r.unknown.join(', ')}`;
+      $('box-status').textContent = msg;
+    } catch (e) { $('box-status').textContent = '⚠ ' + e.message; }
+  }
+
+  const entriesFrom = (sample, key) => (sample && sample[key]) ? sample[key] : [];
 
   async function init() {
     initTabs();
     try { META = await api('/api/meta'); } catch (e) { /* listes vides */ }
     try { SAMPLES = await api('/api/samples'); } catch (e) { SAMPLES = {}; }
 
-    document.querySelectorAll('select[id$="-nature"], #a-nature, #d-nature').forEach(fillNatures);
+    document.querySelectorAll('#tab-damage select[id$="-nature"], #tab-combat select[id$="-nature"]')
+      .forEach((s) => { s.innerHTML = natureOptions('serious'); });
     document.querySelectorAll('.boost').forEach(fillBoost);
-    ['a', 'd', 'c-me', 'c-opp'].forEach((p) => { const el = $(`${p}-sp`); if (el) fillSP(el, p); });
+    ['a', 'd', 'c-me'].forEach((p) => { const el = $(`${p}-sp`); if (el) fillSP(el, p); });
     $('a-nature').value = 'adamant'; $('d-nature').value = 'jolly';
     $('a-sp-atk').value = 31; $('a-sp-spa').value = 31;
     if ($('c-me-sp-atk')) { $('c-me-sp-atk').value = 32; $('c-me-sp-spe').value = 32; }
-
     $('species-list').innerHTML = META.species.map((n) => `<option value="${n}">`).join('');
     $('move-list').innerHTML = META.moves.map((n) => `<option value="${n}">`).join('');
 
-    // Dégâts : recalcul à chaque modif
+    // Builders
+    builders.draft = makeBuilder($('draft-builder'), { withRarity: true });
+    builders.team = makeBuilder($('team-builder'));
+    builders.prevMine = makeBuilder($('prev-mine'));
+    builders.prevOpp = makeBuilder($('prev-opp'));
+    builders.box = makeBuilder($('box-builder'), { withSP: true, withRarity: true });
+
+    builders.draft.setEntries(entriesFrom(SAMPLES.lineup, 'lineup'));
+    builders.team.setEntries(entriesFrom(SAMPLES.team, 'team'));
+    builders.prevMine.setEntries(entriesFrom(SAMPLES.team, 'team'));
+    builders.prevOpp.setEntries(entriesFrom(SAMPLES.opponent, 'team'));
+
+    // Listeners
     $('tab-damage').querySelectorAll('input, select').forEach((el) => {
       el.addEventListener('input', computeDamage); el.addEventListener('change', computeDamage);
     });
     $('c-run').addEventListener('click', runCombat);
     $('draft-run').addEventListener('click', runDraft);
+    $('draft-sample').addEventListener('click', () => builders.draft.setEntries(entriesFrom(SAMPLES.lineup, 'lineup')));
     $('team-run').addEventListener('click', runTeam);
-    $('prev-run').addEventListener('click', runPreview);
-
-    // Préremplissage des exemples
-    if (SAMPLES.lineup) $('draft-input').value = JSON.stringify(SAMPLES.lineup, null, 1);
-    if (SAMPLES.team) { $('team-input').value = JSON.stringify(SAMPLES.team, null, 1);
-      $('prev-mine').value = JSON.stringify(SAMPLES.team, null, 1); }
-    if (SAMPLES.opponent) $('prev-opp').value = JSON.stringify(SAMPLES.opponent, null, 1);
-    $('draft-sample').addEventListener('click', () => { if (SAMPLES.lineup) $('draft-input').value = JSON.stringify(SAMPLES.lineup, null, 1); });
-    $('team-sample').addEventListener('click', () => { if (SAMPLES.team) $('team-input').value = JSON.stringify(SAMPLES.team, null, 1); });
-    $('prev-sample').addEventListener('click', () => {
-      if (SAMPLES.team) $('prev-mine').value = JSON.stringify(SAMPLES.team, null, 1);
-      if (SAMPLES.opponent) $('prev-opp').value = JSON.stringify(SAMPLES.opponent, null, 1);
+    $('team-sample').addEventListener('click', () => builders.team.setEntries(entriesFrom(SAMPLES.team, 'team')));
+    $('team-frombox').addEventListener('click', async () => {
+      try { const r = await api('/api/roster'); builders.team.setEntries(r.roster); } catch (e) { /* */ }
     });
+    $('prev-run').addEventListener('click', runPreview);
+    $('prev-sample').addEventListener('click', () => {
+      builders.prevMine.setEntries(entriesFrom(SAMPLES.team, 'team'));
+      builders.prevOpp.setEntries(entriesFrom(SAMPLES.opponent, 'team'));
+    });
+    $('box-save').addEventListener('click', saveBox);
+    $('box-reload').addEventListener('click', loadBox);
 
+    loadBox();
     computeDamage();
   }
 

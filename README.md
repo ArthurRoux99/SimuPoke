@@ -205,12 +205,16 @@ python -m simupoke.server            # http://127.0.0.1:8000
 # ou, après `pip install -e .` :  simupoke-server --port 9000
 ```
 
-Puis ouvrir <http://127.0.0.1:8000> : une UI sombre à onglets. Le frontend
-(`web/server/`) appelle l'API JSON `/api/*` ; toute la logique de jeu reste
-côté Python. Les onglets Tirage/Équipe/Preview acceptent un JSON (prérempli avec
-les exemples de `data/`). Rien ne sort de ta machine (§3).
+Puis ouvrir <http://127.0.0.1:8000> : une UI sombre à onglets **Dégâts, Combat
+(B1), Tirage (B2), Équipe (B3), Team preview** et **Mon Box**. Le frontend
+(`web/server/`) appelle l'API JSON `/api/*` ; toute la logique de jeu reste côté
+Python. Les onglets Tirage/Équipe/Preview utilisent un **éditeur de Pokémon**
+(lignes ajoutables : espèce, nature, objet, talent, capacités), préremplis avec
+les exemples de `data/`. L'onglet **Mon Box** charge, édite et **enregistre**
+`data/my_roster.json` directement. Rien ne sort de ta machine (§3).
 
-> API : `GET /api/meta|samples`, `POST /api/damage|analyze|draft|team|preview|stats`.
+> API : `GET /api/meta|samples|roster`,
+> `POST /api/damage|analyze|draft|team|preview|stats|roster`.
 
 ## B1 — Assistant de combat (mode analyse)
 
@@ -292,7 +296,8 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Delta Champions au calc : talents -ate (dont Dragonize, piloté par données) + Mega Sol.
 - [x] UI — page HTML autonome v1 (calculateur de dégâts, moteur JS à parité).
 - [x] UI — serveur local v1 : tous les modules (Dégâts/B1/B2/B3) via API Python.
-- [ ] Soigner l'UI hébergée : formulaires dédiés (sans JSON brut) pour B2/B3.
+- [x] UI hébergée : éditeurs de Pokémon (sans JSON brut) + onglet « Mon Box » éditable.
+- [ ] Importeur de stats d'usage (limitless / pokedata) → priors B2 + adversaire (§0.2).
 - [ ] Saisir les base stats des nouvelles Méga Champions dans les données de régulation.
 - [ ] Importeur de stats d'usage (limitless / pokedata) → priors B2 + adversaire (§0.2).
 - [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.

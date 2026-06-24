@@ -19,6 +19,7 @@
   <button data-tab="draft">Tirage (B2)</button>
   <button data-tab="team">Équipe (B3)</button>
   <button data-tab="preview">Team preview</button>
+  <button data-tab="box">Mon Box</button>
 </div>
 
 <main>
@@ -124,10 +125,13 @@
   <!-- ===== TIRAGE ===== -->
   <section class="tab-panel" id="tab-draft">
     <div class="panel">
-      <h2>Tirage du jour (10 Pokémon) — JSON</h2>
-      <textarea id="draft-input"></textarea>
-      <div class="preset-btns"><button class="primary" id="draft-run">Classer le tirage</button>
-        <button id="draft-sample">Charger l'exemple</button></div>
+      <h2>Tirage du jour — ajoute les 10 Pokémon proposés</h2>
+      <div class="builder" id="draft-builder"></div>
+      <div class="builder-actions">
+        <button class="primary" id="draft-run">Classer le tirage</button>
+        <button id="draft-sample">Charger l'exemple</button>
+        <span class="status">La synergie utilise « Mon Box ».</span>
+      </div>
     </div>
     <div class="list-result" id="draft-result" style="margin-top:14px"></div>
   </section>
@@ -135,10 +139,13 @@
   <!-- ===== ÉQUIPE ===== -->
   <section class="tab-panel" id="tab-team">
     <div class="panel">
-      <h2>Mon équipe — JSON</h2>
-      <textarea id="team-input"></textarea>
-      <div class="preset-btns"><button class="primary" id="team-run">Analyser l'équipe</button>
-        <button id="team-sample">Charger l'exemple</button></div>
+      <h2>Mon équipe</h2>
+      <div class="builder" id="team-builder"></div>
+      <div class="builder-actions">
+        <button class="primary" id="team-run">Analyser l'équipe</button>
+        <button id="team-sample">Charger l'exemple</button>
+        <button id="team-frombox">Depuis Mon Box</button>
+      </div>
     </div>
     <pre class="report" id="team-result" style="margin-top:14px"></pre>
   </section>
@@ -146,8 +153,8 @@
   <!-- ===== PREVIEW ===== -->
   <section class="tab-panel" id="tab-preview">
     <div class="grid-2">
-      <div class="panel attacker"><h2>Mon équipe (6) — JSON</h2><textarea id="prev-mine"></textarea></div>
-      <div class="panel defender"><h2>Adversaire (6) — JSON</h2><textarea id="prev-opp"></textarea></div>
+      <div class="panel attacker"><h2>Mon équipe</h2><div class="builder" id="prev-mine"></div></div>
+      <div class="panel defender"><h2>Adversaire (les 6 visibles)</h2><div class="builder" id="prev-opp"></div></div>
     </div>
     <div class="controls" style="grid-template-columns: 1fr auto auto;">
       <div><label>Format</label><select id="prev-format">
@@ -157,6 +164,19 @@
       <button id="prev-sample">Charger les exemples</button>
     </div>
     <pre class="report" id="preview-result" style="margin-top:14px"></pre>
+  </section>
+
+  <!-- ===== MON BOX ===== -->
+  <section class="tab-panel" id="tab-box">
+    <div class="panel">
+      <h2>Mon Box — Pokémon possédés (saisie manuelle)</h2>
+      <div class="builder" id="box-builder"></div>
+      <div class="builder-actions">
+        <button class="primary" id="box-save">Enregistrer</button>
+        <button id="box-reload">Recharger</button>
+        <span class="status" id="box-status"></span>
+      </div>
+    </div>
   </section>
 </main>
 

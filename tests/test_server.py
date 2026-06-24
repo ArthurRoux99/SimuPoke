@@ -88,3 +88,26 @@ def test_stats_endpoint_flags_illegal_spread():
 def test_unknown_species_raises():
     with pytest.raises(ValueError):
         server.api_stats({"species": "notamon"})
+
+
+def test_roster_get_returns_owned():
+    out = server.api_roster_get()
+    assert isinstance(out["roster"], list)
+    assert any(e["species"] == "tyranitar" for e in out["roster"])
+
+
+def test_roster_save_roundtrip(tmp_path):
+    target = tmp_path / "my_roster.json"
+    entries = [{"species": "garchomp", "nature": "jolly",
+                "stat_points": {"atk": 32, "spe": 32}, "moves": ["earthquake"]}]
+    res = server.api_roster_save({"roster": entries}, path=target)
+    assert res["ok"] and res["count"] == 1 and res["unknown"] == []
+    saved = json.loads(target.read_text(encoding="utf-8"))
+    assert saved["owned"][0]["species"] == "garchomp"
+
+
+def test_roster_save_flags_unknown_species(tmp_path):
+    target = tmp_path / "r.json"
+    res = server.api_roster_save({"roster": [{"species": "notamon", "nature": "serious"}]},
+                                 path=target)
+    assert "notamon" in res["unknown"]
