@@ -22,6 +22,7 @@ from .model import PokemonState, FieldState
 from .basestats import is_known, to_id
 from .moves import get_move, is_known as move_known
 from .damage import calculate, battle_stats
+from .usage import likely_set
 
 # Poids de la fonction de valeur (ajustables).
 W_OFFENSE = 1.0
@@ -72,12 +73,27 @@ class Incoming:
     max_pct: float            # % de mes PV max (roll haut)
     ohko: bool                # me met KO d'un coup ?
     known: bool = True
+    estimated: bool = False   # menace estimée via l'usage (coups non saisis)
 
 
 def _incoming(me: PokemonState, opp: PokemonState, field: FieldState | None,
-              opp_move: str | None) -> Incoming:
-    """Dégâts que l'adversaire m'inflige (action fournie, ou pire coup connu)."""
-    candidates = [opp_move] if opp_move else list(opp.moves)
+              opp_move: str | None, use_usage: bool = True) -> Incoming:
+    """Dégâts que l'adversaire m'inflige (action fournie, ou pire coup connu).
+
+    Si aucun coup adverse n'est connu, on estime via le set le plus probable de
+    l'espèce (usage, §10.3) — le résultat est marqué `estimated`.
+    """
+    estimated = False
+    if opp_move:
+        candidates = [opp_move]
+    elif opp.moves:
+        candidates = list(opp.moves)
+    elif use_usage and is_known(opp.species):
+        candidates = likely_set(opp.species).moves
+        estimated = bool(candidates)
+    else:
+        candidates = []
+
     best: Incoming | None = None
     for mv in candidates:
         if not mv or not move_known(mv) or get_move(mv).is_status:
@@ -87,8 +103,8 @@ def _incoming(me: PokemonState, opp: PokemonState, field: FieldState | None,
         except (ValueError, KeyError):
             continue
         cur = r.defender_current_hp
-        cand = Incoming(move=mv, max_pct=r.max_pct,
-                        ohko=(r.max_damage >= cur))
+        cand = Incoming(move=mv, max_pct=r.max_pct, ohko=(r.max_damage >= cur),
+                        estimated=estimated)
         if best is None or cand.max_pct > best.max_pct:
             best = cand
     if best is None:
@@ -127,7 +143,8 @@ class TurnAnalysis:
         else:
             mv = inc.move or "?"
             tag = " — OHKO sur moi !" if inc.ohko else ""
-            out.append(f"Menace adverse : {mv} ~{inc.max_pct:.0f}% max{tag}")
+            src = " [estimé via l'usage]" if inc.estimated else ""
+            out.append(f"Menace adverse : {mv} ~{inc.max_pct:.0f}% max{tag}{src}")
         out.append("")
         out.append("Mes options (classées) :")
         for i, e in enumerate(self.options, 1):
@@ -149,10 +166,15 @@ class TurnAnalysis:
 def analyze_turn(me: PokemonState, opp: PokemonState,
                  field: FieldState | None = None, *,
                  opp_move: str | None = None,
-                 my_moves: list[str] | None = None) -> TurnAnalysis:
-    """Classe mes coups pour le tour courant (mode analyse)."""
+                 my_moves: list[str] | None = None,
+                 use_usage: bool = True) -> TurnAnalysis:
+    """Classe mes coups pour le tour courant (mode analyse).
+
+    Si l'adversaire est connu mais ses coups non renseignés, la menace est
+    estimée à partir de son set le plus probable (usage, §10.3).
+    """
     my_moves = my_moves if my_moves is not None else list(me.moves)
-    incoming = _incoming(me, opp, field, opp_move)
+    incoming = _incoming(me, opp, field, opp_move, use_usage=use_usage)
     my_max_hp = battle_stats(me)["hp"]
     my_cur_hp = max(1, int(my_max_hp * max(0.0, min(1.0, me.current_hp_pct))) or my_max_hp)
     inc_frac = min(1.0, (incoming.max_pct / 100.0) * (my_max_hp / my_cur_hp)) \

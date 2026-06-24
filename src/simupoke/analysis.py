@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .basestats import get_base_stats, get_types
+from .basestats import get_base_stats, get_types, to_id
 from .typechart import effectiveness
 from .moves import get_move, is_known as move_known
 
@@ -18,6 +18,14 @@ STANDARD_TYPES = [
     "Ghost", "Grass", "Ground", "Ice", "Normal", "Poison", "Psychic", "Rock",
     "Steel", "Water",
 ]
+
+# Talents accordant une immunité à un type d'attaque (partagé avec le calc).
+ABILITY_TYPE_IMMUNITY: dict[str, str] = {
+    "levitate": "Ground", "eartheater": "Ground", "flashfire": "Fire",
+    "voltabsorb": "Electric", "lightningrod": "Electric", "motordrive": "Electric",
+    "waterabsorb": "Water", "stormdrain": "Water", "dryskin": "Water",
+    "sapsipper": "Grass",
+}
 
 
 def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
@@ -44,16 +52,31 @@ class DefensiveProfile:
         return len(self.resistances) + len(self.immunities)
 
     def takes(self, attacking_type: str) -> float:
-        """Multiplicateur subi face à un type d'attaque."""
-        return effectiveness(attacking_type, self.types)
+        """Multiplicateur subi face à un type d'attaque (talents inclus)."""
+        if attacking_type in self.immunities:
+            return 0.0
+        if attacking_type in self.weaknesses:
+            return self.weaknesses[attacking_type]
+        if attacking_type in self.resistances:
+            return self.resistances[attacking_type]
+        return 1.0
 
 
-def defensive_profile(species_or_types: str | list[str]) -> DefensiveProfile:
-    """Profil défensif d'une espèce (ID) ou d'une liste de types."""
+def defensive_profile(species_or_types: str | list[str],
+                      ability: str | None = None) -> DefensiveProfile:
+    """Profil défensif d'une espèce (ID) ou d'une liste de types.
+
+    Si `ability` accorde une immunité de type (Lévitation, Torche…), le type
+    concerné est traité comme immunité quelle que soit la composition de types.
+    """
     types = (get_types(species_or_types) if isinstance(species_or_types, str)
              else list(species_or_types))
     prof = DefensiveProfile(types=types)
+    immune_type = ABILITY_TYPE_IMMUNITY.get(to_id(ability)) if ability else None
     for atk in STANDARD_TYPES:
+        if atk == immune_type:
+            prof.immunities.append(atk)
+            continue
         mult = effectiveness(atk, types)
         if mult > 1:
             prof.weaknesses[atk] = mult

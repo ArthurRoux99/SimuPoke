@@ -28,16 +28,9 @@ from .typechart import effectiveness
 from .model import PokemonState, FieldState
 from .delta import type_change_for, personal_weather_for, ATE_POWER_MOD
 
-LEVEL = 50
+from .analysis import ABILITY_TYPE_IMMUNITY as _ABILITY_IMMUNITY
 
-# Talents accordant une immunité à un type d'attaque (annulent les dégâts).
-_ABILITY_IMMUNITY: dict[str, str] = {
-    "levitate": "Ground", "eartheater": "Ground",
-    "flashfire": "Fire",
-    "voltabsorb": "Electric", "lightningrod": "Electric", "motordrive": "Electric",
-    "waterabsorb": "Water", "stormdrain": "Water", "dryskin": "Water",
-    "sapsipper": "Grass",
-}
+LEVEL = 50
 
 
 # ---------------------------------------------------------------------------

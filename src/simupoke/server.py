@@ -147,7 +147,8 @@ def api_analyze(body: dict) -> dict:
     inc = a.incoming
     return {
         "incoming": {"move": inc.move, "maxPct": inc.max_pct,
-                     "ohko": inc.ohko, "known": inc.known},
+                     "ohko": inc.ohko, "known": inc.known,
+                     "estimated": inc.estimated},
         "options": [{"move": e.move, "minPct": e.min_pct, "maxPct": e.max_pct,
                      "ko": e.ko, "first": e.first, "value": e.value,
                      "notes": e.notes} for e in a.options],

@@ -183,10 +183,10 @@ justification et reco **essai 7 j vs permanent (2 500 VP)**.
   6 adverses, choisit les **3 (singles) / 4 (doubles)** à amener et l'**ordre
   d'envoi**, selon un score de matchup de types + vitesse, avec justification.
 
-> Limitations v1 (documentées) : le profil défensif est **purement typé** — les
-> immunités de talent (Levitate, Lévitation, etc.) ne sont pas encore prises en
-> compte ; le matchup preview est une **heuristique de types** (le calculateur
-> de dégâts pourra l'affiner ensuite).
+> Le profil défensif tient compte des **immunités de talent** (Lévitation,
+> Torche, Absorbe-Volt/Eau…) : un Motisma-Lavage à Lévitation n'est plus compté
+> faible au Sol. Limitation restante : le matchup *preview* est une **heuristique
+> de types** (le calculateur de dégâts pourra l'affiner ensuite).
 
 ## UI — page HTML autonome (thème sombre)
 
@@ -240,7 +240,9 @@ les exemples de `data/`. L'onglet **Mon Box** charge, édite et **enregistre**
 partir du calculateur de dégâts, en tenant compte du **KO**, de l'**ordre
 d'action** (priorité + vitesse, paralysie, Choice Scarf, Trick Room) et du
 **risque** (dégâts subis). L'action adverse peut être **fournie** (info quasi
-parfaite) ou **estimée** depuis ses coups connus.
+parfaite), **déduite** des coups déjà observés, ou — si rien n'est connu —
+**estimée via le set le plus probable de l'espèce** (modèle d'usage §10.3,
+signalée « estimé via l'usage »).
 
 > Limitations v1 (assumées) : un seul tour, centré sur les coups offensifs (les
 > coups de statut sont listés mais non évalués) ; pas de changement ni de
@@ -315,8 +317,10 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] UI — serveur local v1 : tous les modules (Dégâts/B1/B2/B3) via API Python.
 - [x] UI hébergée : éditeurs de Pokémon (sans JSON brut) + onglet « Mon Box » éditable.
 - [x] Modèle d'usage (§0.2) : importeur/format local + priors B2 + set probable adverse.
+- [x] B3 : immunités de talent (Lévitation…) dans le profil défensif.
+- [x] B1 : menace adverse estimée via l'usage quand les coups ne sont pas saisis.
 - [ ] Remplacer l'échantillon d'usage par un import réel limitless/pokedata (réseau, plus tard).
 - [ ] Saisir les base stats des nouvelles Méga Champions dans les données de régulation.
-- [ ] Importeur de stats d'usage (limitless / pokedata) → priors B2 + adversaire (§0.2).
+- [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.
 - [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.
 - [ ] UI v2 — page HTML autonome (thème sombre, §12).

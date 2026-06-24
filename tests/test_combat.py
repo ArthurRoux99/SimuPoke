@@ -61,8 +61,30 @@ def test_trick_room_reverses_order():
     assert moves_first(slow, fast, "bodyslam", "earthquake", field) is True
 
 
-def test_incoming_unknown_when_no_opp_moves():
+def test_incoming_unknown_when_no_opp_moves_and_no_usage():
+    # Magikarp est absent de la table d'usage -> menace inconnue.
     me = mk("garchomp", "jolly", {"atk": 32, "spe": 32}, ["earthquake"])
-    opp = mk("tyranitar", "adamant", {"atk": 32}, [])
-    a = analyze_turn(me, opp)
+    a = analyze_turn(me, mk("magikarp", "serious", {}, []))
+    assert a.incoming.known is False
+    assert a.incoming.estimated is False
+
+
+def test_incoming_estimated_via_usage():
+    # Incineroar est dans l'échantillon d'usage : menace estimée via son set probable.
+    me = mk("garchomp", "jolly", {"atk": 32, "spe": 32}, ["earthquake"])
+    a = analyze_turn(me, mk("incineroar", "careful", {}, []))
+    assert a.incoming.known is True
+    assert a.incoming.estimated is True
+    assert a.incoming.move is not None
+
+
+def test_explicit_opp_moves_not_marked_estimated():
+    me = mk("garchomp", "jolly", {"atk": 32, "spe": 32}, ["earthquake"])
+    a = analyze_turn(me, mk("incineroar", "careful", {}, ["knockoff"]))
+    assert a.incoming.estimated is False
+
+
+def test_usage_disabled_falls_back_to_unknown():
+    me = mk("garchomp", "jolly", {"atk": 32, "spe": 32}, ["earthquake"])
+    a = analyze_turn(me, mk("incineroar", "careful", {}, []), use_usage=False)
     assert a.incoming.known is False

@@ -68,7 +68,8 @@ def team_defensive_weaknesses(team: list[OwnedPokemon]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for atk in STANDARD_TYPES:
         n = sum(1 for m in team
-                if is_known(m.species) and defensive_profile(m.species).takes(atk) > 1)
+                if is_known(m.species)
+                and defensive_profile(m.species, m.ability).takes(atk) > 1)
         if n:
             counts[atk] = n
     return counts

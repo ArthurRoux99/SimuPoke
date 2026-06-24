@@ -62,18 +62,19 @@ def team_threats(roster: list[OwnedPokemon]) -> set[str]:
     for atk in STANDARD_TYPES:
         weak = sum(
             1 for m in roster
-            if is_known(m.species) and defensive_profile(m.species).takes(atk) > 1
+            if is_known(m.species)
+            and defensive_profile(m.species, m.ability).takes(atk) > 1
         )
         if weak >= threshold:
             threats.add(atk)
     return threats
 
 
-def _synergy_score(species: str, threats: set[str],
+def _synergy_score(species: str, ability: str | None, threats: set[str],
                    roster: list[OwnedPokemon]) -> tuple[float, list[str]]:
     if not roster:
         return 0.5, []
-    prof = defensive_profile(species)
+    prof = defensive_profile(species, ability)
     covered = [t for t in threats
                if prof.takes(t) < 1]               # résiste/immunise une menace
     stacked = [t for t in prof.weaknesses
@@ -127,7 +128,7 @@ def evaluate_candidate(cand: OwnedPokemon, *, roster: list[OwnedPokemon] | None 
         )
 
     bst = base_stat_total(species)
-    prof = defensive_profile(species)
+    prof = defensive_profile(species, cand.ability)
     off_types = offensive_types(species, cand.moves)
     cov = coverage_count(off_types)
     role = infer_role(species, cand.moves)
@@ -137,7 +138,7 @@ def evaluate_candidate(cand: OwnedPokemon, *, roster: list[OwnedPokemon] | None 
     sub["defense"] = _clamp(0.5 + 0.08 * (prof.n_resist - prof.n_weak))
     sub["coverage"] = _clamp(cov / 12)
     sub["role"] = _clamp(role.score)
-    syn_score, syn_reasons = _synergy_score(species, threats, roster)
+    syn_score, syn_reasons = _synergy_score(species, cand.ability, threats, roster)
     sub["synergy"] = syn_score
     if usage_prior and to_id(species) in {to_id(k): k for k in usage_prior}:
         # tolère des clés en nom d'affichage ou ID

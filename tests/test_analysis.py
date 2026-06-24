@@ -52,3 +52,19 @@ def test_infer_role_sweeper_vs_wall():
 
 def test_base_stat_total():
     assert base_stat_total("tyranitar") == 600
+
+
+def test_defensive_profile_ability_immunity():
+    # Rotom-Wash (Eau/Électrik) est faible au Sol par typage, mais Lévitation immunise.
+    by_type = defensive_profile("rotomwash")
+    assert by_type.takes("Ground") == 2.0
+    assert "Ground" in by_type.weaknesses
+    with_levitate = defensive_profile("rotomwash", "levitate")
+    assert with_levitate.takes("Ground") == 0.0
+    assert "Ground" in with_levitate.immunities
+    assert "Ground" not in with_levitate.weaknesses
+
+
+def test_defensive_profile_ability_none_unchanged():
+    assert defensive_profile("garchomp").weaknesses == \
+        defensive_profile("garchomp", "roughskin").weaknesses
