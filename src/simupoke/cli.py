@@ -7,6 +7,8 @@ Usage :
         [--crit] [--spread] [--weather X] [--item-atk X] [--ability-atk X]
         [--atk-sp k=v,...] [--def-sp k=v,...] [--boost-atk N]
     python -m simupoke.cli draft <lineup.json> [--no-roster]   # B2 aide au tirage
+    python -m simupoke.cli team <team.json>                     # B3 analyse d'équipe
+    python -m simupoke.cli preview <my_team.json> <opp.json> [--format singles|doubles]
 """
 
 from __future__ import annotations
@@ -19,8 +21,9 @@ from .i18n import stat_label, label
 from .loaders import load_my_roster
 from .model import PokemonState, FieldState
 from .damage import calculate
-from .loaders import load_lineup
+from .loaders import load_lineup, load_team
 from .draft import rank_lineup
+from .team import analyze_team, select_team_preview
 
 
 def _print_stats(species: str, stats: dict[str, int]) -> None:
@@ -170,6 +173,50 @@ def cmd_draft(args: list[str]) -> int:
     return 0
 
 
+def cmd_team(args: list[str]) -> int:
+    pos = [a for a in args if not a.startswith("--")]
+    if len(pos) != 1:
+        print("Usage : team <team.json>", file=sys.stderr)
+        return 2
+    try:
+        team = load_team(pos[0])
+    except FileNotFoundError as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    print(f"Analyse d'équipe — {len(team)} Pokémon"
+          f" ({', '.join(label('species', m.species) for m in team)})\n")
+    for line in analyze_team(team).lines():
+        print(line)
+    return 0
+
+
+def cmd_preview(args: list[str]) -> int:
+    pos: list[str] = []
+    fmt = "singles"
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--format":
+            fmt = args[i + 1] if i + 1 < len(args) else fmt
+            i += 1
+        elif not a.startswith("--"):
+            pos.append(a)
+        i += 1
+    if len(pos) != 2:
+        print("Usage : preview <my_team.json> <opp.json> [--format singles|doubles]",
+              file=sys.stderr)
+        return 2
+    try:
+        my_team = load_team(pos[0])
+        opp = load_team(pos[1])
+    except FileNotFoundError as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    for line in select_team_preview(my_team, opp, fmt).lines():
+        print(line)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     if not argv:
@@ -184,6 +231,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_damage(rest)
     if cmd == "draft":
         return cmd_draft(rest)
+    if cmd == "team":
+        return cmd_team(rest)
+    if cmd == "preview":
+        return cmd_preview(rest)
     print(f"Commande inconnue : {cmd!r}", file=sys.stderr)
     return 2
 

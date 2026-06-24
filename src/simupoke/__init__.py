@@ -16,7 +16,7 @@ from .basestats import get_base_stats, get_species, get_types, is_known, to_id
 from .model import (
     OwnedPokemon, PokemonState, SideState, FieldState, BattleState,
 )
-from .loaders import load_my_roster, load_regulation, load_lineup
+from .loaders import load_my_roster, load_regulation, load_lineup, load_team
 from .moves import Move, get_move
 from .typechart import effectiveness
 from .damage import calculate, battle_stats, DamageResult
@@ -25,6 +25,10 @@ from .analysis import (
     base_stat_total, DefensiveProfile, RoleAssessment,
 )
 from .draft import rank_lineup, evaluate_candidate, DraftEvaluation, team_threats
+from .team import (
+    analyze_team, select_team_preview, TeamReport, PreviewResult,
+    matchup_score, check_clauses,
+)
 from . import i18n
 
 __all__ = [
@@ -33,11 +37,13 @@ __all__ = [
     "Build", "compute_stat", "compute_all_stats", "nature_multipliers", "validate_sp",
     "get_base_stats", "get_species", "get_types", "is_known", "to_id",
     "OwnedPokemon", "PokemonState", "SideState", "FieldState", "BattleState",
-    "load_my_roster", "load_regulation", "load_lineup",
+    "load_my_roster", "load_regulation", "load_lineup", "load_team",
     "Move", "get_move", "effectiveness",
     "calculate", "battle_stats", "DamageResult",
     "defensive_profile", "offensive_types", "coverage_count", "infer_role",
     "base_stat_total", "DefensiveProfile", "RoleAssessment",
     "rank_lineup", "evaluate_candidate", "DraftEvaluation", "team_threats",
+    "analyze_team", "select_team_preview", "TeamReport", "PreviewResult",
+    "matchup_score", "check_clauses",
     "i18n",
 ]

@@ -1,0 +1,20 @@
+{
+  "_help": {
+    "description": "Exemple d'équipe adverse (les 6 visibles au matchmaking). Sert de fixture pour l'assistant team preview.",
+    "note": "Côté adverse, builds partiellement connus ; les moves sont indicatifs."
+  },
+  "team": [
+    { "species": "dragapult", "nature": "jolly",
+      "moves": ["dragondarts", "phantomforce", "uturn"] },
+    { "species": "kingambit", "nature": "adamant",
+      "moves": ["suckerpunch", "ironhead", "kowtowcleave"] },
+    { "species": "greatTusk", "nature": "jolly",
+      "moves": ["headlongrush", "closecombat", "iceSpinner"] },
+    { "species": "ironvaliant", "nature": "naive",
+      "moves": ["moonblast", "closecombat", "knockoff"] },
+    { "species": "gholdengo", "nature": "modest",
+      "moves": ["makeitrain", "shadowball", "thunderbolt"] },
+    { "species": "ursaluna", "nature": "brave",
+      "moves": ["facade", "headlongrush", "crunch"] }
+  ]
+}

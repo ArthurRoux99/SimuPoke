@@ -1,0 +1,26 @@
+{
+  "_help": {
+    "description": "Exemple d'équipe de 6 (mon côté). Schéma identique à my_roster.json. Sert de démo/fixture pour B3.",
+    "note": "Items distincts pour respecter l'Item Clause ; espèces distinctes."
+  },
+  "team": [
+    { "species": "garchomp", "nature": "jolly", "item": "lifeorb",
+      "stat_points": { "atk": 32, "spe": 32, "hp": 2 },
+      "moves": ["earthquake", "dragonclaw", "stoneedge", "swordsdance"] },
+    { "species": "incineroar", "nature": "careful", "item": "assaultvest",
+      "stat_points": { "hp": 32, "spd": 20, "atk": 14 },
+      "moves": ["fakeout", "knockoff", "flareblitz", "uturn"] },
+    { "species": "rotomwash", "nature": "modest", "item": "leftovers",
+      "stat_points": { "hp": 28, "spa": 28, "def": 10 },
+      "moves": ["hydropump", "voltswitch", "willowisp", "protect"] },
+    { "species": "fluttermane", "nature": "timid", "item": "choicespecs",
+      "stat_points": { "spa": 32, "spe": 32, "hp": 2 },
+      "moves": ["moonblast", "shadowball", "thunderbolt", "dazzlinggleam"] },
+    { "species": "ironhands", "nature": "adamant", "item": "choiceband",
+      "stat_points": { "hp": 28, "atk": 32, "spd": 6 },
+      "moves": ["drainpunch", "wildcharge", "thunderpunch", "fakeout"] },
+    { "species": "amoonguss", "nature": "relaxed", "item": "rockyhelmet",
+      "stat_points": { "hp": 32, "def": 20, "spd": 14 },
+      "moves": ["spore", "ragepowder", "pollenpuff", "protect"] }
+  ]
+}

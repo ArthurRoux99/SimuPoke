@@ -20,7 +20,7 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 |---|---|---|
 | 0 | Socle données + conversion SP→stats + damage calc | ✅ |
 | 1 | B2 — Aide au tirage (Roster Ranch) | 🟡 v1 (sans priors d'usage) |
-| 2 | B3 — Team builder + team preview | ⏳ |
+| 2 | B3 — Team builder + team preview | 🟡 v1 (matchups par types) |
 | 3 | B1 — Mode analyse (Singles) | ⏳ |
 | 4 | B1 — Mode simultané (MCTS/ISMCTS) | ⏳ |
 | 5 | Doubles | ⏳ |
@@ -58,6 +58,8 @@ SimuPoke/
 │   ├── calc_reference.mjs       # scénarios de référence @smogon/calc (tests)
 │   └── package.json
 ├── data/sample_lineup.json      # exemple de tirage (démo/fixture B2)
+├── data/sample_team.json        # exemple d'équipe (démo/fixture B3)
+├── data/sample_opponent.json    # exemple d'équipe adverse (team preview)
 ├── src/simupoke/
 │   ├── stats.py                  # modèle de stats figé (conversion SP→stats)
 │   ├── basestats.py              # base stats + méta (lit data/pokedex.json)
@@ -66,9 +68,10 @@ SimuPoke/
 │   ├── damage.py                # calculateur de dégâts (Gen 5+, parité @smogon/calc)
 │   ├── analysis.py              # typage défensif/offensif + inférence de rôle
 │   ├── draft.py                 # B2 — scoring/classement du tirage
+│   ├── team.py                  # B3 — analyse d'équipe + assistant team preview
 │   ├── model.py                  # OwnedPokemon + état de combat (Doubles-ready)
 │   ├── i18n.py                   # couche d'affichage FR/EN
-│   ├── loaders.py                # chargement roster + régulation + lineup
+│   ├── loaders.py                # chargement roster + régulation + lineup + équipe
 │   └── cli.py                    # CLI de validation du pipeline
 └── tests/                        # tests pytest
 ```
@@ -122,6 +125,22 @@ justification et reco **essai 7 j vs permanent (2 500 VP)**.
 > de stats d'usage (limitless / pokedata, §0.2) n'est pas branché : il suffira
 > de passer `usage_prior={espèce: 0..1}` à `rank_lineup` — rien d'autre ne change.
 
+## B3 — Team builder & assistant team preview
+
+`simupoke.team` couvre deux besoins (§11.2, §11.4), sans dépendance externe :
+
+- **Analyse d'équipe** (`analyze_team`) : vérification des **clauses** (Species,
+  Item), **trous défensifs** (faiblesses partagées par ≥ la moitié de l'équipe),
+  **couverture offensive manquante**, distribution des **rôles**.
+- **Assistant team preview** (`select_team_preview`) : à partir de mes 6 et des
+  6 adverses, choisit les **3 (singles) / 4 (doubles)** à amener et l'**ordre
+  d'envoi**, selon un score de matchup de types + vitesse, avec justification.
+
+> Limitations v1 (documentées) : le profil défensif est **purement typé** — les
+> immunités de talent (Levitate, Lévitation, etc.) ne sont pas encore prises en
+> compte ; le matchup preview est une **heuristique de types** (le calculateur
+> de dégâts pourra l'affiner ensuite).
+
 ## Démarrage rapide
 
 ```bash
@@ -151,6 +170,12 @@ python -m simupoke.cli damage garchomp adamant earthquake tyranitar jolly \
 # B2 — Aide au tirage : classer les 10 Pokémon du jour
 python -m simupoke.cli draft data/sample_lineup.json
 #   -> classement /100 + rôle + reco essai/permanent + justification
+
+# B3 — Analyse d'équipe (clauses, trous défensifs, couverture, rôles)
+python -m simupoke.cli team data/sample_team.json
+
+# B3 — Assistant team preview : quoi amener face à l'adversaire
+python -m simupoke.cli preview data/sample_team.json data/sample_opponent.json --format doubles
 ```
 
 > Sans installation, on peut aussi lancer depuis la racine du dépôt avec
@@ -171,6 +196,9 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Brancher une vraie source de base stats (`@pkmn/dex`) → `data/pokedex.json`.
 - [x] Calculateur de dégâts (formule Gen 5+, parité `@smogon/calc`).
 - [x] B2 — Aide au tirage v1 (scoring, classement, justification, reco).
+- [x] B3 — Team builder + assistant team preview v1 (clauses, trous, matchups).
+- [ ] Affiner B3 : immunités de talent dans le profil défensif ; matchup preview
+      via le calculateur de dégâts plutôt que les seuls types.
 - [ ] Importeur de stats d'usage (limitless / pokedata) → priors B2 + adversaire (§0.2).
 - [ ] Intégrer le delta Champions au calc (Méga + talents §7.2) via les modificateurs.
-- [ ] B3 — Team builder + assistant team preview (§11.2, §11.4).
+- [ ] B1 — Assistant de combat (mode analyse, §10.1).

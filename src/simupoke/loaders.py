@@ -64,6 +64,13 @@ def load_lineup(path: str | Path) -> list[OwnedPokemon]:
     return [_parse_owned(e) for e in entries]
 
 
+def load_team(path: str | Path) -> list[OwnedPokemon]:
+    """Charge une équipe (clé `team`, à défaut `lineup`/`owned`)."""
+    raw = _read_json(Path(path))
+    entries = raw.get("team", raw.get("lineup", raw.get("owned", [])))
+    return [_parse_owned(e) for e in entries]
+
+
 # ---------------------------------------------------------------------------
 # Régulation courante
 # ---------------------------------------------------------------------------
