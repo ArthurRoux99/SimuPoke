@@ -93,7 +93,8 @@ Les base stats proviennent de **`@pkmn/dex`** (source nommée au §12), alignée
 sur les IDs Showdown utilisés en interne. Elles sont **figées dans un fichier
 versionné** `data/pokedex.json` (1300+ espèces, formes Méga incluses), de sorte
 que le runtime reste **100 % hors-ligne** (§3) — aucune requête réseau pendant
-l'utilisation de l'outil.
+l'utilisation de l'outil. (`@pkmn/dex` ≥ 0.10.11 intègre les Méga custom de
+Pokémon Champions ; régénérer le fichier les inclut automatiquement.)
 
 > Les base stats sont identiques à celles du jeu principal : Champions ne change
 > que le système IV/SP, pas les stats de base (§4.3).
@@ -138,9 +139,11 @@ opération **de données**, sans toucher au moteur :
 
 Les talents purement « moteur » (Piercing Drill = passe Protect, Spicy Spray =
 brûlure au contact) ne sont pas des modificateurs de dégâts et relèveront du
-simulateur de tour. Les **nouvelles Méga** absentes de `@pkmn/dex` (Feraligatr,
-Meganium…) ont leur *mécanique* en place ; il reste à saisir leurs **base stats
-réelles** dans les données de régulation (pas de valeurs inventées).
+simulateur de tour. Les **nouvelles Méga Champions** (Feraligatr-Mega à
+Dragonize, Meganium-Mega à Mega Sol, Floette-Mega, Scovillain-Mega…) ont
+désormais leurs **base stats réelles** : elles figurent dans `@pkmn/dex`
+(≥ 0.10.11, qui intègre les données du mod Champions de Showdown) et sont donc
+incluses automatiquement dans `data/pokedex.json` — aucune valeur inventée.
 
 ## B2 — Aide au tirage (Roster Ranch)
 
@@ -341,7 +344,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] B1 : menace adverse estimée via l'usage quand les coups ne sont pas saisis.
 - [x] Importeur réseau de stats d'usage (Showdown chaos) → `usage_import` / `simupoke-import-usage`.
 - [x] Lancer l'import sur une vraie source (Smogon chaos, Champions Reg M-A 1630, 2026-05) → remplace l'échantillon.
-- [ ] Saisir les base stats des nouvelles Méga Champions dans les données de régulation.
+- [x] Base stats des nouvelles Méga Champions : `@pkmn/dex` ≥ 0.10.11 + régénération de `data/pokedex.json` (24 Méga ajoutées, p. ex. Feraligatr/Meganium/Floette-Mega).
+- [ ] Ré-importer l'usage sur Reg M-B dès que Smogon le publie (`simupoke-import-usage`).
 - [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.
-- [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.
-- [ ] UI v2 — page HTML autonome (thème sombre, §12).
+- [ ] Doubles (Phase 5) ; apprentissage optionnel (Phase 6).
