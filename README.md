@@ -21,7 +21,7 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 | 0 | Socle données + conversion SP→stats + damage calc | ✅ |
 | 1 | B2 — Aide au tirage (Roster Ranch) | 🟡 v1 (sans priors d'usage) |
 | 2 | B3 — Team builder + team preview | 🟡 v1 (matchups par types) |
-| 3 | B1 — Mode analyse (Singles) | ⏳ |
+| 3 | B1 — Mode analyse (Singles) | 🟡 v1 (analyse 1 tour) |
 | 4 | B1 — Mode simultané (MCTS/ISMCTS) | ⏳ |
 | 5 | Doubles | ⏳ |
 | 6 | (optionnel) Apprentissage | ⏳ |
@@ -69,6 +69,7 @@ SimuPoke/
 │   ├── analysis.py              # typage défensif/offensif + inférence de rôle
 │   ├── draft.py                 # B2 — scoring/classement du tirage
 │   ├── team.py                  # B3 — analyse d'équipe + assistant team preview
+│   ├── combat.py                # B1 — assistant de combat (mode analyse, 1 tour)
 │   ├── model.py                  # OwnedPokemon + état de combat (Doubles-ready)
 │   ├── i18n.py                   # couche d'affichage FR/EN
 │   ├── loaders.py                # chargement roster + régulation + lineup + équipe
@@ -106,11 +107,13 @@ node gen_moves.mjs     # réécrit ../data/moves.json + typechart.json
 (modificateurs chaînés en base 4096, `pokeRound`, 16 rolls 85–100 %), avec
 **parité vérifiée contre `@smogon/calc`** (12 scénarios, `tests/test_damage.py`).
 
-Couvert en Phase 0 : STAB (×1.5 / ×2 Adaptability), efficacité des types, coup
-critique, brûlure, météo, terrains, esquive multi-cibles, boosts ; items
-Choice Band/Specs, Life Orb, Expert Belt, Assault Vest ; talents Huge/Pure
-Power, Guts, Technician, Tinted Lens, Neuroforce, Multiscale, Filter & co.
-Le « delta » Champions (§7.2) s'ajoutera via les mêmes listes de modificateurs.
+Couvert : STAB (×1.5 / ×2 Adaptability), efficacité des types, coup critique,
+brûlure, météo, terrains, esquive multi-cibles, boosts ; items Choice
+Band/Specs, Life Orb, Expert Belt, Assault Vest ; talents Huge/Pure Power,
+Guts, Technician, Tinted Lens, Neuroforce, Multiscale, Filter & co. ; **talents
+défensifs** : immunités (Lévitation, Torche, Absorbe-Volt/Eau, etc.) et
+réductions (Thick Fat, Heatproof). Le « delta » Champions (§7.2) s'ajoutera via
+les mêmes listes de modificateurs.
 
 ## B2 — Aide au tirage (Roster Ranch)
 
@@ -140,6 +143,20 @@ justification et reco **essai 7 j vs permanent (2 500 VP)**.
 > immunités de talent (Levitate, Lévitation, etc.) ne sont pas encore prises en
 > compte ; le matchup preview est une **heuristique de types** (le calculateur
 > de dégâts pourra l'affiner ensuite).
+
+## B1 — Assistant de combat (mode analyse)
+
+`simupoke.combat.analyze_turn` réalise une **analyse à 1 tour** (§10.1, palier
+« rapide et indicatif » §15 Q3) : elle classe mes coups par valeur attendue à
+partir du calculateur de dégâts, en tenant compte du **KO**, de l'**ordre
+d'action** (priorité + vitesse, paralysie, Choice Scarf, Trick Room) et du
+**risque** (dégâts subis). L'action adverse peut être **fournie** (info quasi
+parfaite) ou **estimée** depuis ses coups connus.
+
+> Limitations v1 (assumées) : un seul tour, centré sur les coups offensifs (les
+> coups de statut sont listés mais non évalués) ; pas de changement ni de
+> recherche d'arbre — ce sera la **Phase 4** (MCTS/ISMCTS, §10.2). Build adverse
+> inconnu ⇒ nature neutre / 0 SP (le modèle d'usage §10.3 affinera).
 
 ## Démarrage rapide
 
@@ -176,6 +193,11 @@ python -m simupoke.cli team data/sample_team.json
 
 # B3 — Assistant team preview : quoi amener face à l'adversaire
 python -m simupoke.cli preview data/sample_team.json data/sample_opponent.json --format doubles
+
+# B1 — Assistant de combat (mode analyse) : classer mes coups ce tour
+python -m simupoke.cli analyze garchomp jolly earthquake,dragonclaw,stoneedge \
+    tyranitar adamant --me-sp atk=32,spe=32 --opp-move crunch
+#   -> menace adverse + options classées (dégâts, KO, ordre, risque) + reco
 ```
 
 > Sans installation, on peut aussi lancer depuis la racine du dépôt avec
@@ -197,8 +219,8 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Calculateur de dégâts (formule Gen 5+, parité `@smogon/calc`).
 - [x] B2 — Aide au tirage v1 (scoring, classement, justification, reco).
 - [x] B3 — Team builder + assistant team preview v1 (clauses, trous, matchups).
-- [ ] Affiner B3 : immunités de talent dans le profil défensif ; matchup preview
-      via le calculateur de dégâts plutôt que les seuls types.
+- [x] Talents défensifs dans le calc (immunités + Thick Fat/Heatproof).
+- [x] B1 — Assistant de combat, mode analyse v1 (analyse 1 tour, §10.1).
 - [ ] Importeur de stats d'usage (limitless / pokedata) → priors B2 + adversaire (§0.2).
 - [ ] Intégrer le delta Champions au calc (Méga + talents §7.2) via les modificateurs.
-- [ ] B1 — Assistant de combat (mode analyse, §10.1).
+- [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.

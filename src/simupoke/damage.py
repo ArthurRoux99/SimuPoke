@@ -29,6 +29,15 @@ from .model import PokemonState, FieldState
 
 LEVEL = 50
 
+# Talents accordant une immunité à un type d'attaque (annulent les dégâts).
+_ABILITY_IMMUNITY: dict[str, str] = {
+    "levitate": "Ground", "eartheater": "Ground",
+    "flashfire": "Fire",
+    "voltabsorb": "Electric", "lightningrod": "Electric", "motordrive": "Electric",
+    "waterabsorb": "Water", "stormdrain": "Water", "dryskin": "Water",
+    "sapsipper": "Grass",
+}
+
 
 # ---------------------------------------------------------------------------
 # Primitives arithmétiques Showdown
@@ -234,6 +243,11 @@ def calculate(attacker: PokemonState, defender: PokemonState,
         at_mods.append(8192)
     if atk_ability == "guts" and attacker.status:
         at_mods.append(6144)
+    # Talents défensifs réduisant la stat offensive (Thick Fat, Heatproof).
+    if def_ability == "thickfat" and mv.type in ("Fire", "Ice"):
+        at_mods.append(2048)
+    if def_ability == "heatproof" and mv.type == "Fire":
+        at_mods.append(2048)
     if at_mods:
         attack = _apply_mod(attack, _chain_mods(at_mods))
     attack = max(1, attack)
@@ -305,6 +319,9 @@ def calculate(attacker: PokemonState, defender: PokemonState,
         stab_mod = 4096
 
     eff = effectiveness(mv.type, def_types)
+    # Immunités de talent du défenseur (annulent les dégâts).
+    if _ABILITY_IMMUNITY.get(def_ability) == mv.type:
+        eff = 0.0
     is_burned = (physical and defender is not None and attacker.status == "brn"
                  and atk_ability != "guts")
 

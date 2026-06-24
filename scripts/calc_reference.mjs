@@ -64,5 +64,19 @@ add('fireblast_av', { species: 'Garchomp', nature: 'Modest', evs: { spa: 248 } }
 add('eq_spread', { species: 'Garchomp', nature: 'Adamant', evs: { atk: 248 } },
   { species: 'Tyranitar', nature: 'Jolly', evs: { hp: 0 } }, { name: 'Earthquake' },
   { gameType: 'Doubles' });
+// 13. Thick Fat (défenseur), spécial Feu
+add('thickfat_fireblast', { species: 'Garchomp', nature: 'Modest', evs: { spa: 248 } },
+  { species: 'Snorlax', nature: 'Careful', evs: { hp: 0 }, ability: 'Thick Fat' },
+  { name: 'Fire Blast' });
+// 14. Thick Fat, physique Glace
+add('thickfat_ice', { species: 'Mamoswine', nature: 'Adamant', evs: { atk: 248 } },
+  { species: 'Snorlax', nature: 'Impish', evs: { hp: 0 }, ability: 'Thick Fat' },
+  { name: 'Icicle Crash' });
+// 15. Immunité de talent : Lévitation
+add('levitate_eq', { species: 'Garchomp', nature: 'Adamant', evs: { atk: 248 } },
+  { species: 'Rotom-Wash', ability: 'Levitate' }, { name: 'Earthquake' });
+// 16. Immunité de talent : Torche (Flash Fire)
+add('flashfire', { species: 'Garchomp', nature: 'Modest', evs: { spa: 248 } },
+  { species: 'Heatran', ability: 'Flash Fire' }, { name: 'Fire Blast' });
 
 console.log(JSON.stringify(scen, null, 1));

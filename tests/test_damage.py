@@ -47,6 +47,14 @@ CASES = [
     ("fireblast_av",       CHOMP_SP(),
      mk("tyranitar", "careful", {}, item="assaultvest"), "fireblast", {}, 15, 18),
     ("eq_spread",          CHOMP_AD(), TTAR(), "earthquake", {"apply_spread": True}, 132, 156),
+    ("thickfat_fireblast", CHOMP_SP(),
+     mk("snorlax", "careful", {}, ability="thickfat"), "fireblast", {}, 22, 26),
+    ("thickfat_ice",       mk("mamoswine", "adamant", {"atk": 31}),
+     mk("snorlax", "impish", {}, ability="thickfat"), "iciclecrash", {}, 51, 61),
+    ("levitate_eq",        CHOMP_AD(),
+     mk("rotomwash", "serious", {}, ability="levitate"), "earthquake", {}, 0, 0),
+    ("flashfire",          CHOMP_SP(),
+     mk("heatran", "serious", {}, ability="flashfire"), "fireblast", {}, 0, 0),
 ]
 
 

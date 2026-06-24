@@ -9,6 +9,9 @@ Usage :
     python -m simupoke.cli draft <lineup.json> [--no-roster]   # B2 aide au tirage
     python -m simupoke.cli team <team.json>                     # B3 analyse d'équipe
     python -m simupoke.cli preview <my_team.json> <opp.json> [--format singles|doubles]
+    python -m simupoke.cli analyze <me_species> <me_nature> <me_moves> <opp_species> <opp_nature>
+        [--opp-move X] [--opp-moves a,b,c] [--me-sp k=v,...] [--opp-sp k=v,...]
+        [--me-item X] [--opp-item X] [--me-hp 0..1] [--opp-hp 0..1] [--weather X]
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ from .damage import calculate
 from .loaders import load_lineup, load_team
 from .draft import rank_lineup
 from .team import analyze_team, select_team_preview
+from .combat import analyze_turn
 
 
 def _print_stats(species: str, stats: dict[str, int]) -> None:
@@ -217,6 +221,53 @@ def cmd_preview(args: list[str]) -> int:
     return 0
 
 
+def cmd_analyze(args: list[str]) -> int:
+    pos: list[str] = []
+    opts: dict[str, str] = {}
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a.startswith("--"):
+            opts[a[2:]] = args[i + 1] if i + 1 < len(args) else ""
+            i += 1
+        else:
+            pos.append(a)
+        i += 1
+    if len(pos) != 5:
+        print("Usage : analyze <me_species> <me_nature> <me_moves> "
+              "<opp_species> <opp_nature> [options]", file=sys.stderr)
+        return 2
+    me_species, me_nature, me_moves, opp_species, opp_nature = pos
+    for sp in (me_species, opp_species):
+        if not is_known(sp):
+            print(f"Espèce inconnue : {sp!r}", file=sys.stderr)
+            return 1
+    me = PokemonState(
+        species=me_species, nature=me_nature,
+        stat_points=_parse_sp(opts.get("me-sp", "")),
+        moves=[m.strip() for m in me_moves.split(",") if m.strip()],
+        item=opts.get("me-item"),
+        current_hp_pct=float(opts.get("me-hp", 1.0)),
+    )
+    opp = PokemonState(
+        species=opp_species, nature=opp_nature,
+        stat_points=_parse_sp(opts.get("opp-sp", "")),
+        moves=[m.strip() for m in opts.get("opp-moves", "").split(",") if m.strip()],
+        item=opts.get("opp-item"),
+        current_hp_pct=float(opts.get("opp-hp", 1.0)),
+    )
+    field = FieldState(weather=opts.get("weather"), terrain=opts.get("terrain"))
+    try:
+        analysis = analyze_turn(me, opp, field, opp_move=opts.get("opp-move"))
+    except (ValueError, KeyError) as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    print(f"{label('species', me_species)}  vs  {label('species', opp_species)}\n")
+    for line in analysis.lines():
+        print(line)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     if not argv:
@@ -235,6 +286,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_team(rest)
     if cmd == "preview":
         return cmd_preview(rest)
+    if cmd == "analyze":
+        return cmd_analyze(rest)
     print(f"Commande inconnue : {cmd!r}", file=sys.stderr)
     return 2
 

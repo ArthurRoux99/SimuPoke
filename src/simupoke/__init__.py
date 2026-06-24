@@ -29,6 +29,7 @@ from .team import (
     analyze_team, select_team_preview, TeamReport, PreviewResult,
     matchup_score, check_clauses,
 )
+from .combat import analyze_turn, TurnAnalysis, MoveEval, effective_speed, moves_first
 from . import i18n
 
 __all__ = [
@@ -45,5 +46,6 @@ __all__ = [
     "rank_lineup", "evaluate_candidate", "DraftEvaluation", "team_threats",
     "analyze_team", "select_team_preview", "TeamReport", "PreviewResult",
     "matchup_score", "check_clauses",
+    "analyze_turn", "TurnAnalysis", "MoveEval", "effective_speed", "moves_first",
     "i18n",
 ]
