@@ -22,7 +22,8 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 | 1 | B2 — Aide au tirage (Roster Ranch) | 🟡 v1 (sans priors d'usage) |
 | 2 | B3 — Team builder + team preview | 🟡 v1 (matchups par types) |
 | 3 | B1 — Mode analyse (Singles) | 🟡 v1 (analyse 1 tour) |
-| — | UI v2 — page HTML autonome (§12) | 🟡 v1 (calc de dégâts) |
+| — | UI — page HTML autonome (§12) | 🟡 v1 (calc de dégâts) |
+| — | UI — serveur local (tous les modules) | 🟡 v1 (Dégâts/B1/B2/B3) |
 | 4 | B1 — Mode simultané (MCTS/ISMCTS) | ⏳ |
 | 5 | Doubles | ⏳ |
 | 6 | (optionnel) Apprentissage | ⏳ |
@@ -57,7 +58,8 @@ SimuPoke/
 │   ├── index.html · style.css · app.js   # source de l'interface
 │   ├── engine.js                # moteur de dégâts JS (port de damage.py)
 │   ├── verify_engine.mjs        # parité JS vs vecteurs @smogon/calc
-│   └── dist/simupoke.html       # fichier autonome assemblé (généré)
+│   ├── dist/simupoke.html       # fichier autonome assemblé (généré)
+│   └── server/                  # frontend de la version hébergée (index.html + app.js)
 ├── scripts/
 │   ├── gen_pokedex.mjs           # génère data/pokedex.json (hors-ligne, via npm)
 │   ├── gen_moves.mjs            # génère data/moves.json + typechart.json
@@ -188,8 +190,27 @@ critique et attaque de zone, avec dégâts min–max, %, KO en N coups et le del
 Champions (ex. talent `dragonize`).
 
 > Source dans `web/` (`index.html` + `style.css` + `engine.js` + `app.js`),
-> assemblée par `scripts/build_web.py`. Les autres modules (B2/B3/B1) restent en
-> CLI pour l'instant ; ils rejoindront l'UI ensuite.
+> assemblée par `scripts/build_web.py`. Cette version autonome ne couvre que le
+> calcul de dégâts.
+
+### Version hébergée sur le PC (tous les modules)
+
+Pour **tous** les modules (Dégâts, Combat B1, Tirage B2, Équipe B3, Team
+preview) dans une seule interface, on lance un **serveur local** qui réutilise
+directement le moteur Python — une seule source de vérité, déjà testée. Stdlib
+seule, aucune dépendance.
+
+```bash
+python -m simupoke.server            # http://127.0.0.1:8000
+# ou, après `pip install -e .` :  simupoke-server --port 9000
+```
+
+Puis ouvrir <http://127.0.0.1:8000> : une UI sombre à onglets. Le frontend
+(`web/server/`) appelle l'API JSON `/api/*` ; toute la logique de jeu reste
+côté Python. Les onglets Tirage/Équipe/Preview acceptent un JSON (prérempli avec
+les exemples de `data/`). Rien ne sort de ta machine (§3).
+
+> API : `GET /api/meta|samples`, `POST /api/damage|analyze|draft|team|preview|stats`.
 
 ## B1 — Assistant de combat (mode analyse)
 
@@ -269,8 +290,9 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Talents défensifs dans le calc (immunités + Thick Fat/Heatproof).
 - [x] B1 — Assistant de combat, mode analyse v1 (analyse 1 tour, §10.1).
 - [x] Delta Champions au calc : talents -ate (dont Dragonize, piloté par données) + Mega Sol.
-- [x] UI v2 — page HTML autonome v1 (calculateur de dégâts, moteur JS à parité).
-- [ ] Étendre l'UI aux modules B2/B3/B1.
+- [x] UI — page HTML autonome v1 (calculateur de dégâts, moteur JS à parité).
+- [x] UI — serveur local v1 : tous les modules (Dégâts/B1/B2/B3) via API Python.
+- [ ] Soigner l'UI hébergée : formulaires dédiés (sans JSON brut) pour B2/B3.
 - [ ] Saisir les base stats des nouvelles Méga Champions dans les données de régulation.
 - [ ] Importeur de stats d'usage (limitless / pokedata) → priors B2 + adversaire (§0.2).
 - [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.

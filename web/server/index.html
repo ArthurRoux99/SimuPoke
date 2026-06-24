@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SimuPoke — assistant Champions</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>SimuPoke <span class="tag">Champions · serveur local</span></h1>
+  <p>Interface hébergée sur ton PC — branchée sur le moteur Python (calc + delta,
+     B1/B2/B3). Une seule source de vérité, déjà testée.</p>
+</header>
+
+<div class="tabs" id="tabs">
+  <button data-tab="damage" class="active">Dégâts</button>
+  <button data-tab="combat">Combat (B1)</button>
+  <button data-tab="draft">Tirage (B2)</button>
+  <button data-tab="team">Équipe (B3)</button>
+  <button data-tab="preview">Team preview</button>
+</div>
+
+<main>
+  <!-- ===== DÉGÂTS ===== -->
+  <section class="tab-panel active" id="tab-damage">
+    <div class="grid-2">
+      <div class="panel attacker">
+        <h2>Attaquant</h2>
+        <label>Espèce</label>
+        <input id="a-species" list="species-list" value="Garchomp" autocomplete="off">
+        <div class="row">
+          <div><label>Nature</label><select id="a-nature"></select></div>
+          <div><label>Statut</label><select id="a-status">
+            <option value="">aucun</option><option value="brn">brûlé</option>
+            <option value="par">paralysé</option></select></div>
+        </div>
+        <div class="row">
+          <div><label>Objet</label><input id="a-item" autocomplete="off"></div>
+          <div><label>Talent</label><input id="a-ability" autocomplete="off"></div>
+        </div>
+        <label>Stat Points</label><div class="sp-grid" id="a-sp"></div>
+        <div class="row">
+          <div><label>Boost Atq</label><select id="a-boost-atk" class="boost"></select></div>
+          <div><label>Boost Atq.Spé</label><select id="a-boost-spa" class="boost"></select></div>
+        </div>
+      </div>
+      <div class="panel defender">
+        <h2>Défenseur</h2>
+        <label>Espèce</label>
+        <input id="d-species" list="species-list" value="Tyranitar" autocomplete="off">
+        <div class="row">
+          <div><label>Nature</label><select id="d-nature"></select></div>
+          <div><label>PV restants (%)</label><input id="d-hp" type="number" min="1" max="100" value="100"></div>
+        </div>
+        <div class="row">
+          <div><label>Objet</label><input id="d-item" autocomplete="off"></div>
+          <div><label>Talent</label><input id="d-ability" autocomplete="off"></div>
+        </div>
+        <label>Stat Points</label><div class="sp-grid" id="d-sp"></div>
+        <div class="row">
+          <div><label>Boost Déf</label><select id="d-boost-def" class="boost"></select></div>
+          <div><label>Boost Déf.Spé</label><select id="d-boost-spd" class="boost"></select></div>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <div><label>Capacité</label><input id="move" list="move-list" value="Earthquake" autocomplete="off"></div>
+      <div><label>Météo</label><select id="weather">
+        <option value="">aucune</option><option value="sun">soleil</option>
+        <option value="rain">pluie</option><option value="sand">sable</option>
+        <option value="snow">neige</option></select></div>
+      <div><label>Terrain</label><select id="terrain">
+        <option value="">aucun</option><option value="electric">électrique</option>
+        <option value="grassy">herbu</option><option value="psychic">psychique</option>
+        <option value="misty">brumeux</option></select></div>
+      <div class="check"><input type="checkbox" id="crit"><label for="crit">Critique</label></div>
+      <div class="check"><input type="checkbox" id="spread"><label for="spread">Zone</label></div>
+    </div>
+    <div class="result" id="dmg-result"></div>
+  </section>
+
+  <!-- ===== COMBAT ===== -->
+  <section class="tab-panel" id="tab-combat">
+    <div class="grid-2">
+      <div class="panel attacker">
+        <h2>Mon Pokémon</h2>
+        <label>Espèce</label><input id="c-me-species" list="species-list" value="Garchomp" autocomplete="off">
+        <div class="row">
+          <div><label>Nature</label><select id="c-me-nature"></select></div>
+          <div><label>PV (%)</label><input id="c-me-hp" type="number" min="1" max="100" value="100"></div>
+        </div>
+        <label>Mes capacités (séparées par des virgules)</label>
+        <input id="c-me-moves" value="earthquake, dragonclaw, stoneedge, swordsdance" autocomplete="off">
+        <label>SP</label><div class="sp-grid" id="c-me-sp"></div>
+      </div>
+      <div class="panel defender">
+        <h2>Adversaire</h2>
+        <label>Espèce</label><input id="c-opp-species" list="species-list" value="Tyranitar" autocomplete="off">
+        <div class="row">
+          <div><label>Nature</label><select id="c-opp-nature"></select></div>
+          <div><label>PV (%)</label><input id="c-opp-hp" type="number" min="1" max="100" value="100"></div>
+        </div>
+        <label>Action adverse (optionnel)</label>
+        <input id="c-opp-move" placeholder="ex. crunch" autocomplete="off">
+        <label>Capacités adverses connues</label>
+        <input id="c-opp-moves" value="crunch, rockslide, earthquake" autocomplete="off">
+      </div>
+    </div>
+    <div class="controls" style="grid-template-columns: 1fr 1fr auto;">
+      <div><label>Météo</label><select id="c-weather">
+        <option value="">aucune</option><option value="sun">soleil</option>
+        <option value="rain">pluie</option><option value="sand">sable</option>
+        <option value="snow">neige</option></select></div>
+      <div><label>Terrain</label><select id="c-terrain">
+        <option value="">aucun</option><option value="electric">électrique</option>
+        <option value="grassy">herbu</option><option value="psychic">psychique</option>
+        <option value="misty">brumeux</option></select></div>
+      <button class="primary" id="c-run">Analyser le tour</button>
+    </div>
+    <pre class="report" id="combat-result"></pre>
+  </section>
+
+  <!-- ===== TIRAGE ===== -->
+  <section class="tab-panel" id="tab-draft">
+    <div class="panel">
+      <h2>Tirage du jour (10 Pokémon) — JSON</h2>
+      <textarea id="draft-input"></textarea>
+      <div class="preset-btns"><button class="primary" id="draft-run">Classer le tirage</button>
+        <button id="draft-sample">Charger l'exemple</button></div>
+    </div>
+    <div class="list-result" id="draft-result" style="margin-top:14px"></div>
+  </section>
+
+  <!-- ===== ÉQUIPE ===== -->
+  <section class="tab-panel" id="tab-team">
+    <div class="panel">
+      <h2>Mon équipe — JSON</h2>
+      <textarea id="team-input"></textarea>
+      <div class="preset-btns"><button class="primary" id="team-run">Analyser l'équipe</button>
+        <button id="team-sample">Charger l'exemple</button></div>
+    </div>
+    <pre class="report" id="team-result" style="margin-top:14px"></pre>
+  </section>
+
+  <!-- ===== PREVIEW ===== -->
+  <section class="tab-panel" id="tab-preview">
+    <div class="grid-2">
+      <div class="panel attacker"><h2>Mon équipe (6) — JSON</h2><textarea id="prev-mine"></textarea></div>
+      <div class="panel defender"><h2>Adversaire (6) — JSON</h2><textarea id="prev-opp"></textarea></div>
+    </div>
+    <div class="controls" style="grid-template-columns: 1fr auto auto;">
+      <div><label>Format</label><select id="prev-format">
+        <option value="singles">Singles (amener 3)</option>
+        <option value="doubles">Doubles (amener 4)</option></select></div>
+      <button class="primary" id="prev-run">Conseiller la sélection</button>
+      <button id="prev-sample">Charger les exemples</button>
+    </div>
+    <pre class="report" id="preview-result" style="margin-top:14px"></pre>
+  </section>
+</main>
+
+<footer>
+  Serveur : <code>python -m simupoke.server</code>. API JSON sous <code>/api/*</code>.
+  Identifiants au style Showdown (anglais) ; la saisie tolère noms FR/EN et casse.
+</footer>
+
+<datalist id="species-list"></datalist>
+<datalist id="move-list"></datalist>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

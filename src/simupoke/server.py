@@ -1,0 +1,284 @@
+"""Serveur local SimuPoke — UI hébergée sur le PC (§0.4, §12).
+
+Sert le frontend et expose une **API JSON** qui réutilise directement le moteur
+Python (calc + delta Champions, B1/B2/B3) — une seule source de vérité, déjà
+testée. Uniquement la bibliothèque standard (`http.server`), aucune dépendance.
+
+    python -m simupoke.server            # http://127.0.0.1:8000
+    python -m simupoke.server --port 9000 --host 0.0.0.0
+
+Endpoints :
+    GET  /                      page principale (onglets)
+    GET  /static/<f>            fichiers statiques (css/js)
+    GET  /api/meta              listes (espèces, capacités, natures)
+    GET  /api/samples           jeux d'exemple (équipe, adversaire, tirage)
+    POST /api/stats             stats finales d'un build
+    POST /api/damage            calcul de dégâts
+    POST /api/analyze           B1 — analyse de tour
+    POST /api/draft             B2 — classement d'un tirage
+    POST /api/team              B3 — analyse d'équipe
+    POST /api/preview           B3 — assistant team preview
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+from .model import PokemonState, FieldState, OwnedPokemon
+from .stats import STAT_KEYS, NATURES, compute_all_stats, validate_sp
+from .basestats import get_base_stats, is_known, get_species
+from .damage import calculate, DamageResult
+from .combat import analyze_turn
+from .draft import rank_lineup
+from .team import analyze_team, select_team_preview
+from .loaders import load_my_roster, DATA_DIR
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+WEB_DIR = REPO_ROOT / "web"
+SERVER_WEB = WEB_DIR / "server"
+
+
+# ---------------------------------------------------------------------------
+# Construction d'objets depuis le JSON entrant
+# ---------------------------------------------------------------------------
+
+def _state(d: dict) -> PokemonState:
+    return PokemonState(
+        species=d.get("species", ""),
+        nature=d.get("nature", "serious"),
+        stat_points=d.get("stat_points", d.get("sp", {})) or {},
+        item=d.get("item") or None,
+        ability=d.get("ability") or None,
+        moves=d.get("moves", []) or [],
+        status=d.get("status") or None,
+        boosts=d.get("boosts", {}) or {},
+        current_hp_pct=float(d.get("current_hp_pct", d.get("hpPct", 1.0))),
+    )
+
+
+def _owned(d: dict) -> OwnedPokemon:
+    return OwnedPokemon(
+        species=d["species"], nature=d.get("nature", "serious"),
+        stat_points=d.get("stat_points", d.get("sp", {})) or {},
+        item=d.get("item"), ability=d.get("ability"),
+        moves=d.get("moves", []) or [],
+        is_shiny=d.get("is_shiny", False), has_title=d.get("has_title", False),
+        status_ownership=d.get("status_ownership", "permanent"),
+        trial_expires_in_days=d.get("trial_expires_in_days"),
+        display_fr=d.get("display_fr"),
+    )
+
+
+def _owned_list(entries: list[dict]) -> list[OwnedPokemon]:
+    return [_owned(e) for e in entries]
+
+
+# ---------------------------------------------------------------------------
+# Sérialisation des résultats
+# ---------------------------------------------------------------------------
+
+def _damage_json(r: DamageResult) -> dict:
+    return {
+        "move": r.move, "rolls": r.rolls,
+        "min": r.min_damage, "max": r.max_damage,
+        "minPct": r.min_pct, "maxPct": r.max_pct,
+        "maxHp": r.defender_max_hp, "curHp": r.defender_current_hp,
+        "eff": r.type_effectiveness, "isStab": r.is_stab, "crit": r.crit,
+        "koGuaranteed": r.guaranteed_ko_hits, "koPossible": r.possible_ko_hits,
+        "describe": r.describe(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+def api_meta() -> dict:
+    dex = _dex()
+    species = sorted(v["name"] for v in dex.values())
+    from .moves import _load_moves
+    moves = sorted(m["name"] for m in _load_moves().values()
+                   if m["category"] != "Status" and m["basePower"] > 0)
+    return {"species": species, "moves": moves, "natures": sorted(NATURES.keys())}
+
+
+def _dex() -> dict:
+    from .basestats import _load_dex
+    return _load_dex()
+
+
+def api_samples() -> dict:
+    out = {}
+    for key, fname in (("team", "sample_team.json"),
+                       ("opponent", "sample_opponent.json"),
+                       ("lineup", "sample_lineup.json")):
+        path = DATA_DIR / fname
+        if path.exists():
+            out[key] = json.loads(path.read_text(encoding="utf-8"))
+    return out
+
+
+def api_stats(body: dict) -> dict:
+    species = body["species"]
+    if not is_known(species):
+        raise ValueError(f"Espèce inconnue : {species}")
+    sp = body.get("stat_points", body.get("sp", {})) or {}
+    problems = validate_sp(sp)
+    stats = compute_all_stats(get_base_stats(species), sp, body.get("nature", "serious"))
+    return {"species": species, "stats": stats, "problems": problems}
+
+
+def api_damage(body: dict) -> dict:
+    r = calculate(_state(body["attacker"]), _state(body["defender"]),
+                  body["move"], FieldState(**(body.get("field") or {})),
+                  crit=body.get("crit", False),
+                  apply_spread=body.get("spread", False))
+    return _damage_json(r)
+
+
+def api_analyze(body: dict) -> dict:
+    me, opp = _state(body["me"]), _state(body["opp"])
+    field = FieldState(**(body.get("field") or {}))
+    a = analyze_turn(me, opp, field, opp_move=body.get("opp_move") or None)
+    inc = a.incoming
+    return {
+        "incoming": {"move": inc.move, "maxPct": inc.max_pct,
+                     "ohko": inc.ohko, "known": inc.known},
+        "options": [{"move": e.move, "minPct": e.min_pct, "maxPct": e.max_pct,
+                     "ko": e.ko, "first": e.first, "value": e.value,
+                     "notes": e.notes} for e in a.options],
+        "other": [e.move for e in a.other],
+        "recommendation": a.recommendation,
+        "lines": a.lines(),
+    }
+
+
+def api_draft(body: dict) -> dict:
+    lineup = _owned_list(body["lineup"])
+    roster = (_owned_list(body["roster"]) if body.get("roster") is not None
+              else load_my_roster())
+    evals = rank_lineup(lineup, roster=roster, usage_prior=body.get("usage_prior"))
+    return {"ranking": [{"species": e.species, "score": e.score100,
+                         "role": e.role_fr, "recommendation": e.recommendation,
+                         "reasons": e.reasons, "shiny": e.is_shiny}
+                        for e in evals]}
+
+
+def api_team(body: dict) -> dict:
+    report = analyze_team(_owned_list(body["team"]))
+    return {
+        "size": report.size,
+        "sharedWeaknesses": report.shared_weaknesses,
+        "offensiveGaps": report.offensive_gaps,
+        "roles": report.roles,
+        "clauseViolations": report.clause_violations,
+        "lines": report.lines(),
+    }
+
+
+def api_preview(body: dict) -> dict:
+    res = select_team_preview(_owned_list(body["my_team"]),
+                              _owned_list(body["opp_team"]),
+                              body.get("format", "singles"))
+    pick = lambda p: {"species": p.species, "value": p.value,
+                      "beats": p.beats, "threatenedBy": p.threatened_by}
+    return {"fmt": res.fmt, "bring": res.bring,
+            "picks": [pick(p) for p in res.picks],
+            "bench": [pick(p) for p in res.bench],
+            "lines": res.lines()}
+
+
+_POST_ROUTES = {
+    "/api/stats": api_stats, "/api/damage": api_damage, "/api/analyze": api_analyze,
+    "/api/draft": api_draft, "/api/team": api_team, "/api/preview": api_preview,
+}
+_GET_API = {"/api/meta": api_meta, "/api/samples": api_samples}
+
+_CONTENT_TYPES = {".html": "text/html", ".css": "text/css",
+                  ".js": "application/javascript", ".json": "application/json"}
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "SimuPoke/0.1"
+
+    def _send(self, code: int, body: bytes, ctype: str) -> None:
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _json(self, obj, code: int = 200) -> None:
+        self._send(code, json.dumps(obj, ensure_ascii=False).encode("utf-8"),
+                   "application/json; charset=utf-8")
+
+    def _file(self, path: Path) -> None:
+        if not path.is_file():
+            self._json({"error": "introuvable"}, 404)
+            return
+        ctype = _CONTENT_TYPES.get(path.suffix, "application/octet-stream")
+        self._send(200, path.read_bytes(), ctype)
+
+    def do_GET(self) -> None:
+        route = self.path.split("?", 1)[0]
+        try:
+            if route in _GET_API:
+                self._json(_GET_API[route]())
+            elif route == "/" or route == "/index.html":
+                self._file(SERVER_WEB / "index.html")
+            elif route.startswith("/static/"):
+                name = route[len("/static/"):]
+                base = WEB_DIR if name == "style.css" else SERVER_WEB
+                # empêche la traversée de répertoire
+                target = (base / name).resolve()
+                if base.resolve() in target.parents or target == (base / name).resolve():
+                    self._file(target if target.exists() else SERVER_WEB / name)
+                else:
+                    self._json({"error": "interdit"}, 403)
+            else:
+                self._json({"error": "route inconnue"}, 404)
+        except Exception as exc:  # noqa: BLE001
+            self._json({"error": str(exc)}, 500)
+
+    def do_POST(self) -> None:
+        route = self.path.split("?", 1)[0]
+        fn = _POST_ROUTES.get(route)
+        if fn is None:
+            self._json({"error": "route inconnue"}, 404)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length) or b"{}")
+            self._json(fn(body))
+        except (ValueError, KeyError) as exc:
+            self._json({"error": str(exc)}, 400)
+        except Exception as exc:  # noqa: BLE001
+            self._json({"error": str(exc)}, 500)
+
+    def log_message(self, fmt, *args):  # silence par défaut
+        pass
+
+
+def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
+    httpd = ThreadingHTTPServer((host, port), Handler)
+    print(f"SimuPoke en écoute sur http://{host}:{port}  (Ctrl-C pour arrêter)")
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\nArrêt.")
+        httpd.server_close()
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(description="Serveur local SimuPoke")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8000)
+    args = p.parse_args()
+    serve(args.host, args.port)
+
+
+if __name__ == "__main__":
+    main()
