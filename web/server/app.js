@@ -124,6 +124,20 @@
   }
 
   // ---------- Combat ----------
+  async function fillLikelyOpponent() {
+    const sp = $('c-opp-species').value.trim();
+    if (!sp) return;
+    try {
+      const r = await api('/api/likely?species=' + encodeURIComponent(sp));
+      if (!r.known) { $('c-likely-status').textContent = 'aucune donnée d\'usage pour ' + sp; return; }
+      if (r.moves && r.moves.length) $('c-opp-moves').value = r.moves.join(', ');
+      if (r.nature) $('c-opp-nature').value = r.nature;
+      const bits = [];
+      if (r.item) bits.push('objet ' + r.item);
+      if (r.ability) bits.push('talent ' + r.ability);
+      $('c-likely-status').textContent = 'rempli depuis l\'usage' + (bits.length ? ' (' + bits.join(', ') + ')' : '');
+    } catch (e) { $('c-likely-status').textContent = '⚠ ' + e.message; }
+  }
   async function runCombat() {
     try {
       const me = { species: $('c-me-species').value, nature: $('c-me-nature').value,
@@ -142,6 +156,8 @@
     const out = $('draft-result');
     try {
       const r = await api('/api/draft', { lineup: builders.draft.getEntries() });
+      $('draft-status').textContent = 'Synergie : Mon Box · Méta : '
+        + (r.usageApplied ? 'prior d\'usage appliqué' : 'aucune donnée d\'usage');
       out.innerHTML = r.ranking.map((e, i) => `
         <div class="rank-row">
           <div class="rank">${i + 1}</div>
@@ -218,6 +234,7 @@
       el.addEventListener('input', computeDamage); el.addEventListener('change', computeDamage);
     });
     $('c-run').addEventListener('click', runCombat);
+    $('c-opp-likely').addEventListener('click', fillLikelyOpponent);
     $('draft-run').addEventListener('click', runDraft);
     $('draft-sample').addEventListener('click', () => builders.draft.setEntries(entriesFrom(SAMPLES.lineup, 'lineup')));
     $('team-run').addEventListener('click', runTeam);

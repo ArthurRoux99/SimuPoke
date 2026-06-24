@@ -157,8 +157,9 @@ def cmd_damage(args: list[str]) -> int:
 def cmd_draft(args: list[str]) -> int:
     pos = [a for a in args if not a.startswith("--")]
     use_roster = "--no-roster" not in args
+    use_usage = "--usage" in args
     if len(pos) != 1:
-        print("Usage : draft <lineup.json> [--no-roster]", file=sys.stderr)
+        print("Usage : draft <lineup.json> [--no-roster] [--usage]", file=sys.stderr)
         return 2
     try:
         lineup = load_lineup(pos[0])
@@ -166,10 +167,15 @@ def cmd_draft(args: list[str]) -> int:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 1
     roster = load_my_roster() if use_roster else []
+    prior = None
+    if use_usage:
+        from .usage import usage_prior, has_usage
+        prior = usage_prior() if has_usage() else None
     print(f"Tirage du jour — {len(lineup)} Pokémon"
           + (f" (synergie avec mon Box : {len(roster)})" if roster else "")
+          + (" + prior d'usage" if prior else "")
           + "\n")
-    for i, e in enumerate(rank_lineup(lineup, roster=roster), 1):
+    for i, e in enumerate(rank_lineup(lineup, roster=roster, usage_prior=prior), 1):
         name = label("species", e.species)
         print(f"{i:2}. {name:<14} {e.score100:3}/100  {e.role_fr:<8}  "
               f"{e.recommendation}")

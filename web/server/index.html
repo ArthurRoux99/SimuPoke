@@ -106,6 +106,8 @@
         <input id="c-opp-move" placeholder="ex. crunch" autocomplete="off">
         <label>Capacités adverses connues</label>
         <input id="c-opp-moves" value="crunch, rockslide, earthquake" autocomplete="off">
+        <div class="builder-actions"><button id="c-opp-likely" type="button">Adversaire probable (usage)</button>
+          <span class="status" id="c-likely-status"></span></div>
       </div>
     </div>
     <div class="controls" style="grid-template-columns: 1fr 1fr auto;">
@@ -130,7 +132,7 @@
       <div class="builder-actions">
         <button class="primary" id="draft-run">Classer le tirage</button>
         <button id="draft-sample">Charger l'exemple</button>
-        <span class="status">La synergie utilise « Mon Box ».</span>
+        <span class="status" id="draft-status">La synergie utilise « Mon Box ».</span>
       </div>
     </div>
     <div class="list-result" id="draft-result" style="margin-top:14px"></div>

@@ -34,6 +34,7 @@ from .damage import calculate, DamageResult
 from .combat import analyze_turn
 from .draft import rank_lineup
 from .team import analyze_team, select_team_preview
+from .usage import usage_prior, has_usage, likely_set
 from .loaders import load_my_roster, DATA_DIR
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -160,11 +161,29 @@ def api_draft(body: dict) -> dict:
     lineup = _owned_list(body["lineup"])
     roster = (_owned_list(body["roster"]) if body.get("roster") is not None
               else load_my_roster())
-    evals = rank_lineup(lineup, roster=roster, usage_prior=body.get("usage_prior"))
-    return {"ranking": [{"species": e.species, "score": e.score100,
+    reg = body.get("regulation", "reg_m_b")
+    # Prior d'usage : fourni explicitement, sinon table de la régulation si dispo.
+    prior = body.get("usage_prior")
+    used = False
+    if prior is None and body.get("use_usage", True) and has_usage(reg):
+        prior = usage_prior(reg)
+        used = bool(prior)
+    elif prior is not None:
+        used = True
+    evals = rank_lineup(lineup, roster=roster, usage_prior=prior)
+    return {"usageApplied": used,
+            "ranking": [{"species": e.species, "score": e.score100,
                          "role": e.role_fr, "recommendation": e.recommendation,
                          "reasons": e.reasons, "shiny": e.is_shiny}
                         for e in evals]}
+
+
+def api_likely(species: str, reg: str = "reg_m_b") -> dict:
+    """Set le plus probable d'une espèce (modèle d'adversaire, §10.3)."""
+    ls = likely_set(species, reg)
+    return {"species": ls.species, "item": ls.item, "ability": ls.ability,
+            "nature": ls.nature, "moves": ls.moves, "teammates": ls.teammates,
+            "known": bool(ls.item or ls.moves)}
 
 
 def api_team(body: dict) -> dict:
@@ -260,10 +279,18 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, path.read_bytes(), ctype)
 
     def do_GET(self) -> None:
-        route = self.path.split("?", 1)[0]
+        route, _, query = self.path.partition("?")
         try:
             if route in _GET_API:
                 self._json(_GET_API[route]())
+            elif route == "/api/likely":
+                from urllib.parse import parse_qs
+                q = parse_qs(query)
+                species = (q.get("species") or [""])[0]
+                if not species:
+                    self._json({"error": "paramètre 'species' requis"}, 400)
+                else:
+                    self._json(api_likely(species, (q.get("reg") or ["reg_m_b"])[0]))
             elif route == "/" or route == "/index.html":
                 self._file(SERVER_WEB / "index.html")
             elif route.startswith("/static/"):

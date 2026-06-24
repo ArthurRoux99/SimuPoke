@@ -151,9 +151,26 @@ défensif**, **couverture offensive**, **rôle** (sweeper/mur/pivot/support),
 faiblesses) et **rareté** (shiny/titre). La sortie est un classement /100 avec
 justification et reco **essai 7 j vs permanent (2 500 VP)**.
 
-> Le sous-score **usage/méta** est un *hook* neutre (0.5) tant que l'importeur
-> de stats d'usage (limitless / pokedata, §0.2) n'est pas branché : il suffira
-> de passer `usage_prior={espèce: 0..1}` à `rank_lineup` — rien d'autre ne change.
+> Le sous-score **usage/méta** est branché sur le modèle d'usage ci-dessous (et
+> retombe à un neutre 0.5 si aucune donnée d'usage n'est disponible).
+
+## Modèle d'adversaire — stats d'usage (§0.2, §10.3)
+
+`simupoke.usage` transforme des stats d'usage agrégées (un JSON par régulation,
+`data/usage/<reg>.json`) en :
+
+- **priors de popularité** (`usage_prior`) → pondèrent le sous-score « méta » de
+  B2 (appliqués automatiquement par le serveur / `cli draft --usage`) ;
+- **set le plus probable** d'une espèce (`likely_set`) → comble les inconnues
+  adverses (objet, talent, nature, capacités) tant que rien n'est observé.
+  Exposé par `GET /api/likely?species=…` et le bouton « Adversaire probable »
+  de l'onglet Combat.
+
+> ⚠️ Le fichier `data/usage/reg_m_b.json` fourni est un **échantillon manuel
+> illustratif** (valeurs non officielles), destiné à être remplacé par un import
+> réel depuis limitlesstcg / pokedata — aucune connexion réseau n'est faite ici.
+> Le format est documenté en tête de `src/simupoke/usage.py` ; le joueur peut
+> toujours surcharger un prior dès qu'il observe une info réelle.
 
 ## B3 — Team builder & assistant team preview
 
@@ -297,7 +314,8 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] UI — page HTML autonome v1 (calculateur de dégâts, moteur JS à parité).
 - [x] UI — serveur local v1 : tous les modules (Dégâts/B1/B2/B3) via API Python.
 - [x] UI hébergée : éditeurs de Pokémon (sans JSON brut) + onglet « Mon Box » éditable.
-- [ ] Importeur de stats d'usage (limitless / pokedata) → priors B2 + adversaire (§0.2).
+- [x] Modèle d'usage (§0.2) : importeur/format local + priors B2 + set probable adverse.
+- [ ] Remplacer l'échantillon d'usage par un import réel limitless/pokedata (réseau, plus tard).
 - [ ] Saisir les base stats des nouvelles Méga Champions dans les données de régulation.
 - [ ] Importeur de stats d'usage (limitless / pokedata) → priors B2 + adversaire (§0.2).
 - [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.

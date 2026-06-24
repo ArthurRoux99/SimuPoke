@@ -111,3 +111,15 @@ def test_roster_save_flags_unknown_species(tmp_path):
     res = server.api_roster_save({"roster": [{"species": "notamon", "nature": "serious"}]},
                                  path=target)
     assert "notamon" in res["unknown"]
+
+
+def test_draft_endpoint_applies_usage():
+    out = server.api_draft({"lineup": _sample("sample_lineup.json")["lineup"]})
+    assert out["usageApplied"] is True
+
+
+def test_likely_endpoint():
+    out = server.api_likely("incineroar")
+    assert out["item"] == "assaultvest"
+    assert out["known"] is True
+    assert server.api_likely("magikarp")["known"] is False

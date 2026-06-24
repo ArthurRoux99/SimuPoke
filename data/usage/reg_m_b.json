@@ -1,0 +1,64 @@
+{
+  "_help": {
+    "description": "Stats d'usage (modèle d'adversaire, §0.2 / §10.3). IDs au style Showdown.",
+    "champs": {
+      "usage": "part d'usage / popularité (0..1)",
+      "items|abilities|moves|natures|teammates": "probabilité conditionnelle sachant l'espèce (0..1)"
+    }
+  },
+  "_meta": {
+    "regulation": "M-B",
+    "source": "ÉCHANTILLON MANUEL ILLUSTRATIF — à remplacer par un import limitless/pokedata (§0.2). Valeurs non officielles.",
+    "updated": "2026-06-24"
+  },
+  "species": {
+    "incineroar": {
+      "usage": 0.52,
+      "items": { "assaultvest": 0.34, "sitrusberry": 0.28, "safetygoggles": 0.18, "rockyhelmet": 0.10 },
+      "abilities": { "intimidate": 1.0 },
+      "moves": { "fakeout": 0.96, "knockoff": 0.74, "partingshot": 0.62, "flareblitz": 0.58, "uturn": 0.34 },
+      "natures": { "careful": 0.46, "adamant": 0.30, "impish": 0.24 },
+      "teammates": { "rillaboom": 0.22, "amoonguss": 0.18, "fluttermane": 0.16 }
+    },
+    "fluttermane": {
+      "usage": 0.41,
+      "items": { "choicespecs": 0.30, "boosterenergy": 0.27, "focussash": 0.22, "lifeorb": 0.12 },
+      "abilities": { "protosynthesis": 1.0 },
+      "moves": { "moonblast": 0.88, "shadowball": 0.80, "protect": 0.55, "dazzlinggleam": 0.40, "thunderbolt": 0.30 },
+      "natures": { "timid": 0.78, "modest": 0.22 },
+      "teammates": { "ironhands": 0.20, "incineroar": 0.16 }
+    },
+    "ironhands": {
+      "usage": 0.33,
+      "items": { "assaultvest": 0.40, "sitrusberry": 0.22, "safetygoggles": 0.16, "punchingglove": 0.12 },
+      "abilities": { "quarkdrive": 1.0 },
+      "moves": { "fakeout": 0.70, "drainpunch": 0.66, "wildcharge": 0.55, "thunderpunch": 0.40, "icepunch": 0.28 },
+      "natures": { "adamant": 0.60, "brave": 0.25 },
+      "teammates": { "fluttermane": 0.18, "torkoal": 0.12 }
+    },
+    "garchomp": {
+      "usage": 0.24,
+      "items": { "lifeorb": 0.34, "loadeddice": 0.16, "choiceband": 0.14, "yacheberry": 0.10 },
+      "abilities": { "roughskin": 0.7, "sandveil": 0.3 },
+      "moves": { "earthquake": 0.82, "dragonclaw": 0.44, "stoneedge": 0.40, "protect": 0.36, "swordsdance": 0.30 },
+      "natures": { "jolly": 0.74, "adamant": 0.26 },
+      "teammates": { "tyranitar": 0.20 }
+    },
+    "tyranitar": {
+      "usage": 0.21,
+      "items": { "assaultvest": 0.30, "chopleberry": 0.20, "lumberry": 0.16, "leftovers": 0.12 },
+      "abilities": { "sandstream": 1.0 },
+      "moves": { "rockslide": 0.72, "crunch": 0.64, "earthquake": 0.44, "protect": 0.40, "lowkick": 0.24 },
+      "natures": { "adamant": 0.46, "careful": 0.30, "jolly": 0.24 },
+      "teammates": { "garchomp": 0.18 }
+    },
+    "amoonguss": {
+      "usage": 0.30,
+      "items": { "sitrusberry": 0.36, "rockyhelmet": 0.24, "mentalherb": 0.20 },
+      "abilities": { "regenerator": 1.0 },
+      "moves": { "spore": 0.92, "ragepowder": 0.80, "pollenpuff": 0.50, "protect": 0.46, "sludgebomb": 0.24 },
+      "natures": { "relaxed": 0.42, "calm": 0.34, "bold": 0.24 },
+      "teammates": { "incineroar": 0.20, "fluttermane": 0.14 }
+    }
+  }
+}
