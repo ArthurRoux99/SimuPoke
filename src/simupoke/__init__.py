@@ -17,6 +17,9 @@ from .model import (
     OwnedPokemon, PokemonState, SideState, FieldState, BattleState,
 )
 from .loaders import load_my_roster, load_regulation
+from .moves import Move, get_move
+from .typechart import effectiveness
+from .damage import calculate, battle_stats, DamageResult
 from . import i18n
 
 __all__ = [
@@ -26,5 +29,7 @@ __all__ = [
     "get_base_stats", "get_species", "get_types", "is_known", "to_id",
     "OwnedPokemon", "PokemonState", "SideState", "FieldState", "BattleState",
     "load_my_roster", "load_regulation",
+    "Move", "get_move", "effectiveness",
+    "calculate", "battle_stats", "DamageResult",
     "i18n",
 ]

@@ -5,9 +5,13 @@
   "description": "Scripts de génération de données pour SimuPoke (exécutés hors-ligne au runtime).",
   "type": "module",
   "scripts": {
-    "gen:pokedex": "node gen_pokedex.mjs"
+    "gen:pokedex": "node gen_pokedex.mjs",
+    "gen:moves": "node gen_moves.mjs",
+    "gen:all": "node gen_pokedex.mjs && node gen_moves.mjs",
+    "ref:calc": "node calc_reference.mjs"
   },
   "devDependencies": {
-    "@pkmn/dex": "^0.9.0"
+    "@pkmn/dex": "^0.9.0",
+    "@smogon/calc": "^0.10.0"
   }
 }

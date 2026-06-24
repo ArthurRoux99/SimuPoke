@@ -18,7 +18,7 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 
 | Phase | Objet | Statut |
 |---|---|---|
-| 0 | Socle données + conversion SP→stats + (à venir) damage calc | 🟡 en cours |
+| 0 | Socle données + conversion SP→stats + damage calc | 🟡 quasi complet |
 | 1 | B2 — Aide au tirage (Roster Ranch) | ⏳ |
 | 2 | B3 — Team builder + team preview | ⏳ |
 | 3 | B1 — Mode analyse (Singles) | ⏳ |
@@ -43,6 +43,8 @@ SimuPoke/
 ├── docs/conception_socle.md      # document socle de conception (v0.4)
 ├── data/
 │   ├── pokedex.json              # base stats + méta (généré depuis @pkmn/dex)
+│   ├── moves.json               # données de moves (généré depuis @pkmn/dex)
+│   ├── typechart.json           # efficacité des types (généré depuis @pkmn/dex)
 │   ├── my_roster.json            # « mon Box » (Pokémon possédés)
 │   └── reg_m_b/                  # données de la régulation courante (M-B)
 │       ├── roster.json           # espèces légales + flags (peut méga ?)
@@ -52,10 +54,15 @@ SimuPoke/
 │       └── clauses.json          # Species/Item Clause, formats
 ├── scripts/
 │   ├── gen_pokedex.mjs           # génère data/pokedex.json (hors-ligne, via npm)
+│   ├── gen_moves.mjs            # génère data/moves.json + typechart.json
+│   ├── calc_reference.mjs       # scénarios de référence @smogon/calc (tests)
 │   └── package.json
 ├── src/simupoke/
 │   ├── stats.py                  # modèle de stats figé (conversion SP→stats)
 │   ├── basestats.py              # base stats + méta (lit data/pokedex.json)
+│   ├── moves.py                 # données de moves
+│   ├── typechart.py             # efficacité des types
+│   ├── damage.py                # calculateur de dégâts (Gen 5+, parité @smogon/calc)
 │   ├── model.py                  # OwnedPokemon + état de combat (Doubles-ready)
 │   ├── i18n.py                   # couche d'affichage FR/EN
 │   ├── loaders.py                # chargement roster + régulation
@@ -74,13 +81,30 @@ l'utilisation de l'outil.
 > Les base stats sont identiques à celles du jeu principal : Champions ne change
 > que le système IV/SP, pas les stats de base (§4.3).
 
-Pour **régénérer** le fichier (mise à jour `@pkmn/dex`, nouvelle régulation) :
+Les **moves** et la **table des types** suivent le même principe
+(`data/moves.json`, `data/typechart.json`).
+
+Pour **régénérer** les fichiers (mise à jour `@pkmn/dex`, nouvelle régulation) :
 
 ```bash
 cd scripts
 npm install
 node gen_pokedex.mjs   # réécrit ../data/pokedex.json
+node gen_moves.mjs     # réécrit ../data/moves.json + typechart.json
+# ou : npm run gen:all
 ```
+
+## Calculateur de dégâts
+
+`simupoke.damage.calculate` implémente la formule de dégâts **Génération 5+**
+(modificateurs chaînés en base 4096, `pokeRound`, 16 rolls 85–100 %), avec
+**parité vérifiée contre `@smogon/calc`** (12 scénarios, `tests/test_damage.py`).
+
+Couvert en Phase 0 : STAB (×1.5 / ×2 Adaptability), efficacité des types, coup
+critique, brûlure, météo, terrains, esquive multi-cibles, boosts ; items
+Choice Band/Specs, Life Orb, Expert Belt, Assault Vest ; talents Huge/Pure
+Power, Guts, Technician, Tinted Lens, Neuroforce, Multiscale, Filter & co.
+Le « delta » Champions (§7.2) s'ajoutera via les mêmes listes de modificateurs.
 
 ## Démarrage rapide
 
@@ -100,6 +124,13 @@ python -m simupoke.cli roster
 # Calculer les stats d'un build ad hoc
 #   stats <species> <nature> <hp> <atk> <def> <spa> <spd> <spe>
 python -m simupoke.cli stats tyranitar jolly 2 32 0 0 0 32
+
+# Calculer des dégâts
+#   damage <atk_species> <atk_nature> <move> <def_species> <def_nature> [options]
+python -m simupoke.cli damage garchomp adamant earthquake tyranitar jolly \
+    --atk-sp atk=31 --item-atk choiceband
+#   -> Earthquake : 258–306 (147.4–174.9 %) — super efficace (×2) — STAB
+#      KO garanti en 1 coup(s)
 ```
 
 > Sans installation, on peut aussi lancer depuis la racine du dépôt avec
@@ -118,6 +149,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 ## Prochaines étapes (Phase 0 → Phase 1)
 
 - [x] Brancher une vraie source de base stats (`@pkmn/dex`) → `data/pokedex.json`.
-- [ ] Calculateur de dégâts intégrant le delta Champions (Méga + talents §7.2).
+- [x] Calculateur de dégâts (formule Gen 5+, parité `@smogon/calc`).
+- [ ] Intégrer le delta Champions au calc (Méga + talents §7.2) via les modificateurs.
 - [ ] Importeur de stats d'usage (limitless / pokedata) → priors adversaire (§0.2).
 - [ ] B2 — Aide au tirage (saisie des 10, scoring, classement).
