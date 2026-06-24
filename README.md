@@ -22,6 +22,7 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 | 1 | B2 — Aide au tirage (Roster Ranch) | 🟡 v1 (sans priors d'usage) |
 | 2 | B3 — Team builder + team preview | 🟡 v1 (matchups par types) |
 | 3 | B1 — Mode analyse (Singles) | 🟡 v1 (analyse 1 tour) |
+| — | UI v2 — page HTML autonome (§12) | 🟡 v1 (calc de dégâts) |
 | 4 | B1 — Mode simultané (MCTS/ISMCTS) | ⏳ |
 | 5 | Doubles | ⏳ |
 | 6 | (optionnel) Apprentissage | ⏳ |
@@ -52,10 +53,16 @@ SimuPoke/
 │       ├── items.json
 │       ├── moves_overrides.json  # exceptions de moves vs VGC classique
 │       └── clauses.json          # Species/Item Clause, formats
+├── web/                          # UI v2 — page HTML autonome (thème sombre)
+│   ├── index.html · style.css · app.js   # source de l'interface
+│   ├── engine.js                # moteur de dégâts JS (port de damage.py)
+│   ├── verify_engine.mjs        # parité JS vs vecteurs @smogon/calc
+│   └── dist/simupoke.html       # fichier autonome assemblé (généré)
 ├── scripts/
 │   ├── gen_pokedex.mjs           # génère data/pokedex.json (hors-ligne, via npm)
 │   ├── gen_moves.mjs            # génère data/moves.json + typechart.json
 │   ├── calc_reference.mjs       # scénarios de référence @smogon/calc (tests)
+│   ├── build_web.py             # assemble web/dist/simupoke.html (stdlib)
 │   └── package.json
 ├── data/sample_lineup.json      # exemple de tirage (démo/fixture B2)
 ├── data/sample_team.json        # exemple d'équipe (démo/fixture B3)
@@ -162,6 +169,28 @@ justification et reco **essai 7 j vs permanent (2 500 VP)**.
 > compte ; le matchup preview est une **heuristique de types** (le calculateur
 > de dégâts pourra l'affiner ensuite).
 
+## UI — page HTML autonome (thème sombre)
+
+Une interface graphique **hors-ligne, en un seul fichier** (§12), pour le
+calculateur de dégâts. Le moteur JS (`web/engine.js`) est un **port fidèle** de
+`src/simupoke/damage.py`, vérifié contre les **mêmes vecteurs de parité
+`@smogon/calc`** (`node web/verify_engine.mjs` → 18/18).
+
+```bash
+# Construire le fichier autonome (stdlib Python, aucune dépendance)
+python scripts/build_web.py        # -> web/dist/simupoke.html (~285 Ko)
+```
+
+Ouvrir ensuite `web/dist/simupoke.html` dans un navigateur : tout est embarqué
+(données + moteur), aucun serveur requis. La page propose attaquant/défenseur
+(espèce, nature, SP, objet, talent, boosts, statut, PV %), météo/terrain,
+critique et attaque de zone, avec dégâts min–max, %, KO en N coups et le delta
+Champions (ex. talent `dragonize`).
+
+> Source dans `web/` (`index.html` + `style.css` + `engine.js` + `app.js`),
+> assemblée par `scripts/build_web.py`. Les autres modules (B2/B3/B1) restent en
+> CLI pour l'instant ; ils rejoindront l'UI ensuite.
+
 ## B1 — Assistant de combat (mode analyse)
 
 `simupoke.combat.analyze_turn` réalise une **analyse à 1 tour** (§10.1, palier
@@ -240,6 +269,8 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Talents défensifs dans le calc (immunités + Thick Fat/Heatproof).
 - [x] B1 — Assistant de combat, mode analyse v1 (analyse 1 tour, §10.1).
 - [x] Delta Champions au calc : talents -ate (dont Dragonize, piloté par données) + Mega Sol.
+- [x] UI v2 — page HTML autonome v1 (calculateur de dégâts, moteur JS à parité).
+- [ ] Étendre l'UI aux modules B2/B3/B1.
 - [ ] Saisir les base stats des nouvelles Méga Champions dans les données de régulation.
 - [ ] Importeur de stats d'usage (limitless / pokedata) → priors B2 + adversaire (§0.2).
 - [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.

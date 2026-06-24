@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SimuPoke — Calculateur de dégâts (Champions)</title>
+<style>/* @STYLE */</style>
+</head>
+<body>
+<header>
+  <h1>SimuPoke <span class="tag">Champions</span></h1>
+  <p>Calculateur de dégâts hors-ligne — modèle de stats Champions (niveau 50, SP, IV 31)
+     et delta Méga. Moteur identique au cœur Python (parité @smogon/calc).</p>
+</header>
+
+<main>
+  <div class="grid-2">
+    <!-- ATTAQUANT -->
+    <section class="panel attacker">
+      <h2>Attaquant</h2>
+      <label>Espèce</label>
+      <input id="a-species" list="species-list" value="Garchomp" autocomplete="off">
+      <div class="row">
+        <div><label>Nature</label><select id="a-nature"></select></div>
+        <div><label>Statut</label>
+          <select id="a-status">
+            <option value="">aucun</option>
+            <option value="brn">brûlé</option>
+            <option value="par">paralysé</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div><label>Objet</label><input id="a-item" placeholder="ex. choiceband" autocomplete="off"></div>
+        <div><label>Talent</label><input id="a-ability" placeholder="ex. dragonize" autocomplete="off"></div>
+      </div>
+      <label>Stat Points (0–32, total ≤ 66)</label>
+      <div class="sp-grid" id="a-sp"></div>
+      <div class="row">
+        <div><label>Boost Atq</label><select id="a-boost-atk" class="boost"></select></div>
+        <div><label>Boost Atq.Spé</label><select id="a-boost-spa" class="boost"></select></div>
+      </div>
+    </section>
+
+    <!-- DÉFENSEUR -->
+    <section class="panel defender">
+      <h2>Défenseur</h2>
+      <label>Espèce</label>
+      <input id="d-species" list="species-list" value="Tyranitar" autocomplete="off">
+      <div class="row">
+        <div><label>Nature</label><select id="d-nature"></select></div>
+        <div><label>PV restants (%)</label><input id="d-hp" type="number" min="1" max="100" value="100"></div>
+      </div>
+      <div class="row">
+        <div><label>Objet</label><input id="d-item" placeholder="ex. assaultvest" autocomplete="off"></div>
+        <div><label>Talent</label><input id="d-ability" placeholder="ex. levitate" autocomplete="off"></div>
+      </div>
+      <label>Stat Points (0–32, total ≤ 66)</label>
+      <div class="sp-grid" id="d-sp"></div>
+      <div class="row">
+        <div><label>Boost Déf</label><select id="d-boost-def" class="boost"></select></div>
+        <div><label>Boost Déf.Spé</label><select id="d-boost-spd" class="boost"></select></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- CONTRÔLES -->
+  <div class="controls">
+    <div><label>Capacité</label><input id="move" list="move-list" value="Earthquake" autocomplete="off"></div>
+    <div><label>Météo</label>
+      <select id="weather">
+        <option value="">aucune</option><option value="sun">soleil</option>
+        <option value="rain">pluie</option><option value="sand">sable</option>
+        <option value="snow">neige</option>
+      </select>
+    </div>
+    <div><label>Terrain</label>
+      <select id="terrain">
+        <option value="">aucun</option><option value="electric">électrique</option>
+        <option value="grassy">herbu</option><option value="psychic">psychique</option>
+        <option value="misty">brumeux</option>
+      </select>
+    </div>
+    <div class="check"><input type="checkbox" id="crit"><label for="crit">Critique</label></div>
+    <div class="check"><input type="checkbox" id="spread"><label for="spread">Zone (×0.75)</label></div>
+  </div>
+
+  <div class="result" id="result"></div>
+
+  <div class="preset-btns">
+    <button data-preset="band">Garchomp (Choice Band) vs Tyranitar</button>
+    <button data-preset="dragonize">Feraligatr (Dragonize) vs Garchomp</button>
+    <button data-preset="pixilate">Sylveon (Pixilate) vs Garchomp</button>
+  </div>
+</main>
+
+<footer>
+  Fichier autonome — fonctionne hors-ligne. Les identifiants (objets, talents, capacités)
+  sont au style Showdown en anglais ; la saisie tolère noms FR/EN et casse.
+  Cœur de calcul : <code>web/engine.js</code> (port de <code>src/simupoke/damage.py</code>).
+</footer>
+
+<datalist id="species-list"></datalist>
+<datalist id="move-list"></datalist>
+
+<script>/* @DATA */</script>
+<script>/* @ENGINE */</script>
+<script>/* @APP */</script>
+</body>
+</html>
