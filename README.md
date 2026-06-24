@@ -18,8 +18,8 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 
 | Phase | Objet | Statut |
 |---|---|---|
-| 0 | Socle données + conversion SP→stats + damage calc | 🟡 quasi complet |
-| 1 | B2 — Aide au tirage (Roster Ranch) | ⏳ |
+| 0 | Socle données + conversion SP→stats + damage calc | ✅ |
+| 1 | B2 — Aide au tirage (Roster Ranch) | 🟡 v1 (sans priors d'usage) |
 | 2 | B3 — Team builder + team preview | ⏳ |
 | 3 | B1 — Mode analyse (Singles) | ⏳ |
 | 4 | B1 — Mode simultané (MCTS/ISMCTS) | ⏳ |
@@ -57,15 +57,18 @@ SimuPoke/
 │   ├── gen_moves.mjs            # génère data/moves.json + typechart.json
 │   ├── calc_reference.mjs       # scénarios de référence @smogon/calc (tests)
 │   └── package.json
+├── data/sample_lineup.json      # exemple de tirage (démo/fixture B2)
 ├── src/simupoke/
 │   ├── stats.py                  # modèle de stats figé (conversion SP→stats)
 │   ├── basestats.py              # base stats + méta (lit data/pokedex.json)
 │   ├── moves.py                 # données de moves
 │   ├── typechart.py             # efficacité des types
 │   ├── damage.py                # calculateur de dégâts (Gen 5+, parité @smogon/calc)
+│   ├── analysis.py              # typage défensif/offensif + inférence de rôle
+│   ├── draft.py                 # B2 — scoring/classement du tirage
 │   ├── model.py                  # OwnedPokemon + état de combat (Doubles-ready)
 │   ├── i18n.py                   # couche d'affichage FR/EN
-│   ├── loaders.py                # chargement roster + régulation
+│   ├── loaders.py                # chargement roster + régulation + lineup
 │   └── cli.py                    # CLI de validation du pipeline
 └── tests/                        # tests pytest
 ```
@@ -106,6 +109,19 @@ Choice Band/Specs, Life Orb, Expert Belt, Assault Vest ; talents Huge/Pure
 Power, Guts, Technician, Tinted Lens, Neuroforce, Multiscale, Filter & co.
 Le « delta » Champions (§7.2) s'ajoutera via les mêmes listes de modificateurs.
 
+## B2 — Aide au tirage (Roster Ranch)
+
+`simupoke.draft.rank_lineup` note et classe les 10 Pokémon d'un lineup (§11.3).
+Le score combine des sous-scores pondérés : **stats** (BST), **typage
+défensif**, **couverture offensive**, **rôle** (sweeper/mur/pivot/support),
+**synergie avec mon Box** (couvre les menaces de l'équipe sans empiler de
+faiblesses) et **rareté** (shiny/titre). La sortie est un classement /100 avec
+justification et reco **essai 7 j vs permanent (2 500 VP)**.
+
+> Le sous-score **usage/méta** est un *hook* neutre (0.5) tant que l'importeur
+> de stats d'usage (limitless / pokedata, §0.2) n'est pas branché : il suffira
+> de passer `usage_prior={espèce: 0..1}` à `rank_lineup` — rien d'autre ne change.
+
 ## Démarrage rapide
 
 ```bash
@@ -131,6 +147,10 @@ python -m simupoke.cli damage garchomp adamant earthquake tyranitar jolly \
     --atk-sp atk=31 --item-atk choiceband
 #   -> Earthquake : 258–306 (147.4–174.9 %) — super efficace (×2) — STAB
 #      KO garanti en 1 coup(s)
+
+# B2 — Aide au tirage : classer les 10 Pokémon du jour
+python -m simupoke.cli draft data/sample_lineup.json
+#   -> classement /100 + rôle + reco essai/permanent + justification
 ```
 
 > Sans installation, on peut aussi lancer depuis la racine du dépôt avec
@@ -150,6 +170,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 
 - [x] Brancher une vraie source de base stats (`@pkmn/dex`) → `data/pokedex.json`.
 - [x] Calculateur de dégâts (formule Gen 5+, parité `@smogon/calc`).
+- [x] B2 — Aide au tirage v1 (scoring, classement, justification, reco).
+- [ ] Importeur de stats d'usage (limitless / pokedata) → priors B2 + adversaire (§0.2).
 - [ ] Intégrer le delta Champions au calc (Méga + talents §7.2) via les modificateurs.
-- [ ] Importeur de stats d'usage (limitless / pokedata) → priors adversaire (§0.2).
-- [ ] B2 — Aide au tirage (saisie des 10, scoring, classement).
+- [ ] B3 — Team builder + assistant team preview (§11.2, §11.4).

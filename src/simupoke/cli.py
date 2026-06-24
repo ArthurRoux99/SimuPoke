@@ -6,6 +6,7 @@ Usage :
     python -m simupoke.cli damage <atk_species> <atk_nature> <move> <def_species> <def_nature>
         [--crit] [--spread] [--weather X] [--item-atk X] [--ability-atk X]
         [--atk-sp k=v,...] [--def-sp k=v,...] [--boost-atk N]
+    python -m simupoke.cli draft <lineup.json> [--no-roster]   # B2 aide au tirage
 """
 
 from __future__ import annotations
@@ -18,6 +19,8 @@ from .i18n import stat_label, label
 from .loaders import load_my_roster
 from .model import PokemonState, FieldState
 from .damage import calculate
+from .loaders import load_lineup
+from .draft import rank_lineup
 
 
 def _print_stats(species: str, stats: dict[str, int]) -> None:
@@ -144,6 +147,29 @@ def cmd_damage(args: list[str]) -> int:
     return 0
 
 
+def cmd_draft(args: list[str]) -> int:
+    pos = [a for a in args if not a.startswith("--")]
+    use_roster = "--no-roster" not in args
+    if len(pos) != 1:
+        print("Usage : draft <lineup.json> [--no-roster]", file=sys.stderr)
+        return 2
+    try:
+        lineup = load_lineup(pos[0])
+    except FileNotFoundError as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    roster = load_my_roster() if use_roster else []
+    print(f"Tirage du jour — {len(lineup)} Pokémon"
+          + (f" (synergie avec mon Box : {len(roster)})" if roster else "")
+          + "\n")
+    for i, e in enumerate(rank_lineup(lineup, roster=roster), 1):
+        name = label("species", e.species)
+        print(f"{i:2}. {name:<14} {e.score100:3}/100  {e.role_fr:<8}  "
+              f"{e.recommendation}")
+        print(f"      {' · '.join(e.reasons)}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     if not argv:
@@ -156,6 +182,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_stats(rest)
     if cmd == "damage":
         return cmd_damage(rest)
+    if cmd == "draft":
+        return cmd_draft(rest)
     print(f"Commande inconnue : {cmd!r}", file=sys.stderr)
     return 2
 

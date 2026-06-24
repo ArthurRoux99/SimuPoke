@@ -25,6 +25,24 @@ def _read_json(path: Path) -> dict:
 # Mon Box
 # ---------------------------------------------------------------------------
 
+def _parse_owned(entry: dict) -> OwnedPokemon:
+    """Construit un OwnedPokemon depuis une entrée JSON (schéma my_roster)."""
+    return OwnedPokemon(
+        species=entry["species"],
+        nature=entry["nature"],
+        stat_points=entry.get("stat_points", {}),
+        item=entry.get("item"),
+        ability=entry.get("ability"),
+        moves=entry.get("moves", []),
+        status_ownership=entry.get("status_ownership", "permanent"),
+        trial_expires_in_days=entry.get("trial_expires_in_days"),
+        source=entry.get("source", "ranch"),
+        is_shiny=entry.get("is_shiny", False),
+        has_title=entry.get("has_title", False),
+        display_fr=entry.get("display_fr"),
+    )
+
+
 def load_my_roster(path: str | Path | None = None) -> list[OwnedPokemon]:
     """Charge « mon Box » depuis un JSON (clé `owned`).
 
@@ -32,24 +50,18 @@ def load_my_roster(path: str | Path | None = None) -> list[OwnedPokemon]:
     """
     path = Path(path) if path else DATA_DIR / "my_roster.json"
     raw = _read_json(path)
-    owned = raw.get("owned", [])
-    result: list[OwnedPokemon] = []
-    for entry in owned:
-        result.append(OwnedPokemon(
-            species=entry["species"],
-            nature=entry["nature"],
-            stat_points=entry.get("stat_points", {}),
-            item=entry.get("item"),
-            ability=entry.get("ability"),
-            moves=entry.get("moves", []),
-            status_ownership=entry.get("status_ownership", "permanent"),
-            trial_expires_in_days=entry.get("trial_expires_in_days"),
-            source=entry.get("source", "ranch"),
-            is_shiny=entry.get("is_shiny", False),
-            has_title=entry.get("has_title", False),
-            display_fr=entry.get("display_fr"),
-        ))
-    return result
+    return [_parse_owned(e) for e in raw.get("owned", [])]
+
+
+def load_lineup(path: str | Path) -> list[OwnedPokemon]:
+    """Charge un lineup de tirage (clé `lineup`) — même schéma que `owned`.
+
+    Les builds préréglés du jour sont représentés comme des OwnedPokemon
+    (statut d'ownership ignoré ici).
+    """
+    raw = _read_json(Path(path))
+    entries = raw.get("lineup", raw.get("owned", []))
+    return [_parse_owned(e) for e in entries]
 
 
 # ---------------------------------------------------------------------------
