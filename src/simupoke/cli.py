@@ -274,7 +274,20 @@ def cmd_analyze(args: list[str]) -> int:
     return 0
 
 
+def _force_utf8_stdout() -> None:
+    """Évite les UnicodeEncodeError sur console Windows (cp1252) : la sortie
+    contient des accents et le séparateur « • ». Sans effet ailleurs."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8")
+            except (ValueError, OSError):
+                pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_stdout()
     argv = argv if argv is not None else sys.argv[1:]
     if not argv:
         print(__doc__)

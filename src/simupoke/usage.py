@@ -5,10 +5,10 @@ priors de popularité (pour pondérer B2) et set le plus probable d'une espèce
 (pour combler les inconnues adverses pendant l'analyse/la recherche).
 
 **Source des données.** Le format est volontairement simple (un JSON par
-régulation, `data/usage/<reg>.json`). Il est alimenté **manuellement** ou par
-un futur importeur depuis limitlesstcg / pokedata (§0.2) — aucune connexion
-réseau ici. L'échantillon fourni est **illustratif** et destiné à être remplacé
-par des données réelles.
+régulation, `data/usage/<reg>.json`). Il est alimenté par `usage_import` depuis
+les stats d'usage **Showdown/Smogon « chaos »** (§0.2) — aucune connexion réseau
+*ici* (l'import, lui, est réseau et tourne séparément). Ce module ne fait que
+**lire** la table déjà importée.
 
 Format attendu :
     {
@@ -60,12 +60,15 @@ def load_usage(reg_id: str = "reg_m_b") -> dict[str, dict]:
     return {to_id(k): v for k, v in raw.get("species", {}).items()}
 
 
-def usage_prior(reg_id: str = "reg_m_b") -> dict[str, float]:
+def usage_prior(reg_id: str = "reg_m_b", *,
+                table: dict[str, dict] | None = None) -> dict[str, float]:
     """Popularité normalisée par espèce (0..1, l'espèce la plus jouée = 1.0).
 
     Convient comme `usage_prior` de `draft.rank_lineup` (sous-score « méta »).
+    `table` permet d'injecter une table déjà chargée (sinon lue par `reg_id`).
     """
-    table = load_usage(reg_id)
+    if table is None:
+        table = load_usage(reg_id)
     raw = {sid: float(v.get("usage", 0.0)) for sid, v in table.items()}
     top = max(raw.values(), default=0.0)
     if top <= 0:
@@ -101,13 +104,17 @@ class LikelySet:
             self.teammates = []
 
 
-def likely_set(species: str, reg_id: str = "reg_m_b", *, n_moves: int = 4) -> LikelySet:
+def likely_set(species: str, reg_id: str = "reg_m_b", *, n_moves: int = 4,
+               table: dict[str, dict] | None = None) -> LikelySet:
     """Set le plus probable d'une espèce d'après l'usage (modèle d'adversaire).
 
     Sert à combler les inconnues côté adverse (objet/talent/nature/moves) tant
     que le joueur n'a rien observé. Champs à None/[] si l'espèce est absente.
+    `table` permet d'injecter une table déjà chargée (sinon lue par `reg_id`).
     """
-    rec = load_usage(reg_id).get(to_id(species), {})
+    if table is None:
+        table = load_usage(reg_id)
+    rec = table.get(to_id(species), {})
     return LikelySet(
         species=to_id(species),
         item=_argmax(rec.get("items")),

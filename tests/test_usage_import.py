@@ -61,6 +61,30 @@ def test_build_usage_has_meta_and_species():
     assert "incineroar" in doc["species"]
 
 
+def test_weighted_counts_use_ability_sum_not_raw_count():
+    # Cas réel : les sous-comptes sont *pondérés* et bien plus petits que le
+    # « Raw count » non pondéré. Le dénominateur doit être la somme des talents
+    # (total pondéré), sinon toutes les probabilités sont sous-estimées.
+    chaos = {
+        "data": {
+            "Garchomp": {
+                "Raw count": 1_000_000, "usage": 0.36,
+                "Abilities": {"Rough Skin": 90_000, "Sand Veil": 10_000},
+                "Items": {"Choice Scarf": 28_000, "Sitrus Berry": 27_000},
+                "Moves": {"Earthquake": 88_000, "Dragon Claw": 70_000},
+                "Spreads": {"Jolly:4/252/0/0/0/252": 60_000},
+                "Teammates": {},
+            },
+        },
+    }
+    sp = from_showdown_chaos(chaos)["garchomp"]
+    # denom = 90000 + 10000 = 100000 (pondéré), pas 1_000_000.
+    assert sp["abilities"]["roughskin"] == 0.9
+    assert sp["items"]["choicescarf"] == 0.28
+    assert sp["moves"]["earthquake"] == 0.88
+    assert sp["natures"]["jolly"] == 0.6
+
+
 def test_import_from_file_writes_loadable_table(tmp_path):
     src = tmp_path / "chaos.json"
     src.write_text(json.dumps(CHAOS), encoding="utf-8")

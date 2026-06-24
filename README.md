@@ -166,9 +166,12 @@ justification et reco **essai 7 j vs permanent (2 500 VP)**.
   Exposé par `GET /api/likely?species=…` et le bouton « Adversaire probable »
   de l'onglet Combat.
 
-> ⚠️ Le fichier `data/usage/reg_m_b.json` fourni est un **échantillon manuel
-> illustratif** (valeurs non officielles). Le joueur peut toujours surcharger un
-> prior dès qu'il observe une info réelle.
+> `data/usage/reg_m_b.json` est désormais alimenté par de **vraies stats
+> d'usage Smogon** (format Champions `gen9championsvgc2026regma`, palier 1630,
+> mois 2026-05), importées via `simupoke.usage_import`. Faute de stats publiées
+> pour Reg M-B, on utilise Reg M-A comme **meilleur proxy disponible** ; la
+> source exacte est tracée dans `_meta.source`. Le joueur peut toujours
+> surcharger un prior dès qu'il observe une info réelle.
 
 ### Importer de vraies stats d'usage (partie réseau)
 
@@ -337,7 +340,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] B3 : immunités de talent (Lévitation…) dans le profil défensif.
 - [x] B1 : menace adverse estimée via l'usage quand les coups ne sont pas saisis.
 - [x] Importeur réseau de stats d'usage (Showdown chaos) → `usage_import` / `simupoke-import-usage`.
-- [ ] Lancer l'import sur une vraie source (sur PC, réseau ouvert) pour remplacer l'échantillon.
+- [x] Lancer l'import sur une vraie source (Smogon chaos, Champions Reg M-A 1630, 2026-05) → remplace l'échantillon.
 - [ ] Saisir les base stats des nouvelles Méga Champions dans les données de régulation.
 - [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.
 - [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.

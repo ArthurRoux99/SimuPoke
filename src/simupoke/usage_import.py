@@ -93,8 +93,14 @@ def from_showdown_chaos(obj: dict) -> dict[str, dict]:
     data = obj.get("data", obj)            # tolère un dict déjà « data »
     species: dict[str, dict] = {}
     for name, d in data.items():
-        denom = float(d.get("Raw count") or 0) or sum(
-            v for v in d.get("Abilities", {}).values() if v > 0)
+        # Dans le format chaos, Items/Abilities/Moves/Spreads sont *pondérés*
+        # (weighted), alors que « Raw count » est *non pondéré*. Le bon
+        # dénominateur pour des probabilités conditionnelles est donc le total
+        # pondéré de l'espèce = somme des talents (chaque set a exactement un
+        # talent). On ne retombe sur « Raw count » que si les talents manquent.
+        denom = sum(
+            v for v in d.get("Abilities", {}).values() if v > 0
+        ) or float(d.get("Raw count") or 0)
         entry = {
             "usage": round(float(d.get("usage", 0.0)), 4),
             "items": _pct(d.get("Items", {}), denom, top=_TOP["items"]),
