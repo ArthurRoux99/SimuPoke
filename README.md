@@ -233,6 +233,20 @@ Champions (ex. talent `dragonize`).
 > assemblée par `scripts/build_web.py`. Cette version autonome ne couvre que le
 > calcul de dégâts.
 
+### Publication sur GitHub Pages
+
+La page autonome est publiée automatiquement à chaque push sur `main`
+(`.github/workflows/pages.yml`) : la CI lance `build_web.py` et déploie le
+fichier produit comme racine du site. Le build reste **hors du dépôt**
+(`dist/` est dans `.gitignore`) — la page publiée ne peut donc jamais être
+périmée par rapport aux données.
+
+Le cadre hors-ligne (§3) est préservé : la page embarque tout (données +
+moteur) et ne fait **aucune requête réseau** une fois chargée. Elle n'embarque
+que `pokedex`/`moves`/`typechart` et la carte -ate de la régulation —
+**jamais `data/my_roster.json`** : rien de personnel n'est publié. Les modules
+B1/B2/B3, qui ont besoin du moteur Python, restent locaux (serveur ci-dessous).
+
 ### Version hébergée sur le PC (tous les modules)
 
 Pour **tous** les modules (Dégâts, Combat B1, Tirage B2, Équipe B3, Team
