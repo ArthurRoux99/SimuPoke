@@ -481,6 +481,10 @@ python -m simupoke.cli decide garchomp jolly earthquake,dragonclaw,swordsdance \
 > `POST /api/decide` (champs `bench`, `depth`, `opp_model`). Ce n'est pas encore
 > de l'ISMCTS complet, mais une recherche multi-tours réelle et explicable.
 
+Dans l'**UI hébergée**, l'onglet Combat expose cette recherche : bouton
+« Décider (recherche §10.2) », sélecteur de **profondeur** et case **prudent
+(pire cas)**, sur les mêmes champs (moi / adverse / banc / terrain).
+
 ## Démarrage rapide
 
 ```bash
