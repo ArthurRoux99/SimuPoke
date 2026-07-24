@@ -199,6 +199,21 @@ def test_decide_endpoint():
     assert "recommendation" in out and "lines" in out
 
 
+def test_decide_endpoint_with_switch():
+    out = server.api_decide({
+        "me": {"species": "gengar", "nature": "timid",
+               "sp": {"spa": 32, "spe": 32}, "moves": ["shadowball"],
+               "current_hp_pct": 0.35},
+        "opp": {"species": "garchomp", "nature": "jolly",
+                "sp": {"atk": 32, "spe": 32}, "item": "choiceband",
+                "moves": ["earthquake"]},
+        "bench": [{"species": "skarmory", "nature": "impish",
+                   "sp": {"hp": 32, "def": 32}, "moves": ["bravebird"]}],
+    })
+    assert out["actions"][0]["kind"] == "switch"
+    assert "Changer pour skarmory" in out["recommendation"]
+
+
 def test_likely_endpoint():
     # Agnostique aux données importées : on valide le comportement de l'endpoint.
     out = server.api_likely("incineroar")

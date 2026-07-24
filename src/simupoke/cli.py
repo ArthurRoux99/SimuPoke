@@ -29,7 +29,8 @@ Usage :
         # rejoue une ligne tour par tour (séquences de coups séparées par des virgules)
     python -m simupoke.cli decide <me_species> <me_nature> <me_moves> <opp_species> <opp_nature>
         [--opp-moves a,b,c] [--me-sp k=v] [--opp-sp k=v] [--roll 0..1] [--weather X]
-        # classe mes actions par valeur attendue (coups simultanés, 1-ply sur le simulateur)
+        [--bench "species,nature,move1|move2;species2,..."]   # inclut les changements
+        # classe mes actions (coups ET switchs) par valeur attendue (1-ply sur le simulateur)
 """
 
 from __future__ import annotations
@@ -612,8 +613,23 @@ def cmd_decide(args: list[str]) -> int:
         item=opts.get("opp-item"), current_hp_pct=float(opts.get("opp-hp", 1.0))))
     field = FieldState(weather=opts.get("weather"), terrain=opts.get("terrain"),
                        trick_room="trick-room" in args)
+    bench: list[Mon] = []
+    for chunk in opts.get("bench", "").split(";"):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        parts = [p.strip() for p in chunk.split(",")]
+        if not is_known(parts[0]):
+            print(f"Espèce inconnue (banc) : {parts[0]!r}", file=sys.stderr)
+            return 1
+        nat = parts[1] if len(parts) > 1 and parts[1] else "serious"
+        mvs = ([m.strip() for m in parts[2].split("|") if m.strip()]
+               if len(parts) > 2 else [])
+        bench.append(Mon.from_state(PokemonState(species=parts[0], nature=nat,
+                                                 moves=mvs)))
     try:
-        res = rank_actions(me, opp, field, roll=float(opts.get("roll", 0.5)))
+        res = rank_actions(me, opp, field, my_bench=bench,
+                           roll=float(opts.get("roll", 0.5)))
     except (ValueError, KeyError) as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 1

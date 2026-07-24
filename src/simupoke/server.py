@@ -259,11 +259,14 @@ def api_decide(body: dict) -> dict:
     me = Mon.from_state(_state(body["me"]))
     opp = Mon.from_state(_state(body["opp"]))
     field = FieldState(**(body.get("field") or {}))
-    res = rank_actions(me, opp, field, use_usage=body.get("use_usage", True),
+    bench = [Mon.from_state(_state(d)) for d in (body.get("bench") or [])]
+    res = rank_actions(me, opp, field, my_bench=bench,
+                       use_usage=body.get("use_usage", True),
                        roll=float(body.get("roll", 0.5)))
     return {"oppMoves": res.opp_moves,
-            "actions": [{"move": a.move, "expected": a.expected, "worst": a.worst,
-                         "koChance": a.ko_chance, "survivesWorst": a.survives_worst}
+            "actions": [{"move": a.move, "kind": a.kind, "expected": a.expected,
+                         "worst": a.worst, "koChance": a.ko_chance,
+                         "survivesWorst": a.survives_worst}
                         for a in res.actions],
             "recommendation": res.recommendation, "lines": res.lines()}
 

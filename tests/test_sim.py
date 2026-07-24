@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from simupoke.model import PokemonState, FieldState
-from simupoke.sim import Mon, simulate_turn, rollout, action_order
+from simupoke.sim import (
+    Mon, Side, simulate_turn, simulate_turn_actions, rollout, action_order,
+)
 
 
 def st(species, nature="serious", sp=None, item=None, ability=None,
@@ -132,3 +134,38 @@ def test_leftovers_heals():
     r = simulate_turn(me, opp, "dragonclaw", None, roll=0.0)
     # Vestiges soigne 1/16 en fin de tour (pas de dégâts subis ici).
     assert r.me.hp > int(r.me.max_hp * 0.5)
+
+
+# --- Changements (actions complètes) ---------------------------------------
+
+def test_switch_brings_in_bench_and_takes_the_hit():
+    me = Side(active=mon("gengar", "timid", {"spa": 32}, moves=["shadowball"]),
+              bench=[mon("skarmory", "impish", {"hp": 32, "def": 32})])
+    opp = Side(active=mon("garchomp", "jolly", {"atk": 32, "spe": 32},
+                          item="choiceband", moves=["earthquake"]))
+    r = simulate_turn_actions(me, opp, ("switch", 0), ("move", "earthquake"))
+    # Skarmory entre (Acier/Vol) : immunisé au Séisme.
+    assert r.me.active.build.species == "skarmory"
+    assert r.me.active.hp == r.me.active.max_hp
+
+
+def test_switch_resets_boosts_of_outgoing():
+    active = mon("garchomp", "jolly", {"spe": 32})
+    active.boosts = {"atk": 2}
+    me = Side(active=active, bench=[mon("tyranitar", "adamant")])
+    opp = Side(active=mon("amoonguss", "sassy"))
+    r = simulate_turn_actions(me, opp, ("switch", 0), ("move", None))
+    # Garchomp est renvoyé au banc, ses boosts remis à zéro.
+    benched = next(b for b in r.me.bench if b.build.species == "garchomp")
+    assert benched.boosts == {}
+
+
+def test_switch_into_weakness_takes_damage():
+    me = Side(active=mon("gengar", "timid", {"spa": 32}, moves=["shadowball"]),
+              bench=[mon("charizard", "timid", {"hp": 0})])
+    opp = Side(active=mon("garchomp", "jolly", {"atk": 32, "spe": 32},
+                          item="choiceband", moves=["stoneedge"]))
+    r = simulate_turn_actions(me, opp, ("switch", 0), ("move", "stoneedge"))
+    # Charizard entre et encaisse Lance-Pierre (×4) : gros dégâts.
+    assert r.me.active.build.species == "charizard"
+    assert r.me.active.hp < r.me.active.max_hp

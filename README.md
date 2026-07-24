@@ -417,10 +417,14 @@ python -m simupoke.cli sim garchomp jolly swordsdance,earthquake amoonguss sassy
 #   -> déroulé commenté (setup, sommeil, KO) + verdict de la ligne
 ```
 
-> Périmètre v1 (assumé, extensible) : Singles, **sans changement** (deux coups
-> résolus) ; dégâts déterministes à un roll ; effets secondaires probabilistes
-> non modélisés (para 25 %, gel/dégel…). C'est la brique qui manquait pour la
-> **Phase 4** (recherche multi-tours).
+Les **changements** sont gérés via `simulate_turn_actions(Side, Side, action, …)`
+où une action est `("move", nom)` ou `("switch", indice)` : les switchs se
+résolvent avant les coups (le coup adverse touche l'entrant), boosts du sortant
+remis à zéro.
+
+> Périmètre v1 (assumé, extensible) : Singles ; dégâts déterministes à un roll ;
+> effets secondaires probabilistes non modélisés (para 25 %, flinch, gel/dégel…).
+> C'est la brique qui débloque la **Phase 4** (recherche multi-tours).
 
 ## Recherche à coups simultanés (Phase 4, §10.2)
 
@@ -433,16 +437,22 @@ dominants, différentiel de PV, boosts, statut) et classe mes actions par valeur
 coups observés, sinon du **set le plus probable** (usage §10.3), sinon adversaire
 inactif.
 
+Les **changements** sont des actions à part entière : si un banc est fourni,
+chaque switch vers un Pokémon vivant est évalué comme un coup (l'adversaire, qui
+joue en même temps, frappe l'entrant) via une évaluation **consciente du banc**
+(`evaluate_side`). B1 peut donc recommander un pivot défensif chiffré.
+
 ```bash
-python -m simupoke.cli decide garchomp jolly earthquake,dragonclaw,swordsdance \
-    tyranitar adamant --me-sp atk=32,spe=32 --opp-moves crunch,stoneedge
-#   -> actions classées (valeur attendue / pire cas) + reco (préfère le sûr à
-#      espérance proche)
+# Gengar entamé perdant vs Garchomp Choice Band ; le banc a Skarmory (immunisé Sol)
+python -m simupoke.cli decide gengar timid shadowball,sludgebomb garchomp jolly \
+    --me-hp 0.35 --opp-item choiceband --opp-moves earthquake,stoneedge \
+    --bench "skarmory,impish,bravebird ; rotomwash,bold,hydropump"
+#   -> 1. → skarmory (attendu -0.16)  ➤ Changer pour skarmory
 ```
 
 > Profondeur 1 pour rester rapide et explicable ; l'extension MCTS/ISMCTS
 > multi-tours réutilisera la **même** fonction d'évaluation et le **même**
-> simulateur. Exposé aussi par `POST /api/decide`.
+> simulateur. Exposé aussi par `POST /api/decide` (champ `bench`).
 
 ## Démarrage rapide
 
@@ -528,6 +538,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [ ] Ré-importer l'usage sur Reg M-B dès que Smogon le publie (`simupoke-import-usage`).
 - [x] Simulateur de tour (ordre, dégâts, statut/setup/protection, fin de tour) + `rollout`/CLI `sim` — fondation Phase 4.
 - [x] Recherche 1-ply à coups simultanés (`rank_actions`/CLI `decide`/API) : valeur attendue + pire cas.
+- [x] Changements (switch) dans le simulateur (`simulate_turn_actions`/`Side`) et la recherche (reco de pivot chiffrée).
 - [ ] B1 — recherche multi-tours (MCTS/ISMCTS, §10.2) par-dessus le simulateur.
-- [ ] Simulateur & recherche : changements (switch) + effets secondaires probabilistes.
+- [ ] Effets secondaires probabilistes (para 25 %, flinch, gel/dégel) dans le simulateur.
 - [ ] Doubles (Phase 5) ; apprentissage optionnel (Phase 6).

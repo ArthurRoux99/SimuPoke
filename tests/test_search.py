@@ -93,6 +93,31 @@ def test_expected_and_worst_consistent():
         assert a.worst <= a.expected          # le pire cas ≤ la moyenne
 
 
+def test_switch_ranked_and_recommended_when_active_is_lost():
+    # Gengar entamé se fait OHKO par Séisme ; Skarmory (banc) y est immunisé.
+    me = mon("gengar", "timid", {"spa": 32, "spe": 32},
+             moves=["shadowball"], hp=0.35)
+    opp = mon("garchomp", "jolly", {"atk": 32, "spe": 32}, item="choiceband",
+              moves=["earthquake"])
+    bench = [mon("skarmory", "impish", {"hp": 32, "def": 32}, moves=["bravebird"])]
+    r = rank_actions(me, opp, my_bench=bench)
+    top = r.actions[0]
+    assert top.kind == "switch"
+    assert "skarmory" in top.move
+    assert "Changer pour skarmory" in r.recommendation
+
+
+def test_switch_not_preferred_when_attacking_is_better():
+    # Garchomp domine Tyranitar ; le switch défensif ne doit pas primer.
+    me = mon("garchomp", "jolly", {"atk": 32, "spe": 32},
+             moves=["earthquake"])
+    opp = mon("tyranitar", "adamant", {"atk": 32}, moves=["crunch"])
+    bench = [mon("amoonguss", "sassy", {"hp": 32, "spd": 32}, moves=["sludgebomb"])]
+    r = rank_actions(me, opp, my_bench=bench)
+    assert r.actions[0].kind == "move"
+    assert r.actions[0].move == "Earthquake"
+
+
 def test_safe_compromise_recommendation():
     # Face à une menace, une option qui ne se fait pas KO peut primer.
     me = mon("garchomp", "jolly", {"atk": 32, "spe": 32},

@@ -284,6 +284,85 @@ def simulate_turn(me: Mon, opp: Mon, my_move: str | None, opp_move: str | None,
                       me_max=me.max_hp, opp_max=opp.max_hp)
 
 
+# ---------------------------------------------------------------------------
+# Actions complètes (coup OU changement) — camps avec banc
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Side:
+    """Un camp : Pokémon actif + banc (pour les changements)."""
+    active: Mon
+    bench: list[Mon] = field(default_factory=list)
+
+
+def _copy_mon(m: Mon) -> Mon:
+    return replace(m, boosts=dict(m.boosts))
+
+
+def _copy_side(s: Side) -> Side:
+    return Side(active=_copy_mon(s.active), bench=[_copy_mon(b) for b in s.bench])
+
+
+def _do_switch(side: Side, index: int, log: list[str]) -> None:
+    """Rappelle l'actif et envoie `bench[index]` (les boosts du sortant sont
+    remis à zéro, comme en jeu ; le statut est conservé)."""
+    if not (0 <= index < len(side.bench)):
+        log.append("  changement invalide (indice hors banc)")
+        return
+    old = side.active
+    old.boosts = {}
+    old.protected = False
+    new = side.bench[index]
+    side.bench[index] = old
+    side.active = new
+    log.append(f"{old.build.species} est rappelé ; {new.build.species} entre")
+
+
+@dataclass
+class ActionResult:
+    me: Side
+    opp: Side
+    log: list[str]
+    me_fainted: bool
+    opp_fainted: bool
+
+
+def simulate_turn_actions(me: Side, opp: Side, my_action: tuple, opp_action: tuple,
+                          field: FieldState | None = None, *, roll: float = 0.5,
+                          copy: bool = True) -> ActionResult:
+    """Résout un tour d'**actions** : chaque camp joue ('move', nom) ou
+    ('switch', indice). Les changements sont résolus **avant** les coups (le coup
+    adverse touche donc l'entrant), puis les coups par ordre de vitesse, puis la
+    fin de tour.
+    """
+    if copy:
+        me, opp = _copy_side(me), _copy_side(opp)
+    me.active.protected = opp.active.protected = False
+    log: list[str] = []
+
+    # 1) Changements d'abord.
+    for side, action in ((me, my_action), (opp, opp_action)):
+        if action and action[0] == "switch":
+            _do_switch(side, action[1], log)
+
+    # 2) Coups, dans l'ordre de vitesse des actifs courants.
+    mv_me = my_action[1] if my_action and my_action[0] == "move" else None
+    mv_opp = opp_action[1] if opp_action and opp_action[0] == "move" else None
+    sides = {"me": me.active, "opp": opp.active}
+    moves = {"me": mv_me, "opp": mv_opp}
+    for who in action_order(me.active, opp.active, mv_me, mv_opp, field):
+        actor = sides[who]
+        target = sides["opp" if who == "me" else "me"]
+        if actor.fainted or target.fainted or not moves[who]:
+            continue
+        _apply_move(actor, target, moves[who], field, roll, log)
+
+    _end_of_turn(me.active, field, log)
+    _end_of_turn(opp.active, field, log)
+    return ActionResult(me=me, opp=opp, log=log,
+                        me_fainted=me.active.fainted, opp_fainted=opp.active.fainted)
+
+
 def rollout(me: Mon, opp: Mon, my_moves: list[str], opp_moves: list[str],
             field: FieldState | None = None, *, roll: float = 0.5,
             max_turns: int = 20) -> list[TurnResult]:
