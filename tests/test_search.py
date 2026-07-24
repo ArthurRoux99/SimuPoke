@@ -138,6 +138,30 @@ def test_depth_is_clamped():
     assert r.actions
 
 
+def test_worst_model_ranks_by_worst_case():
+    me = mon("garchomp", "jolly", {"atk": 32, "spe": 32},
+             moves=["earthquake", "dragonclaw", "swordsdance"])
+    opp = mon("dragapult", "timid", {"spa": 32, "spe": 32},
+              moves=["dracometeor", "shadowball", "thunderbolt"])
+    r = rank_actions(me, opp, depth=2, opp_model="worst")
+    # En mode minimax, les actions sont triées par pire cas décroissant.
+    worsts = [a.worst for a in r.actions]
+    assert worsts == sorted(worsts, reverse=True)
+    assert "pire cas" in r.recommendation
+
+
+def test_worst_and_expected_may_differ_in_recommendation():
+    # Setup risqué : bonne espérance en profondeur, mauvais pire cas.
+    me = mon("garchomp", "jolly", {"atk": 32, "spe": 32},
+             moves=["earthquake", "swordsdance"])
+    opp = mon("tyranitar", "adamant", {"atk": 32}, moves=["crunch", "earthquake"])
+    exp = rank_actions(me, opp, depth=2, opp_model="expected")
+    wor = rank_actions(me, opp, depth=2, opp_model="worst")
+    # Les deux modes produisent des classements valides (peuvent coïncider ou non).
+    assert exp.actions and wor.actions
+    assert all(a.worst <= a.expected for a in exp.actions)
+
+
 def test_deep_ko_move_tops_when_lethal():
     me = mon("garchomp", "adamant", {"atk": 32}, item="choiceband",
              moves=["earthquake", "swordsdance"])

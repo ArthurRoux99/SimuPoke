@@ -29,8 +29,8 @@ Usage :
         # rejoue une ligne tour par tour (séquences de coups séparées par des virgules)
     python -m simupoke.cli decide <me_species> <me_nature> <me_moves> <opp_species> <opp_nature>
         [--opp-moves a,b,c] [--me-sp k=v] [--opp-sp k=v] [--roll 0..1] [--weather X]
-        [--bench "species,nature,move1|move2;species2,..."] [--depth 1..5]  # inclut les changements
-        # classe mes actions (coups ET switchs) par valeur attendue ; --depth ≥2 = recherche multi-tours
+        [--bench "species,nature,move1|move2;species2,..."] [--depth 1..5] [--cautious]
+        # classe mes actions (coups ET switchs) ; --depth ≥2 = multi-tours ; --cautious = pire cas (minimax)
 """
 
 from __future__ import annotations
@@ -544,7 +544,7 @@ def cmd_spread(args: list[str]) -> int:
 
 
 def cmd_sim(args: list[str]) -> int:
-    pos, opts, _ = _split_args(args, set())
+    pos, opts, flags = _split_args(args, {"trick-room"})
     if len(pos) != 6:
         print("Usage : sim <me_species> <me_nature> <me_moves> "
               "<opp_species> <opp_nature> <opp_moves> "
@@ -564,7 +564,7 @@ def cmd_sim(args: list[str]) -> int:
         species=opp_sp, nature=opp_nat, stat_points=_parse_sp(opts.get("opp-sp", "")),
         item=opts.get("opp-item"), ability=opts.get("opp-ability")))
     field = FieldState(weather=opts.get("weather"), terrain=opts.get("terrain"),
-                       trick_room="trick-room" in args)
+                       trick_room="trick-room" in flags)
     seq_me = [m.strip() for m in me_moves.split(",") if m.strip()]
     seq_opp = [m.strip() for m in opp_moves.split(",") if m.strip()]
     try:
@@ -591,7 +591,7 @@ def cmd_sim(args: list[str]) -> int:
 
 
 def cmd_decide(args: list[str]) -> int:
-    pos, opts, _ = _split_args(args, set())
+    pos, opts, flags = _split_args(args, {"cautious", "trick-room"})
     if len(pos) != 5:
         print("Usage : decide <me_species> <me_nature> <me_moves> "
               "<opp_species> <opp_nature> [--me-sp k=v] [--opp-sp k=v] "
@@ -612,7 +612,7 @@ def cmd_decide(args: list[str]) -> int:
         moves=[m.strip() for m in opts.get("opp-moves", "").split(",") if m.strip()],
         item=opts.get("opp-item"), current_hp_pct=float(opts.get("opp-hp", 1.0))))
     field = FieldState(weather=opts.get("weather"), terrain=opts.get("terrain"),
-                       trick_room="trick-room" in args)
+                       trick_room="trick-room" in flags)
     bench: list[Mon] = []
     for chunk in opts.get("bench", "").split(";"):
         chunk = chunk.strip()
@@ -627,16 +627,18 @@ def cmd_decide(args: list[str]) -> int:
                if len(parts) > 2 else [])
         bench.append(Mon.from_state(PokemonState(species=parts[0], nature=nat,
                                                  moves=mvs)))
+    opp_model = "worst" if "cautious" in flags else "expected"
     try:
         res = rank_actions(me, opp, field, my_bench=bench,
                            roll=float(opts.get("roll", 0.5)),
-                           depth=int(opts.get("depth", 1)))
+                           depth=int(opts.get("depth", 1)), opp_model=opp_model)
     except (ValueError, KeyError) as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 1
     depth = max(1, min(5, int(opts.get("depth", 1))))
+    mode = "  [prudent : pire cas]" if opp_model == "worst" else ""
     print(f"{label('species', me_sp)}  vs  {label('species', opp_sp)}"
-          + (f"  (profondeur {depth})" if depth > 1 else "") + "\n")
+          + (f"  (profondeur {depth})" if depth > 1 else "") + mode + "\n")
     for line in res.lines():
         print(line)
     return 0

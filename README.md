@@ -461,13 +461,25 @@ python -m simupoke.cli decide garchomp jolly earthquake,swordsdance \
     tyranitar adamant --me-sp atk=32,spe=32 --opp-moves crunch,rockslide --depth 2
 ```
 
+**Modèle d'adversaire** (`opp_model`, CLI `--cautious`) : `expected` (défaut) traite
+les coups adverses comme un **nœud chance** (moyenne) ; `worst` fait de
+l'adversaire un joueur qui **répond au mieux contre moi à chaque tour**
+(**minimax** / mode prudent). Le classement suit le modèle choisi ; `expected` et
+`worst` restent affichés pour chaque action.
+
+```bash
+# Mode prudent : face à un Dragapult plus rapide, quelle action limite la casse ?
+python -m simupoke.cli decide garchomp jolly earthquake,dragonclaw,swordsdance \
+    dragapult timid --opp-moves dracometeor,shadowball --depth 2 --cautious
+```
+
 > Bornage : dans la descente, seuls les **coups** sont explorés côté « moi »
 > (plus un changement forcé si l'actif tombe K.O.) ; les changements volontaires
-> ne sont notés qu'au niveau racine. L'adversaire est un nœud stochastique
-> uniforme sur ses coups probables (son banc n'est pas modélisé). Coût ~ ×10 par
-> tour de profondeur (depth 3 ≈ 300 ms) ; `depth` est borné à [1, 5]. Exposé
-> aussi par `POST /api/decide` (champs `bench`, `depth`). Ce n'est pas encore de
-> l'ISMCTS complet, mais une recherche multi-tours réelle, bornée et explicable.
+> ne sont notés qu'au niveau racine. L'adversaire est agrégé sur ses coups
+> probables (son banc n'est pas modélisé). Coût ~ ×10 par tour de profondeur
+> (depth 3 ≈ 300 ms) ; `depth` borné à [1, 5]. Exposé aussi par
+> `POST /api/decide` (champs `bench`, `depth`, `opp_model`). Ce n'est pas encore
+> de l'ISMCTS complet, mais une recherche multi-tours réelle et explicable.
 
 ## Démarrage rapide
 

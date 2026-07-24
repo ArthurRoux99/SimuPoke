@@ -158,36 +158,53 @@ def _my_actions(me: Side, allow_switch: bool) -> list[tuple]:
     return acts or [("move", None)]
 
 
+def _aggregate(values: list[float], model: str) -> float:
+    """Agrège les issues sur les coups adverses : moyenne (nœud « chance ») ou
+    minimum (adversaire qui joue au mieux contre moi — minimax)."""
+    return min(values) if model == "worst" else sum(values) / len(values)
+
+
 def _state_value(me: Side, opp: Side, field: FieldState | None,
-                 depth: int, roll: float, opp_cands: list[str | None]) -> float:
-    """Valeur d'un état (mon point de vue) : je maximise, l'adversaire est un
-    nœud stochastique (uniforme) sur `opp_cands`. Feuille à `depth<=0`/terminal."""
+                 depth: int, roll: float, opp_cands: list[str | None],
+                 model: str) -> float:
+    """Valeur d'un état (mon point de vue) : je maximise, l'adversaire est agrégé
+    selon `model` ('expected' = moyenne, 'worst' = minimax). Feuille à
+    `depth<=0`/terminal."""
     if depth <= 0 or _terminal(me, opp):
         return evaluate_side(me, opp.active)
     best = float("-inf")
     for action in _my_actions(me, allow_switch=False):
-        acc = 0.0
-        for omv in opp_cands:
-            child = simulate_turn_actions(me, opp, action, ("move", omv),
-                                          field, roll=roll, copy=True)
-            acc += _state_value(child.me, child.opp, field, depth - 1, roll,
-                                opp_cands)
-        best = max(best, acc / len(opp_cands))
+        vals = [
+            _state_value(
+                *_child(me, opp, action, omv, field, roll),
+                field, depth - 1, roll, opp_cands, model)
+            for omv in opp_cands
+        ]
+        best = max(best, _aggregate(vals, model))
     return GAMMA * best
+
+
+def _child(me: Side, opp: Side, action: tuple, omv: str | None,
+           field: FieldState | None, roll: float) -> tuple[Side, Side]:
+    res = simulate_turn_actions(me, opp, action, ("move", omv), field,
+                                roll=roll, copy=True)
+    return res.me, res.opp
 
 
 def rank_actions(me: Mon, opp: Mon, field: FieldState | None = None, *,
                  my_moves: list[str] | None = None,
                  my_bench: list[Mon] | None = None,
                  use_usage: bool = True, roll: float = 0.5,
-                 depth: int = 1) -> SearchResult:
-    """Classe mes actions (coups **et** changements) par valeur attendue.
+                 depth: int = 1, opp_model: str = "expected") -> SearchResult:
+    """Classe mes actions (coups **et** changements) par valeur.
 
     `depth=1` : évaluation immédiate après le tour (rapide). `depth≥2` : recherche
-    expectimax multi-tours — après mon action et la réponse (stochastique) de
-    l'adversaire, je continue à jouer au mieux sur `depth-1` tours de plus. Si
-    `my_bench` est fourni, chaque changement vers un Pokémon vivant est évalué au
-    même titre qu'un coup (l'adversaire frappe l'entrant).
+    multi-tours sur le simulateur.
+    `opp_model` : « expected » (adversaire moyen — nœuds chance) ou « worst »
+    (minimax — l'adversaire répond au mieux contre moi, à chaque tour ; mode
+    prudent). Dans les deux cas on remonte `expected` et `worst` pour info, mais
+    le **classement** suit le modèle choisi. Si `my_bench` est fourni, chaque
+    changement vers un Pokémon vivant est évalué au même titre qu'un coup.
     """
     depth = max(1, min(5, depth))            # borne de sécurité (coût ~ ×10/ply)
     bench = my_bench or []
@@ -216,7 +233,7 @@ def rank_actions(me: Mon, opp: Mon, field: FieldState | None = None, *,
                 outcomes.append(evaluate_side(res.me, res.opp.active))
             else:
                 outcomes.append(_state_value(res.me, res.opp, field, depth - 1,
-                                             roll, opp_cands))
+                                             roll, opp_cands, opp_model))
             if res.opp_fainted:
                 ko_chance = True
             if res.me_fainted:
@@ -226,9 +243,11 @@ def rank_actions(me: Mon, opp: Mon, field: FieldState | None = None, *,
             worst=min(outcomes), ko_chance=ko_chance,
             survives_worst=survives_worst, kind=kind))
 
-    actions.sort(key=lambda a: (a.expected, a.worst), reverse=True)
+    key = ((lambda a: (a.worst, a.expected)) if opp_model == "worst"
+           else (lambda a: (a.expected, a.worst)))
+    actions.sort(key=key, reverse=True)
     return SearchResult(actions=actions, opp_moves=opp_cands,
-                        recommendation=_recommend(actions))
+                        recommendation=_recommend(actions, opp_model))
 
 
 def _phrase(a: ActionValue) -> str:
@@ -237,10 +256,15 @@ def _phrase(a: ActionValue) -> str:
     return a.move
 
 
-def _recommend(actions: list[ActionValue]) -> str:
+def _recommend(actions: list[ActionValue], opp_model: str = "expected") -> str:
     if not actions:
         return "aucune action évaluable."
     best = actions[0]
+    if opp_model == "worst":
+        # Le classement est déjà minimax : `best` est l'action la plus sûre.
+        ko = " — peut mettre KO" if best.ko_chance else ""
+        risk = "" if best.survives_worst else " (aucune option ne garantit la survie)"
+        return f"{_phrase(best)} — meilleure garantie au pire cas{ko}{risk}."
     # Préfère une option sûre si elle est proche de la meilleure espérance.
     safe = [a for a in actions if a.survives_worst]
     if safe and safe[0] is not best and safe[0].expected >= best.expected - 0.15:
