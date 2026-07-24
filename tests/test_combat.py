@@ -44,6 +44,50 @@ def test_status_move_listed_not_ranked():
     assert any(e.move == "Swords Dance" for e in a.other)
 
 
+# --- Coups de soutien évalués ----------------------------------------------
+
+def test_setup_recommended_when_safe():
+    # Face à une menace faible et lente, Danse-Lames prime (offense doublée).
+    me = mk("garchomp", "jolly", {"atk": 32, "spe": 32},
+            ["earthquake", "swordsdance"])
+    opp = mk("amoonguss", "sassy", {"hp": 32, "spd": 32}, ["sludgebomb"])
+    a = analyze_turn(me, opp, opp_move="sludgebomb")
+    sd = next(e for e in a.other if e.move == "Swords Dance")
+    assert sd.value > 0
+    assert "Swords Dance" in a.recommendation
+
+
+def test_setup_penalized_when_ohko_incoming():
+    me = mk("gengar", "timid", {"spa": 32, "spe": 32},
+            ["shadowball", "nastyplot"], hp=0.4)
+    opp = mk("garchomp", "jolly", {"atk": 32, "spe": 32}, ["earthquake"])
+    a = analyze_turn(me, opp, opp_move="earthquake")
+    np = next(e for e in a.other if e.move == "Nasty Plot")
+    assert np.value < 0
+    assert "Nasty Plot" not in a.recommendation      # on n'setup pas sous OHKO
+
+
+def test_status_move_no_effect_on_immune_target():
+    # Cage-Éclair (paralysie) est sans effet sur un type Sol.
+    me = mk("rotomwash", "bold", {"hp": 32, "def": 32},
+            ["hydropump", "thunderwave"])
+    opp = mk("garchomp", "jolly", {"atk": 32, "spe": 32}, ["earthquake"])
+    a = analyze_turn(me, opp, opp_move="earthquake")
+    tw = next(e for e in a.other if e.move == "Thunder Wave")
+    assert tw.value == 0.0
+    assert any("sans effet" in n for n in tw.notes)
+
+
+def test_protect_valued_higher_under_ohko():
+    me = mk("incineroar", "careful", {"hp": 32, "spd": 32},
+            ["knockoff", "protect"], hp=0.3)
+    opp = mk("garchomp", "jolly", {"atk": 32, "spe": 32}, ["earthquake"],
+             item="choiceband")
+    a = analyze_turn(me, opp, opp_move="earthquake")
+    prot = next(e for e in a.other if e.move == "Protect")
+    assert prot.value >= 0.4
+
+
 def test_speed_order_and_paralysis():
     fast = mk("garchomp", "jolly", {"spe": 32})
     slow = mk("snorlax", "brave", {})

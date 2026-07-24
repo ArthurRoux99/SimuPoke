@@ -10,9 +10,14 @@ Les **changements** (switch) sont évalués si un banc est fourni : sûreté à
 l'entrée (coup encaissé) + menace offensive au tour suivant (escomptée), et
 peuvent primer la recommandation quand l'actif serait mis KO sans tuer d'abord.
 
+Les **coups de soutien** sont notés (§10.1, palier indicatif) : les setups sont
+chiffrés par l'offense qu'ils débloquent au tour suivant (via le calc), les
+statuts/protection/soin par des heuristiques transparentes ; un setup sûr peut
+primer la recommandation.
+
 Limites restantes (assumées) :
-  - analyse d'un seul tour ; les coups de statut/soutien sont listés mais non
-    évalués (il faudrait du multi-tours) ; pas encore de recherche d'arbre
+  - analyse d'un seul tour ; les coups de soutien sont notés par heuristique
+    (pas de simulation multi-tours) ; pas encore de recherche d'arbre
     (ce sera §10.2, MCTS) ;
   - build adverse inconnu => nature neutre / 0 SP par défaut (le modèle d'usage
     §10.3 affinera plus tard).
@@ -20,10 +25,10 @@ Limites restantes (assumées) :
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dfield
+from dataclasses import dataclass, field as dfield, replace
 
 from .model import PokemonState, FieldState
-from .basestats import is_known, to_id
+from .basestats import is_known, to_id, get_species
 from .moves import get_move, is_known as move_known
 from .damage import calculate, battle_stats
 from .usage import likely_set
@@ -38,6 +43,26 @@ W_SPEED = 0.1
 # et on pénalise le coup encaissé à l'entrée.
 W_SWITCH_OFF = 0.5
 W_SWITCH_RISK = 0.9
+
+# --- Coups de soutien (§10.1, palier indicatif) ---------------------------
+# Setups : capacité -> boosts accordés (le gain est ensuite chiffré via le calc).
+_SETUP_BOOSTS: dict[str, dict[str, int]] = {
+    "swordsdance": {"atk": 2}, "howl": {"atk": 1}, "bulkup": {"atk": 1, "def": 1},
+    "nastyplot": {"spa": 2}, "calmmind": {"spa": 1, "spd": 1},
+    "dragondance": {"atk": 1, "spe": 1}, "quiverdance": {"spa": 1, "spd": 1, "spe": 1},
+    "agility": {"spe": 2}, "rockpolish": {"spe": 2}, "shellsmash": {"atk": 2, "spa": 2, "spe": 2},
+    "workup": {"atk": 1, "spa": 1}, "victorydance": {"atk": 1, "def": 1, "spe": 1},
+}
+# Coups infligeant un statut à l'adversaire.
+_STATUS_MOVES: dict[str, str] = {
+    "willowisp": "brn", "thunderwave": "par", "spore": "slp", "sleeppowder": "slp",
+    "hypnosis": "slp", "toxic": "tox", "glare": "par", "stunspore": "par",
+    "nuzzle": "par", "lovelykiss": "slp", "darkvoid": "slp",
+}
+_POWDER_MOVES = {"spore", "sleeppowder", "stunspore"}   # sans effet sur Plante
+_PROTECT_MOVES = {"protect", "detect", "kingsshield", "spikyshield", "banefulbunker"}
+_RECOVERY_MOVES = {"recover", "roost", "synthesis", "moonlight", "morningsun",
+                   "slackoff", "softboiled", "milkdrink", "rest", "shoreup"}
 
 
 def _boost_mult(stage: int) -> float:
@@ -168,6 +193,70 @@ def _best_offense(mon: PokemonState, opp: PokemonState,
     return best_name, best_avg, best_ko
 
 
+def _add_boosts(current: dict[str, int], delta: dict[str, int]) -> dict[str, int]:
+    """Combine des boosts (plafonnés à ±6)."""
+    out = dict(current)
+    for k, v in delta.items():
+        out[k] = max(-6, min(6, out.get(k, 0) + v))
+    return out
+
+
+def _evaluate_support(move_name: str, me: PokemonState, opp: PokemonState,
+                      field: FieldState | None, incoming: Incoming
+                      ) -> tuple[float, list[str]]:
+    """Note un coup de soutien (setup / statut / protection / soin).
+
+    Palier indicatif (§10.1) : le setup est chiffré par l'**offense qu'il
+    débloque** au tour suivant (via le calc) ; le reste par des heuristiques
+    transparentes. Un coup encaissé mortel (OHKO subi) déprécie le setup/soin.
+    """
+    mid = to_id(move_name)
+    inc_ohko = incoming.known and incoming.ohko
+    inc_frac = min(1.0, incoming.max_pct / 100.0) if incoming.known else 0.0
+    notes: list[str] = []
+
+    if mid in _PROTECT_MOVES:
+        if inc_ohko:
+            return 0.5, ["bloque un coup fatal ce tour (répit / scout)"]
+        return 0.25, ["protection / scout"]
+
+    if mid in _SETUP_BOOSTS:
+        if inc_ohko:
+            return -0.3, ["risqué : mis KO pendant le setup"]
+        boosted = replace(me, boosts=_add_boosts(me.boosts, _SETUP_BOOSTS[mid]))
+        _, off_now, _ = _best_offense(me, opp, field)
+        _, off_after, ko_after = _best_offense(boosted, opp, field)
+        gain = max(0.0, (off_after - off_now) / 100.0)
+        value = 1.2 * gain - W_RISK * inc_frac
+        notes.append(f"offense ~{off_now:.0f}%→{off_after:.0f}% au tour suivant")
+        if ko_after and off_now < 100:
+            notes.append("débloque un KO")
+        return value, notes
+
+    if mid in _STATUS_MOVES:
+        if opp.status:
+            return 0.05, [f"adversaire déjà {opp.status}"]
+        st = _STATUS_MOVES[mid]
+        opp_types = get_species(opp.species).get("types") or []
+        if st == "brn" and "Fire" in opp_types:
+            return 0.0, ["sans effet (Feu insensible à la brûlure)"]
+        if st == "par" and ("Electric" in opp_types
+                            or (mid == "thunderwave" and "Ground" in opp_types)):
+            return 0.0, ["sans effet (immunité à la paralysie)"]
+        if mid in _POWDER_MOVES and "Grass" in opp_types:
+            return 0.0, ["sans effet (poudre inefficace sur Plante)"]
+        value = 0.55 if st == "slp" else (0.45 if st in ("par", "brn") else 0.4)
+        notes.append(f"inflige {st} à l'adversaire")
+        return value, notes
+
+    if mid in _RECOVERY_MOVES:
+        if inc_ohko:
+            return -0.1, ["soin inutile si mis KO"]
+        return max(0.0, 0.5 - inc_frac), ["soin (~50% PV)"]
+
+    return 0.1, ["coup de soutien — non modélisé"]
+
+
 def evaluate_switches(bench: list[PokemonState], opp: PokemonState,
                       field: FieldState | None, opp_move: str | None,
                       use_usage: bool = True) -> list[SwitchEval]:
@@ -227,8 +316,11 @@ class TurnAnalysis:
             for n in e.notes:
                 out.append(f"       · {n}")
         if self.other:
-            out.append("  Autres (non évalués en v1) : "
-                       + ", ".join(e.move for e in self.other))
+            out.append("")
+            out.append("Coups de soutien (classés) :")
+            for e in self.other:
+                note = f"  — {e.notes[0]}" if e.notes else ""
+                out.append(f"  · {e.move:<16} (valeur {e.value:+.2f}){note}")
         if self.switches:
             out.append("")
             out.append("Changements possibles (classés) :")
@@ -273,8 +365,9 @@ def analyze_turn(me: PokemonState, opp: PokemonState,
             continue
         m = get_move(mv)
         if m.is_status:
-            other.append(MoveEval(move=m.name, kind="status", value=0.15,
-                                  notes=["coup de statut — non évalué en v1"]))
+            val, notes = _evaluate_support(m.name, me, opp, field, incoming)
+            other.append(MoveEval(move=m.name, kind="status", value=val,
+                                  notes=notes))
             continue
         res = calculate(me, opp, mv, field)
         cur = res.defender_current_hp
@@ -307,16 +400,19 @@ def analyze_turn(me: PokemonState, opp: PokemonState,
         ))
 
     options.sort(key=lambda e: e.value, reverse=True)
+    other.sort(key=lambda e: e.value, reverse=True)
     switches = (evaluate_switches(bench, opp, field, opp_move, use_usage)
                 if bench else [])
-    recommendation = _recommend(options, incoming, switches)
+    recommendation = _recommend(options, incoming, switches, other)
     return TurnAnalysis(options=options, other=other, incoming=incoming,
                         recommendation=recommendation, switches=switches)
 
 
 def _recommend(options: list[MoveEval], incoming: Incoming,
-               switches: list[SwitchEval] | None = None) -> str:
+               switches: list[SwitchEval] | None = None,
+               support: list[MoveEval] | None = None) -> str:
     switches = switches or []
+    support = support or []
     best = options[0] if options else None
 
     # Situation mauvaise pour l'actif : mis KO avant d'agir sans tuer en premier.
@@ -328,6 +424,14 @@ def _recommend(options: list[MoveEval], incoming: Incoming,
                  if best_switch.best_move else "")
         return (f"Changer pour {best_switch.species} — l'actif serait mis KO ; "
                 f"ce switch encaisse{pivot}.")
+
+    # Un coup de soutien peut primer si l'actif ne tue pas déjà à coup sûr.
+    best_support = support[0] if support else None
+    if best_support and best_support.value > 0.3 \
+            and (best is None or (best.ko != "KO garanti"
+                                  and best_support.value > best.value)):
+        why = f" — {best_support.notes[0]}" if best_support.notes else ""
+        return f"{best_support.move}{why}."
 
     if best is None:
         if best_switch and best_switch.survives:

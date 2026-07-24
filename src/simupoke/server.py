@@ -163,7 +163,8 @@ def api_analyze(body: dict) -> dict:
         "options": [{"move": e.move, "minPct": e.min_pct, "maxPct": e.max_pct,
                      "ko": e.ko, "first": e.first, "value": e.value,
                      "notes": e.notes} for e in a.options],
-        "other": [e.move for e in a.other],
+        "other": [{"move": e.move, "value": e.value, "notes": e.notes}
+                  for e in a.other],
         "switches": [{"species": s.species, "incomingPct": s.incoming_pct,
                       "survives": s.survives, "bestMove": s.best_move,
                       "bestMovePct": s.best_move_pct, "value": s.value,

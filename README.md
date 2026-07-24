@@ -318,10 +318,17 @@ python -m simupoke.cli analyze gengar timid shadowball garchomp jolly \
 #   -> ➤ Changer pour skarmory — l'actif serait mis KO ; ce switch encaisse.
 ```
 
-> Limitations restantes (assumées) : un seul tour ; coups de statut listés mais
-> non évalués ; pas encore de recherche d'arbre — ce sera la **Phase 4**
-> (MCTS/ISMCTS, §10.2). Build adverse inconnu ⇒ nature neutre / 0 SP (le modèle
-> d'usage §10.3 affine).
+Les **coups de soutien** sont désormais notés (palier indicatif) : les **setups**
+(Danse-Lames, Machination, Danse Draco…) sont chiffrés par l'**offense qu'ils
+débloquent** au tour suivant (recalcul avec les boosts) ; **statut**
+(Feu Follet/Cage-Éclair/Spore, avec immunités de type), **protection** et **soin**
+par des heuristiques transparentes. Un setup **sûr** peut primer la reco ; sous
+menace de OHKO il est déprécié.
+
+> Limitations restantes (assumées) : un seul tour ; coups de soutien notés par
+> **heuristique** (pas de simulation multi-tours) ; pas encore de recherche
+> d'arbre — ce sera la **Phase 4** (MCTS/ISMCTS, §10.2). Build adverse inconnu
+> ⇒ nature neutre / 0 SP (le modèle d'usage §10.3 affine).
 
 ## Seuils & optimiseur de SP (§11.1 — « seuils de survie / de KO »)
 
@@ -461,6 +468,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] B1 — évaluation des changements (switch) : sûreté à l'entrée + menace, reco de pivot.
 - [x] B3 — team preview affiné par le vrai calc de dégâts (coups pour KO) + repli types.
 - [x] Port `engine.js` : modificateurs avancés dans la page autonome (parité 31/31).
+- [x] B1 — coups de soutien évalués : setup (offense débloquée) + statut/protection/soin.
 - [x] Delta Champions au calc : talents -ate (dont Dragonize, piloté par données) + Mega Sol.
 - [x] UI — page HTML autonome v1 (calculateur de dégâts, moteur JS à parité).
 - [x] UI — serveur local v1 : tous les modules (Dégâts/B1/B2/B3) via API Python.
