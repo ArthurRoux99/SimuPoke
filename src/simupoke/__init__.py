@@ -17,6 +17,7 @@ from .model import (
     OwnedPokemon, PokemonState, SideState, FieldState, BattleState,
 )
 from .loaders import load_my_roster, load_regulation, load_lineup, load_team
+from .showdown import parse_team as parse_showdown, format_team as format_showdown
 from .moves import Move, get_move
 from .typechart import effectiveness
 from .damage import calculate, battle_stats, DamageResult
@@ -58,6 +59,7 @@ __all__ = [
     "get_base_stats", "get_species", "get_types", "is_known", "to_id",
     "OwnedPokemon", "PokemonState", "SideState", "FieldState", "BattleState",
     "load_my_roster", "load_regulation", "load_lineup", "load_team",
+    "parse_showdown", "format_showdown",
     "Move", "get_move", "effectiveness",
     "calculate", "battle_stats", "DamageResult",
     "defensive_profile", "offensive_types", "coverage_count", "infer_role",

@@ -201,6 +201,18 @@
     } catch (e) { $('team-result').textContent = '⚠ ' + e.message; }
   }
 
+  async function importPaste() {
+    const status = $('team-paste-status');
+    try {
+      const r = await api('/api/paste', { paste: $('team-paste').value });
+      if (!r.count) { status.textContent = 'aucun Pokémon reconnu'; return; }
+      builders.team.setEntries(r.team);
+      let msg = `${r.count} Pokémon importé(s).`;
+      if (r.unknown && r.unknown.length) msg += ` ⚠ inconnus : ${r.unknown.join(', ')}`;
+      status.textContent = msg;
+    } catch (e) { status.textContent = '⚠ ' + e.message; }
+  }
+
   // ---------- Preview ----------
   async function runPreview() {
     try {
@@ -360,6 +372,7 @@
     $('team-frombox').addEventListener('click', async () => {
       try { const r = await api('/api/roster'); builders.team.setEntries(r.roster); } catch (e) { /* */ }
     });
+    $('team-import').addEventListener('click', importPaste);
     $('prev-run').addEventListener('click', runPreview);
     $('prev-sample').addEventListener('click', () => {
       builders.prevMine.setEntries(entriesFrom(SAMPLES.team, 'team'));

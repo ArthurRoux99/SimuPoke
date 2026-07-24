@@ -24,6 +24,8 @@ Endpoints :
     POST /api/ko                SP offensif mini pour garantir un KO en N coups
     POST /api/spread            optimiseur de spread SP (objectifs combinés)
     POST /api/decide            recherche 1-ply à coups simultanés (§10.2)
+    POST /api/paste             importe un paste Showdown (EV -> SP)
+    POST /api/export            regénère un paste Showdown (SP -> EV)
 """
 
 from __future__ import annotations
@@ -44,6 +46,7 @@ from .bench import (
 from .optimize import optimize_spread, Outspeed, Survive, Ko
 from .sim import Mon
 from .search import rank_actions, rank_actions_sampled
+from .showdown import parse_team as parse_showdown, format_team as format_showdown
 from .draft import rank_lineup
 from .team import analyze_team, select_team_preview
 from .usage import usage_prior, has_usage, likely_set
@@ -280,6 +283,22 @@ def api_decide(body: dict) -> dict:
             "recommendation": res.recommendation, "lines": res.lines()}
 
 
+def api_paste(body: dict) -> dict:
+    """Parse un paste Showdown en entrées d'équipe (EV -> SP Champions)."""
+    team = parse_showdown(body.get("paste", ""))
+    entries = [{"species": m.species, "nature": m.nature,
+                "stat_points": m.stat_points, "item": m.item,
+                "ability": m.ability, "moves": m.moves, "is_shiny": m.is_shiny}
+               for m in team]
+    unknown = [e["species"] for e in entries if not is_known(e["species"])]
+    return {"team": entries, "count": len(entries), "unknown": unknown}
+
+
+def api_export(body: dict) -> dict:
+    """Regénère un paste Showdown à partir d'entrées d'équipe (SP -> EV)."""
+    return {"paste": format_showdown(_owned_list(body.get("team", [])))}
+
+
 def api_draft(body: dict) -> dict:
     lineup = _owned_list(body["lineup"])
     roster = (_owned_list(body["roster"]) if body.get("roster") is not None
@@ -376,6 +395,7 @@ _POST_ROUTES = {
     "/api/speed": api_speed, "/api/outspeed": api_outspeed,
     "/api/survive": api_survive, "/api/ko": api_ko, "/api/spread": api_spread,
     "/api/decide": api_decide,
+    "/api/paste": api_paste, "/api/export": api_export,
 }
 _GET_API = {"/api/meta": api_meta, "/api/samples": api_samples,
             "/api/roster": api_roster_get}

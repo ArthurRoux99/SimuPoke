@@ -27,6 +27,7 @@ Usage :
     python -m simupoke.cli sim <me_species> <me_nature> <me_moves> <opp_species> <opp_nature> <opp_moves>
         [--me-sp k=v,...] [--opp-sp k=v,...] [--me-item X] [--roll 0..1] [--weather X]
         # rejoue une ligne tour par tour (séquences de coups séparées par des virgules)
+    python -m simupoke.cli paste <paste.txt> [--json]   # importe un paste Showdown (EV->SP) + analyse
     python -m simupoke.cli decide <me_species> <me_nature> <me_moves> <opp_species> <opp_nature>
         [--opp-moves a,b,c] [--me-sp k=v] [--opp-sp k=v] [--roll 0..1] [--weather X]
         [--bench "species,nature,move1|move2;species2,..."] [--depth 1..5] [--cautious] [--samples N]
@@ -53,6 +54,7 @@ from .bench import (
 from .optimize import optimize_spread, Outspeed, Survive, Ko
 from .sim import Mon, rollout
 from .search import rank_actions, rank_actions_sampled
+from .showdown import parse_team as parse_showdown
 
 
 def _print_stats(species: str, stats: dict[str, int]) -> None:
@@ -651,6 +653,41 @@ def cmd_decide(args: list[str]) -> int:
     return 0
 
 
+def cmd_paste(args: list[str]) -> int:
+    pos, _, flags = _split_args(args, {"json"})
+    if len(pos) != 1:
+        print("Usage : paste <paste.txt> [--json]   # importe un paste Showdown "
+              "et analyse l'équipe (EV -> SP)", file=sys.stderr)
+        return 2
+    try:
+        with open(pos[0], encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    team = parse_showdown(text)
+    if not team:
+        print("Aucun Pokémon reconnu dans le paste.", file=sys.stderr)
+        return 1
+    if "json" in flags:
+        import json
+        entries = [{"species": m.species, "nature": m.nature,
+                    "stat_points": m.stat_points, "item": m.item,
+                    "ability": m.ability, "moves": m.moves,
+                    "is_shiny": m.is_shiny} for m in team]
+        print(json.dumps({"team": entries}, ensure_ascii=False, indent=2))
+        return 0
+    print(f"Paste importé — {len(team)} Pokémon "
+          f"({', '.join(label('species', m.species) for m in team)})\n")
+    for m in team:
+        problems = m.validate()
+        if problems:
+            print(f"⚠ {label('species', m.species)} : {'; '.join(problems)}")
+    for line in analyze_team(team).lines():
+        print(line)
+    return 0
+
+
 def _force_utf8_stdout() -> None:
     """Évite les UnicodeEncodeError sur console Windows (cp1252) : la sortie
     contient des accents et le séparateur « • ». Sans effet ailleurs."""
@@ -698,6 +735,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_sim(rest)
     if cmd == "decide":
         return cmd_decide(rest)
+    if cmd == "paste":
+        return cmd_paste(rest)
     print(f"Commande inconnue : {cmd!r}", file=sys.stderr)
     return 2
 

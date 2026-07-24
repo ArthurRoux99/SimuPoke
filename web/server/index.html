@@ -160,6 +160,12 @@
         <button id="team-sample">Charger l'exemple</button>
         <button id="team-frombox">Depuis Mon Box</button>
       </div>
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;color:var(--muted);font-size:13px">Importer un paste Showdown (EV → SP)</summary>
+        <textarea id="team-paste" rows="6" style="width:100%;margin-top:6px" placeholder="Garchomp @ Life Orb&#10;Ability: Rough Skin&#10;EVs: 252 Atk / 252 Spe&#10;Adamant Nature&#10;- Earthquake&#10;- Dragon Claw"></textarea>
+        <div class="builder-actions"><button id="team-import">Importer dans l'éditeur</button>
+          <span class="status" id="team-paste-status"></span></div>
+      </details>
     </div>
     <pre class="report" id="team-result" style="margin-top:14px"></pre>
   </section>

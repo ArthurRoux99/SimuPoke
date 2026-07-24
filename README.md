@@ -86,6 +86,7 @@ SimuPoke/
 │   ├── bench.py                 # seuils & optimiseur de SP (speed tiers, outspeed/survive/ko)
 │   ├── optimize.py              # optimiseur de spread complet (objectifs combinés → SP)
 │   ├── model.py                  # OwnedPokemon + état de combat (Doubles-ready)
+│   ├── showdown.py              # import/export « Showdown paste » (EV ⇄ SP)
 │   ├── i18n.py                   # couche d'affichage FR/EN
 │   ├── loaders.py                # chargement roster + régulation + lineup + équipe
 │   └── cli.py                    # CLI de validation du pipeline
@@ -548,6 +549,24 @@ python -m simupoke.cli analyze garchomp jolly earthquake,dragonclaw,stoneedge \
 > Sans installation, on peut aussi lancer depuis la racine du dépôt avec
 > `PYTHONPATH=src python -m simupoke.cli ...` et `PYTHONPATH=src pytest`.
 
+## Import / export « Showdown paste »
+
+`simupoke.showdown` importe une équipe au **format Showdown** (le standard de
+partage) et la regénère, en faisant le pont avec Champions : les **EV** du paste
+sont convertis en **SP** (§8.3, `SP = round(EV/8)`, plafond 32 ; l'export refait
+l'inverse, borné à 252 EV). IV/niveau sont ignorés (31/50 figés) ; le Tera Type
+est toléré mais informatif (§4.6).
+
+```bash
+# Importer un paste et analyser l'équipe (EV -> SP), ou le sortir en JSON
+python -m simupoke.cli paste mon_equipe.txt
+python -m simupoke.cli paste mon_equipe.txt --json > data/mon_equipe.json
+```
+
+> Exposé par `POST /api/paste` (texte → entrées) et `POST /api/export`
+> (entrées → texte) ; l'onglet **Équipe** de l'UI a un champ « Importer un paste
+> Showdown » qui remplit l'éditeur.
+
 ## Modèle de stats (rappel, §8.3)
 
 Niveau 50, IV 31 partout, SP ∈ [0, 32] par stat, budget total **66 SP**.
@@ -590,6 +609,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Changements (switch) dans le simulateur (`simulate_turn_actions`/`Side`) et la recherche (reco de pivot chiffrée).
 - [x] B1 — recherche multi-tours (expectimax déterminisé `depth≥2` + escompte) par-dessus le simulateur.
 - [x] Déterminisation du build adverse (ISMCTS-lite) : `sample_set` + `rank_actions_sampled` (CLI `--samples`, API).
+- [x] Import/export « Showdown paste » (EV ⇄ SP) : `showdown.py`, CLI `paste`, API, import UI.
 - [ ] Effets secondaires probabilistes (para 25 %, flinch, gel/dégel) dans le simulateur.
 - [ ] Déterminisations profondes (ré-échantillonnage par nœud) + budget temps — vers l'ISMCTS complet.
 - [ ] Doubles (Phase 5) ; apprentissage optionnel (Phase 6).

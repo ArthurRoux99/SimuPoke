@@ -188,6 +188,27 @@ def test_spread_endpoint_flags_unmet():
     assert out["unmet"]
 
 
+def test_paste_endpoint_parses_and_converts():
+    out = server.api_paste({"paste":
+        "Garchomp @ Life Orb\nAbility: Rough Skin\n"
+        "EVs: 252 Atk / 252 Spe\nAdamant Nature\n- Earthquake\n- Dragon Claw"})
+    assert out["count"] == 1
+    e = out["team"][0]
+    assert e["species"] == "garchomp"
+    assert e["stat_points"]["atk"] == 32          # 252 EV -> 32 SP
+    assert e["item"] == "lifeorb"
+    assert out["unknown"] == []
+
+
+def test_export_endpoint_roundtrips():
+    entries = [{"species": "garchomp", "nature": "adamant",
+                "stat_points": {"atk": 32, "spe": 32}, "item": "lifeorb",
+                "moves": ["earthquake"]}]
+    paste = server.api_export({"team": entries})["paste"]
+    assert "Garchomp" in paste
+    assert server.api_paste({"paste": paste})["team"][0]["species"] == "garchomp"
+
+
 def test_decide_endpoint():
     out = server.api_decide({
         "me": {"species": "garchomp", "nature": "jolly",
