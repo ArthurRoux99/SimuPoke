@@ -87,6 +87,14 @@ def test_budget_overflow_flagged():
         assert any("budget" in u for u in r.unmet)
 
 
+def test_focus_sash_ko_flagged_in_spread():
+    objs = [Ko(defender=st("fluttermane", "timid", {"hp": 0}, item="focussash"),
+               move="earthquake", hits=1)]
+    r = optimize_spread("garchomp", "adamant", objs, item="choiceband")
+    assert r.feasible is False
+    assert any("Focus Sash" in u for u in r.unmet)
+
+
 def test_result_lines_render():
     objs = [Outspeed(target=st("amoonguss", "sassy"))]
     r = optimize_spread("tyranitar", "adamant", objs)

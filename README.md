@@ -323,6 +323,10 @@ dans [0, 32], §8.3) rend l'espace de recherche trivial : on énumère.
   **garanti** (roll bas) en N coups — tient compte des PV courants de la cible
   (finir un adversaire entamé).
 
+> **Focus Sash / Fermeté** sont pris en compte : une cible à PV pleins encaisse
+> un coup fatal (reste 1 PV) — la survie est garantie sans SP et un OHKO devient
+> un 2HKO minimum (signalé dans les seuils et l'optimiseur de spread).
+
 > Ces optimiseurs raisonnent **stat par stat** (le minimum requis là où ça
 > compte) ; la contrainte de budget global (66 SP au total) reste au joueur qui
 > assemble le spread complet. Exposés en CLI (`speed`/`outspeed`/`survive`/`ko`)
@@ -435,6 +439,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Seuils & optimiseur de SP : speed tiers + `outspeed`/`survive`/`ko` (CLI + API + onglet).
 - [x] Optimiseur de spread complet : objectifs combinés → spread SP légal (`spread`, API, UI).
 - [x] Couverture calc étendue : items type-boost, Paradox (Protosynthèse/Charge Quantique), Fluffy/Ice Scales/Water Bubble & co.
+- [x] Focus Sash / Fermeté dans les seuils de survie/KO et l'optimiseur de spread.
 - [x] Delta Champions au calc : talents -ate (dont Dragonize, piloté par données) + Mega Sol.
 - [x] UI — page HTML autonome v1 (calculateur de dégâts, moteur JS à parité).
 - [x] UI — serveur local v1 : tous les modules (Dégâts/B1/B2/B3) via API Python.

@@ -151,3 +151,44 @@ def test_ko_respects_current_hp():
     # Finir un adversaire entamé coûte au plus autant de SP qu'à pleins PV.
     if res_full.feasible and res_weak.feasible:
         assert res_weak.sp <= res_full.sp
+
+
+# --- Focus Sash / Fermeté ---------------------------------------------------
+
+def test_focus_sash_guarantees_survival():
+    defender = mk("fluttermane", "timid", {"hp": 0}, item="focussash")
+    attacker = mk("garchomp", "adamant", {"atk": 32}, item="choiceband")
+    res = min_sp_to_survive(defender, attacker, "earthquake")
+    assert res.feasible and res.by_endure and res.total_sp == 0
+
+
+def test_sturdy_guarantees_survival():
+    defender = PokemonState(species="fluttermane", nature="timid",
+                            ability="sturdy", stat_points={"hp": 0})
+    attacker = mk("garchomp", "adamant", {"atk": 32}, item="choiceband")
+    res = min_sp_to_survive(defender, attacker, "earthquake")
+    assert res.feasible and res.by_endure
+
+
+def test_focus_sash_blocks_ohko():
+    defender = mk("fluttermane", "timid", {"hp": 0}, item="focussash")
+    attacker = mk("garchomp", "adamant", {"atk": 32}, item="choiceband")
+    res = min_sp_to_ko(attacker, defender, "earthquake", hits=1)
+    assert res.feasible is False
+    assert res.blocked_by_endure is True
+
+
+def test_focus_sash_allows_2hko():
+    defender = mk("fluttermane", "timid", {"hp": 0}, item="focussash")
+    attacker = mk("garchomp", "adamant", {"atk": 32}, item="choiceband")
+    res = min_sp_to_ko(attacker, defender, "earthquake", hits=2)
+    assert res.feasible is True
+
+
+def test_sash_irrelevant_when_not_full_hp():
+    # À PV entamés, Focus Sash ne se déclenche pas : OHKO possible.
+    defender = mk("fluttermane", "timid", {"hp": 0}, item="focussash", hp=0.5)
+    attacker = mk("garchomp", "adamant", {"atk": 32}, item="choiceband")
+    res = min_sp_to_ko(attacker, defender, "earthquake", hits=1)
+    assert res.feasible is True
+    assert res.blocked_by_endure is False

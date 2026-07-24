@@ -18,6 +18,10 @@ Note budget : ces optimiseurs raisonnent **stat par stat** (le SP minimal requis
 dans la/les stat(s) concernée(s)). La contrainte de budget global (66 SP au
 total, §8.3) reste à la charge du joueur qui assemble son spread — l'outil dit
 « il te faut au moins X SP ici », pas « voici ton spread complet ».
+
+Focus Sash / Fermeté (§11.1) sont pris en compte : un défenseur à PV pleins
+**encaisse** un coup fatal (reste 1 PV), donc la survie est garantie sans SP et
+un OHKO devient un 2HKO minimum.
 """
 
 from __future__ import annotations
@@ -116,6 +120,25 @@ def _with_sp(state: PokemonState, key: str, value: int) -> PokemonState:
     return replace(state, stat_points={**state.stat_points, key: value})
 
 
+def _endures(state: PokemonState) -> bool:
+    """Focus Sash / Fermeté : survit à UN coup s'il part des PV pleins."""
+    if state.current_hp_pct < 1.0:
+        return False
+    return (to_id(state.item or "") == "focussash"
+            or to_id(state.ability or "") == "sturdy")
+
+
+def _effective_ko_hits(raw: int | None, endures: bool) -> int | None:
+    """Nb de coups pour KO garanti, en tenant compte de Focus Sash / Fermeté.
+
+    Un coup fatal partant des PV pleins est encaissé (reste 1 PV) → il faut un
+    coup de plus qu'un OHKO « brut ».
+    """
+    if raw is None:
+        return None
+    return 2 if (endures and raw == 1) else raw
+
+
 def min_sp_to_outspeed(me: PokemonState, target: PokemonState,
                        *, me_tailwind: bool = False,
                        target_tailwind: bool = False,
@@ -152,8 +175,12 @@ class SurviveResult:
     move: str
     stat: str                     # "def" ou "spd" (côté défensif sollicité)
     max_pct: float | None = None  # % PV du roll haut au spread trouvé
+    by_endure: bool = False       # survie garantie par Focus Sash / Fermeté
 
     def line(self) -> str:
+        if self.by_endure:
+            return (f"Survie à {self.move} : garantie par Focus Sash / Fermeté "
+                    f"(depuis PV pleins) — 0 SP requis.")
         if not self.feasible:
             return (f"Survie à {self.move} : impossible même à fond "
                     f"(PV + {self.stat}).")
@@ -174,6 +201,9 @@ def min_sp_to_survive(defender: PokemonState, attacker: PokemonState,
     m = get_move(move)
     stat = "def" if m.is_physical else "spd"
     base = replace(defender, current_hp_pct=1.0)
+    # Focus Sash / Fermeté : survie garantie depuis PV pleins, sans SP.
+    if _endures(base):
+        return SurviveResult(True, 0, 0, 0, m.name, stat, by_endure=True)
     cap = SP_CAP_PER_STAT
     for total in range(0, 2 * cap + 1):
         lo = max(0, total - cap)
@@ -201,9 +231,13 @@ class KoResult:
     stat: str                     # "atk" ou "spa"
     hits: int                     # KO recherché en N coups
     min_pct: float | None = None  # % PV du roll bas au SP trouvé
+    blocked_by_endure: bool = False   # empêché par Focus Sash / Fermeté
 
     def line(self) -> str:
         what = "OHKO" if self.hits == 1 else f"KO en {self.hits}"
+        if self.blocked_by_endure:
+            return (f"{what} avec {self.move} : bloqué par Focus Sash / Fermeté "
+                    f"(cible à PV pleins) — impossible en {self.hits}.")
         if not self.feasible:
             return (f"{what} avec {self.move} : hors de portée même à "
                     f"{SP_CAP_PER_STAT} SP {self.stat}.")
@@ -222,10 +256,14 @@ def min_sp_to_ko(attacker: PokemonState, defender: PokemonState,
     """
     m = get_move(move)
     stat = "atk" if m.is_physical else "spa"
+    endures = _endures(defender)
     for sp in range(0, SP_CAP_PER_STAT + 1):
         trial = _with_sp(attacker, stat, sp)
         r = calculate(trial, defender, m, field, crit=crit)
-        g = r.guaranteed_ko_hits
+        g = _effective_ko_hits(r.guaranteed_ko_hits, endures)
         if g is not None and g <= hits:
             return KoResult(True, sp, m.name, stat, hits, min_pct=r.min_pct)
-    return KoResult(False, None, m.name, stat, hits)
+    # KO en `hits` inatteignable : signaler si c'est Focus Sash / Fermeté qui
+    # l'empêche (un OHKO devient un 2HKO minimum).
+    blocked = endures and hits < 2
+    return KoResult(False, None, m.name, stat, hits, blocked_by_endure=blocked)

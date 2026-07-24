@@ -187,7 +187,10 @@ def optimize_spread(species: str, nature: str,
                            o.move, o.field, hits=o.hits, crit=o.crit)
         tag = o.label or f"{o.move} sur {o.defender.species}"
         if not res.feasible:
-            unmet.append(f"KO {tag} : hors de portée (>{cap} SP {res.stat})")
+            reason = ("bloqué par Focus Sash / Fermeté"
+                      if res.blocked_by_endure
+                      else f"hors de portée (>{cap} SP {res.stat})")
+            unmet.append(f"KO {tag} : {reason}")
         else:
             sp[res.stat] = max(sp[res.stat], res.sp)
 
