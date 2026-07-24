@@ -41,6 +41,9 @@ from .optimize import (
     optimize_spread, Outspeed, Survive, Ko, SpreadResult,
 )
 from .sim import Mon, simulate_turn, rollout, action_order, TurnResult
+from .search import (
+    rank_actions, evaluate_state, opponent_moves, ActionValue, SearchResult,
+)
 from .usage import load_usage, usage_prior, likely_set, has_usage, LikelySet
 from . import i18n
 
@@ -64,6 +67,7 @@ __all__ = [
     "min_sp_to_ko", "SpeedEntry", "OutspeedResult", "SurviveResult", "KoResult",
     "optimize_spread", "Outspeed", "Survive", "Ko", "SpreadResult",
     "Mon", "simulate_turn", "rollout", "action_order", "TurnResult",
+    "rank_actions", "evaluate_state", "opponent_moves", "ActionValue", "SearchResult",
     "load_usage", "usage_prior", "likely_set", "has_usage", "LikelySet",
     "i18n",
 ]

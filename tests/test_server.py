@@ -188,6 +188,17 @@ def test_spread_endpoint_flags_unmet():
     assert out["unmet"]
 
 
+def test_decide_endpoint():
+    out = server.api_decide({
+        "me": {"species": "garchomp", "nature": "jolly",
+               "sp": {"atk": 32, "spe": 32},
+               "moves": ["earthquake", "dragonclaw", "stoneedge"]},
+        "opp": {"species": "tyranitar", "nature": "adamant", "moves": ["crunch"]},
+    })
+    assert out["actions"][0]["move"] == "Earthquake"
+    assert "recommendation" in out and "lines" in out
+
+
 def test_likely_endpoint():
     # Agnostique aux données importées : on valide le comportement de l'endpoint.
     out = server.api_likely("incineroar")

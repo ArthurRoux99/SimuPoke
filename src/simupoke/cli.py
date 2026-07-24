@@ -27,6 +27,9 @@ Usage :
     python -m simupoke.cli sim <me_species> <me_nature> <me_moves> <opp_species> <opp_nature> <opp_moves>
         [--me-sp k=v,...] [--opp-sp k=v,...] [--me-item X] [--roll 0..1] [--weather X]
         # rejoue une ligne tour par tour (séquences de coups séparées par des virgules)
+    python -m simupoke.cli decide <me_species> <me_nature> <me_moves> <opp_species> <opp_nature>
+        [--opp-moves a,b,c] [--me-sp k=v] [--opp-sp k=v] [--roll 0..1] [--weather X]
+        # classe mes actions par valeur attendue (coups simultanés, 1-ply sur le simulateur)
 """
 
 from __future__ import annotations
@@ -48,6 +51,7 @@ from .bench import (
 )
 from .optimize import optimize_spread, Outspeed, Survive, Ko
 from .sim import Mon, rollout
+from .search import rank_actions
 
 
 def _print_stats(species: str, stats: dict[str, int]) -> None:
@@ -585,6 +589,40 @@ def cmd_sim(args: list[str]) -> int:
     return 0
 
 
+def cmd_decide(args: list[str]) -> int:
+    pos, opts, _ = _split_args(args, set())
+    if len(pos) != 5:
+        print("Usage : decide <me_species> <me_nature> <me_moves> "
+              "<opp_species> <opp_nature> [--me-sp k=v] [--opp-sp k=v] "
+              "[--opp-moves a,b,c] [--me-item X] [--opp-item X] [--me-hp 0..1] "
+              "[--opp-hp 0..1] [--roll 0..1] [--weather X]", file=sys.stderr)
+        return 2
+    me_sp, me_nat, me_moves, opp_sp, opp_nat = pos
+    for sp in (me_sp, opp_sp):
+        if not is_known(sp):
+            print(f"Espèce inconnue : {sp!r}", file=sys.stderr)
+            return 1
+    me = Mon.from_state(PokemonState(
+        species=me_sp, nature=me_nat, stat_points=_parse_sp(opts.get("me-sp", "")),
+        moves=[m.strip() for m in me_moves.split(",") if m.strip()],
+        item=opts.get("me-item"), current_hp_pct=float(opts.get("me-hp", 1.0))))
+    opp = Mon.from_state(PokemonState(
+        species=opp_sp, nature=opp_nat, stat_points=_parse_sp(opts.get("opp-sp", "")),
+        moves=[m.strip() for m in opts.get("opp-moves", "").split(",") if m.strip()],
+        item=opts.get("opp-item"), current_hp_pct=float(opts.get("opp-hp", 1.0))))
+    field = FieldState(weather=opts.get("weather"), terrain=opts.get("terrain"),
+                       trick_room="trick-room" in args)
+    try:
+        res = rank_actions(me, opp, field, roll=float(opts.get("roll", 0.5)))
+    except (ValueError, KeyError) as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    print(f"{label('species', me_sp)}  vs  {label('species', opp_sp)}\n")
+    for line in res.lines():
+        print(line)
+    return 0
+
+
 def _force_utf8_stdout() -> None:
     """Évite les UnicodeEncodeError sur console Windows (cp1252) : la sortie
     contient des accents et le séparateur « • ». Sans effet ailleurs."""
@@ -630,6 +668,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_spread(rest)
     if cmd == "sim":
         return cmd_sim(rest)
+    if cmd == "decide":
+        return cmd_decide(rest)
     print(f"Commande inconnue : {cmd!r}", file=sys.stderr)
     return 2
 

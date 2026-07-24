@@ -23,6 +23,7 @@ Endpoints :
     POST /api/survive           SP défensif mini pour survivre à une attaque
     POST /api/ko                SP offensif mini pour garantir un KO en N coups
     POST /api/spread            optimiseur de spread SP (objectifs combinés)
+    POST /api/decide            recherche 1-ply à coups simultanés (§10.2)
 """
 
 from __future__ import annotations
@@ -41,6 +42,8 @@ from .bench import (
     speed_tiers, min_sp_to_outspeed, min_sp_to_survive, min_sp_to_ko,
 )
 from .optimize import optimize_spread, Outspeed, Survive, Ko
+from .sim import Mon
+from .search import rank_actions
 from .draft import rank_lineup
 from .team import analyze_team, select_team_preview
 from .usage import usage_prior, has_usage, likely_set
@@ -251,6 +254,20 @@ def api_spread(body: dict) -> dict:
             "stats": res.stats, "unmet": res.unmet, "lines": res.lines()}
 
 
+def api_decide(body: dict) -> dict:
+    """Recherche 1-ply à coups simultanés : classe mes actions (§10.2)."""
+    me = Mon.from_state(_state(body["me"]))
+    opp = Mon.from_state(_state(body["opp"]))
+    field = FieldState(**(body.get("field") or {}))
+    res = rank_actions(me, opp, field, use_usage=body.get("use_usage", True),
+                       roll=float(body.get("roll", 0.5)))
+    return {"oppMoves": res.opp_moves,
+            "actions": [{"move": a.move, "expected": a.expected, "worst": a.worst,
+                         "koChance": a.ko_chance, "survivesWorst": a.survives_worst}
+                        for a in res.actions],
+            "recommendation": res.recommendation, "lines": res.lines()}
+
+
 def api_draft(body: dict) -> dict:
     lineup = _owned_list(body["lineup"])
     roster = (_owned_list(body["roster"]) if body.get("roster") is not None
@@ -346,6 +363,7 @@ _POST_ROUTES = {
     "/api/roster": api_roster_save,
     "/api/speed": api_speed, "/api/outspeed": api_outspeed,
     "/api/survive": api_survive, "/api/ko": api_ko, "/api/spread": api_spread,
+    "/api/decide": api_decide,
 }
 _GET_API = {"/api/meta": api_meta, "/api/samples": api_samples,
             "/api/roster": api_roster_get}

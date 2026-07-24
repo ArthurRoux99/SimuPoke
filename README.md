@@ -82,6 +82,7 @@ SimuPoke/
 │   ├── team.py                  # B3 — analyse d'équipe + assistant team preview
 │   ├── combat.py                # B1 — assistant de combat (mode analyse, 1 tour)
 │   ├── sim.py                   # simulateur de tour (ordre, dégâts, statut, fin de tour) — fondation Phase 4
+│   ├── search.py                # recherche 1-ply à coups simultanés (§10.2) sur le simulateur
 │   ├── bench.py                 # seuils & optimiseur de SP (speed tiers, outspeed/survive/ko)
 │   ├── optimize.py              # optimiseur de spread complet (objectifs combinés → SP)
 │   ├── model.py                  # OwnedPokemon + état de combat (Doubles-ready)
@@ -292,7 +293,7 @@ les exemples de `data/`. L'onglet **Mon Box** charge, édite et **enregistre**
 `data/my_roster.json` directement. Rien ne sort de ta machine (§3).
 
 > API : `GET /api/meta|samples|roster`,
-> `POST /api/damage|analyze|draft|team|preview|stats|roster|speed|outspeed|survive|ko|spread`.
+> `POST /api/damage|analyze|decide|draft|team|preview|stats|roster|speed|outspeed|survive|ko|spread`.
 
 ## B1 — Assistant de combat (mode analyse)
 
@@ -421,6 +422,28 @@ python -m simupoke.cli sim garchomp jolly swordsdance,earthquake amoonguss sassy
 > non modélisés (para 25 %, gel/dégel…). C'est la brique qui manquait pour la
 > **Phase 4** (recherche multi-tours).
 
+## Recherche à coups simultanés (Phase 4, §10.2)
+
+`simupoke.search.rank_actions` fait le **premier vrai pas** au-delà de
+l'heuristique à un tour : elle **simule** chaque combinaison (mon coup × coup
+adverse) via le simulateur, **évalue l'état résultant** (`evaluate_state` : K.O.
+dominants, différentiel de PV, boosts, statut) et classe mes actions par valeur
+**attendue** sur la distribution des coups adverses — en signalant le **pire cas**
+(coups simultanés = information imparfaite). La distribution adverse vient des
+coups observés, sinon du **set le plus probable** (usage §10.3), sinon adversaire
+inactif.
+
+```bash
+python -m simupoke.cli decide garchomp jolly earthquake,dragonclaw,swordsdance \
+    tyranitar adamant --me-sp atk=32,spe=32 --opp-moves crunch,stoneedge
+#   -> actions classées (valeur attendue / pire cas) + reco (préfère le sûr à
+#      espérance proche)
+```
+
+> Profondeur 1 pour rester rapide et explicable ; l'extension MCTS/ISMCTS
+> multi-tours réutilisera la **même** fonction d'évaluation et le **même**
+> simulateur. Exposé aussi par `POST /api/decide`.
+
 ## Démarrage rapide
 
 ```bash
@@ -504,6 +527,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Base stats des nouvelles Méga Champions : `@pkmn/dex` ≥ 0.10.11 + régénération de `data/pokedex.json` (24 Méga ajoutées, p. ex. Feraligatr/Meganium/Floette-Mega).
 - [ ] Ré-importer l'usage sur Reg M-B dès que Smogon le publie (`simupoke-import-usage`).
 - [x] Simulateur de tour (ordre, dégâts, statut/setup/protection, fin de tour) + `rollout`/CLI `sim` — fondation Phase 4.
-- [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4 (recherche par-dessus le simulateur).
-- [ ] Simulateur : changements (switch) + effets secondaires probabilistes.
+- [x] Recherche 1-ply à coups simultanés (`rank_actions`/CLI `decide`/API) : valeur attendue + pire cas.
+- [ ] B1 — recherche multi-tours (MCTS/ISMCTS, §10.2) par-dessus le simulateur.
+- [ ] Simulateur & recherche : changements (switch) + effets secondaires probabilistes.
 - [ ] Doubles (Phase 5) ; apprentissage optionnel (Phase 6).
