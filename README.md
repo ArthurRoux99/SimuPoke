@@ -21,7 +21,7 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 | 0 | Socle données + conversion SP→stats + damage calc | ✅ |
 | 1 | B2 — Aide au tirage (Roster Ranch) | 🟡 v1 (sans priors d'usage) |
 | 2 | B3 — Team builder + team preview | 🟡 v1 (matchups par types) |
-| 3 | B1 — Mode analyse (Singles) | 🟡 v1 (analyse 1 tour) |
+| 3 | B1 — Mode analyse (Singles) | 🟡 v1 (analyse 1 tour + switchs) |
 | — | Seuils & optimiseur de SP (§11.1, §8.3) | ✅ speed tiers + outspeed/survive/ko + spread |
 | — | UI — page HTML autonome (§12) | 🟡 v1 (calc de dégâts) |
 | — | UI — serveur local (tous les modules) | 🟡 v1 (Dégâts/B1/B2/B3) |
@@ -300,10 +300,24 @@ parfaite), **déduite** des coups déjà observés, ou — si rien n'est connu �
 **estimée via le set le plus probable de l'espèce** (modèle d'usage §10.3,
 signalée « estimé via l'usage »).
 
-> Limitations v1 (assumées) : un seul tour, centré sur les coups offensifs (les
-> coups de statut sont listés mais non évalués) ; pas de changement ni de
-> recherche d'arbre — ce sera la **Phase 4** (MCTS/ISMCTS, §10.2). Build adverse
-> inconnu ⇒ nature neutre / 0 SP (le modèle d'usage §10.3 affinera).
+Les **changements** (switch) sont évalués si un banc est fourni : `analyze_turn`
+note chaque Pokémon du banc sur sa **sûreté à l'entrée** (coup encaissé) et sa
+**menace au tour suivant** (offense escomptée), et **recommande un pivot** quand
+l'actif serait mis KO sans tuer d'abord et qu'un remplaçant encaisse. Exposé en
+CLI (`analyze --bench …`), par l'API (`bench` dans `POST /api/analyze`, champ
+`switches` en sortie) et le champ **Mon banc** de l'onglet Combat.
+
+```bash
+python -m simupoke.cli analyze gengar timid shadowball garchomp jolly \
+    --me-hp 0.3 --opp-move earthquake \
+    --bench "skarmory,impish,bravebird ; rotomwash,bold,hydropump"
+#   -> ➤ Changer pour skarmory — l'actif serait mis KO ; ce switch encaisse.
+```
+
+> Limitations restantes (assumées) : un seul tour ; coups de statut listés mais
+> non évalués ; pas encore de recherche d'arbre — ce sera la **Phase 4**
+> (MCTS/ISMCTS, §10.2). Build adverse inconnu ⇒ nature neutre / 0 SP (le modèle
+> d'usage §10.3 affine).
 
 ## Seuils & optimiseur de SP (§11.1 — « seuils de survie / de KO »)
 
@@ -440,6 +454,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Optimiseur de spread complet : objectifs combinés → spread SP légal (`spread`, API, UI).
 - [x] Couverture calc étendue : items type-boost, Paradox (Protosynthèse/Charge Quantique), Fluffy/Ice Scales/Water Bubble & co.
 - [x] Focus Sash / Fermeté dans les seuils de survie/KO et l'optimiseur de spread.
+- [x] B1 — évaluation des changements (switch) : sûreté à l'entrée + menace, reco de pivot.
 - [x] Delta Champions au calc : talents -ate (dont Dragonize, piloté par données) + Mega Sol.
 - [x] UI — page HTML autonome v1 (calculateur de dégâts, moteur JS à parité).
 - [x] UI — serveur local v1 : tous les modules (Dégâts/B1/B2/B3) via API Python.

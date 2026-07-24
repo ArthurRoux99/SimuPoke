@@ -12,6 +12,7 @@ Usage :
     python -m simupoke.cli analyze <me_species> <me_nature> <me_moves> <opp_species> <opp_nature>
         [--opp-move X] [--opp-moves a,b,c] [--me-sp k=v,...] [--opp-sp k=v,...]
         [--me-item X] [--opp-item X] [--me-hp 0..1] [--opp-hp 0..1] [--weather X]
+        [--bench "species,nature,move1|move2;species2,nature2,move1|move2"]  # évalue les switchs
     python -m simupoke.cli speed <team.json> [<team2.json> ...] [--trick-room]
     python -m simupoke.cli outspeed <me_species> <me_nature> <target_species> <target_nature>
         [--target-sp k=v,...] [--me-tailwind] [--target-tailwind] [--tie]
@@ -278,8 +279,23 @@ def cmd_analyze(args: list[str]) -> int:
         current_hp_pct=float(opts.get("opp-hp", 1.0)),
     )
     field = FieldState(weather=opts.get("weather"), terrain=opts.get("terrain"))
+    bench: list[PokemonState] = []
+    for chunk in opts.get("bench", "").split(";"):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        parts = [p.strip() for p in chunk.split(",")]
+        species = parts[0]
+        if not is_known(species):
+            print(f"Espèce inconnue (banc) : {species!r}", file=sys.stderr)
+            return 1
+        nature = parts[1] if len(parts) > 1 and parts[1] else "serious"
+        moves = ([m.strip() for m in parts[2].split("|") if m.strip()]
+                 if len(parts) > 2 else [])
+        bench.append(PokemonState(species=species, nature=nature, moves=moves))
     try:
-        analysis = analyze_turn(me, opp, field, opp_move=opts.get("opp-move"))
+        analysis = analyze_turn(me, opp, field, opp_move=opts.get("opp-move"),
+                                bench=bench)
     except (ValueError, KeyError) as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 1

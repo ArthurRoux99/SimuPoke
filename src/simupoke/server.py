@@ -152,7 +152,9 @@ def api_damage(body: dict) -> dict:
 def api_analyze(body: dict) -> dict:
     me, opp = _state(body["me"]), _state(body["opp"])
     field = FieldState(**(body.get("field") or {}))
-    a = analyze_turn(me, opp, field, opp_move=body.get("opp_move") or None)
+    bench = [_state(d) for d in (body.get("bench") or [])]
+    a = analyze_turn(me, opp, field, opp_move=body.get("opp_move") or None,
+                     bench=bench)
     inc = a.incoming
     return {
         "incoming": {"move": inc.move, "maxPct": inc.max_pct,
@@ -162,6 +164,10 @@ def api_analyze(body: dict) -> dict:
                      "ko": e.ko, "first": e.first, "value": e.value,
                      "notes": e.notes} for e in a.options],
         "other": [e.move for e in a.other],
+        "switches": [{"species": s.species, "incomingPct": s.incoming_pct,
+                      "survives": s.survives, "bestMove": s.best_move,
+                      "bestMovePct": s.best_move_pct, "value": s.value,
+                      "notes": s.notes} for s in a.switches],
         "recommendation": a.recommendation,
         "lines": a.lines(),
     }

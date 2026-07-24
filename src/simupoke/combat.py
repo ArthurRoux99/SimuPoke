@@ -6,10 +6,14 @@ tenant compte du KO, de l'ordre d'action (priorité + vitesse, Trick Room) et du
 risque encouru (dégâts subis). L'action adverse peut être **fournie** (info
 quasi parfaite, §10.1) ou **estimée** à partir des coups adverses connus.
 
-Limites v1 (assumées) :
-  - analyse d'un seul tour, centrée sur les coups offensifs ; les coups de
-    statut/soutien sont listés mais non évalués (il faudrait du multi-tours) ;
-  - pas de changement (switch) ni de recherche d'arbre (ce sera §10.2, MCTS).
+Les **changements** (switch) sont évalués si un banc est fourni : sûreté à
+l'entrée (coup encaissé) + menace offensive au tour suivant (escomptée), et
+peuvent primer la recommandation quand l'actif serait mis KO sans tuer d'abord.
+
+Limites restantes (assumées) :
+  - analyse d'un seul tour ; les coups de statut/soutien sont listés mais non
+    évalués (il faudrait du multi-tours) ; pas encore de recherche d'arbre
+    (ce sera §10.2, MCTS) ;
   - build adverse inconnu => nature neutre / 0 SP par défaut (le modèle d'usage
     §10.3 affinera plus tard).
 """
@@ -29,6 +33,11 @@ W_OFFENSE = 1.0
 W_KO = 0.5
 W_RISK = 0.8
 W_SPEED = 0.1
+
+# Changements (switch) : l'offense n'arrive qu'au tour SUIVANT -> on l'escompte,
+# et on pénalise le coup encaissé à l'entrée.
+W_SWITCH_OFF = 0.5
+W_SWITCH_RISK = 0.9
 
 
 def _boost_mult(stage: int) -> float:
@@ -129,11 +138,73 @@ class MoveEval:
 
 
 @dataclass
+class SwitchEval:
+    species: str
+    incoming_pct: float               # % PV encaissés à l'entrée (roll haut)
+    survives: bool                    # survit au coup d'entrée ?
+    best_move: str | None             # meilleur coup offensif au tour suivant
+    best_move_pct: float              # % moyen infligé par ce coup
+    value: float
+    notes: list[str] = dfield(default_factory=list)
+
+
+def _best_offense(mon: PokemonState, opp: PokemonState,
+                  field: FieldState | None) -> tuple[str | None, float, bool]:
+    """Meilleur coup offensif de `mon` sur `opp` : (nom, % moyen, KO possible)."""
+    best_name: str | None = None
+    best_avg = 0.0
+    best_ko = False
+    for mv in mon.moves:
+        if not move_known(mv) or get_move(mv).is_status:
+            continue
+        try:
+            r = calculate(mon, opp, mv, field)
+        except (ValueError, KeyError):
+            continue
+        avg = (r.min_pct + r.max_pct) / 2
+        if avg > best_avg:
+            best_avg, best_name = avg, get_move(mv).name
+            best_ko = r.max_damage >= r.defender_current_hp
+    return best_name, best_avg, best_ko
+
+
+def evaluate_switches(bench: list[PokemonState], opp: PokemonState,
+                      field: FieldState | None, opp_move: str | None,
+                      use_usage: bool = True) -> list[SwitchEval]:
+    """Note chaque changement possible : sûreté à l'entrée + menace au tour +1.
+
+    Palier « indicatif » (§15 Q3) : on suppose que l'adversaire attaque le
+    Pokémon qui entre (le coup fourni/estimé le touche), puis on estime la
+    valeur offensive du nouvel actif au tour suivant (escomptée).
+    """
+    evals: list[SwitchEval] = []
+    for mon in bench:
+        inc = _incoming(mon, opp, field, opp_move, use_usage=use_usage)
+        inc_frac = min(1.0, inc.max_pct / 100.0) if inc.known else 0.0
+        off_name, off_avg, off_ko = _best_offense(mon, opp, field)
+        value = W_SWITCH_OFF * (off_avg / 100.0) - W_SWITCH_RISK * inc_frac
+        notes: list[str] = []
+        survives = not inc.ohko if inc.known else True
+        if inc.known and inc.ohko:
+            notes.append("mis KO à l'entrée")
+            value -= 0.5
+        if off_ko:
+            notes.append("menace un KO au tour suivant")
+        evals.append(SwitchEval(
+            species=mon.species, incoming_pct=inc.max_pct if inc.known else 0.0,
+            survives=survives, best_move=off_name, best_move_pct=off_avg,
+            value=value, notes=notes))
+    evals.sort(key=lambda e: e.value, reverse=True)
+    return evals
+
+
+@dataclass
 class TurnAnalysis:
     options: list[MoveEval]            # coups offensifs, classés
     other: list[MoveEval]             # coups de statut/soutien (non notés)
     incoming: Incoming
     recommendation: str
+    switches: list[SwitchEval] = dfield(default_factory=list)
 
     def lines(self) -> list[str]:
         out: list[str] = []
@@ -158,6 +229,15 @@ class TurnAnalysis:
         if self.other:
             out.append("  Autres (non évalués en v1) : "
                        + ", ".join(e.move for e in self.other))
+        if self.switches:
+            out.append("")
+            out.append("Changements possibles (classés) :")
+            for s in self.switches:
+                surv = "encaisse" if s.survives else "KO à l'entrée"
+                mv = f" puis {s.best_move} {s.best_move_pct:.0f}%" if s.best_move else ""
+                extra = f" — {', '.join(s.notes)}" if s.notes else ""
+                out.append(f"  ~ {s.species:<14} entrée {s.incoming_pct:.0f}% "
+                           f"[{surv}]{mv}  (valeur {s.value:+.2f}){extra}")
         out.append("")
         out.append(f"➤ Recommandation : {self.recommendation}")
         return out
@@ -167,11 +247,14 @@ def analyze_turn(me: PokemonState, opp: PokemonState,
                  field: FieldState | None = None, *,
                  opp_move: str | None = None,
                  my_moves: list[str] | None = None,
+                 bench: list[PokemonState] | None = None,
                  use_usage: bool = True) -> TurnAnalysis:
     """Classe mes coups pour le tour courant (mode analyse).
 
     Si l'adversaire est connu mais ses coups non renseignés, la menace est
-    estimée à partir de son set le plus probable (usage, §10.3).
+    estimée à partir de son set le plus probable (usage, §10.3). Si un banc
+    (`bench`) est fourni, les changements possibles sont aussi évalués et
+    peuvent primer la recommandation quand la situation de l'actif est mauvaise.
     """
     my_moves = my_moves if my_moves is not None else list(me.moves)
     incoming = _incoming(me, opp, field, opp_move, use_usage=use_usage)
@@ -224,15 +307,32 @@ def analyze_turn(me: PokemonState, opp: PokemonState,
         ))
 
     options.sort(key=lambda e: e.value, reverse=True)
-    recommendation = _recommend(options, incoming)
+    switches = (evaluate_switches(bench, opp, field, opp_move, use_usage)
+                if bench else [])
+    recommendation = _recommend(options, incoming, switches)
     return TurnAnalysis(options=options, other=other, incoming=incoming,
-                        recommendation=recommendation)
+                        recommendation=recommendation, switches=switches)
 
 
-def _recommend(options: list[MoveEval], incoming: Incoming) -> str:
-    if not options:
+def _recommend(options: list[MoveEval], incoming: Incoming,
+               switches: list[SwitchEval] | None = None) -> str:
+    switches = switches or []
+    best = options[0] if options else None
+
+    # Situation mauvaise pour l'actif : mis KO avant d'agir sans tuer en premier.
+    active_bad = (incoming.ohko and (best is None or not (best.first and best.ko)))
+    best_switch = switches[0] if switches else None
+    if active_bad and best_switch and best_switch.survives \
+            and best_switch.value > 0:
+        pivot = (f" (menace {best_switch.best_move})"
+                 if best_switch.best_move else "")
+        return (f"Changer pour {best_switch.species} — l'actif serait mis KO ; "
+                f"ce switch encaisse{pivot}.")
+
+    if best is None:
+        if best_switch and best_switch.survives:
+            return f"Changer pour {best_switch.species} (aucun coup offensif utile)."
         return "aucun coup offensif disponible (voir coups de statut)."
-    best = options[0]
     if best.ko == "KO garanti" and best.first:
         return f"{best.move} — KO garanti en agissant en premier."
     if best.ko == "KO garanti":

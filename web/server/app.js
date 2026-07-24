@@ -139,6 +139,14 @@
       $('c-likely-status').textContent = 'rempli depuis l\'usage' + (bits.length ? ' (' + bits.join(', ') + ')' : '');
     } catch (e) { $('c-likely-status').textContent = '⚠ ' + e.message; }
   }
+  function parseBench(spec) {
+    return (spec || '').split(';').map((chunk) => {
+      const parts = chunk.split(',').map((x) => x.trim());
+      if (!parts[0]) return null;
+      return { species: parts[0], nature: parts[1] || 'serious',
+        moves: (parts[2] || '').split('|').map((x) => x.trim()).filter(Boolean) };
+    }).filter(Boolean);
+  }
   async function runCombat() {
     try {
       const me = { species: $('c-me-species').value, nature: $('c-me-nature').value,
@@ -147,6 +155,7 @@
       const opp = { species: $('c-opp-species').value, nature: $('c-opp-nature').value,
         moves: splitMoves($('c-opp-moves').value), hpPct: parseFloat($('c-opp-hp').value || '100') / 100 };
       const r = await api('/api/analyze', { me, opp, opp_move: $('c-opp-move').value,
+        bench: parseBench($('c-bench').value),
         field: { weather: $('c-weather').value, terrain: $('c-terrain').value } });
       $('combat-result').textContent = r.lines.join('\n');
     } catch (e) { $('combat-result').textContent = '⚠ ' + e.message; }

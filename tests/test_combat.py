@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from simupoke.model import PokemonState, FieldState
-from simupoke.combat import analyze_turn, effective_speed, moves_first
+from simupoke.combat import (
+    analyze_turn, effective_speed, moves_first, evaluate_switches,
+)
 
 
 def mk(species, nature="serious", sp=None, moves=None, item=None,
@@ -88,3 +90,41 @@ def test_usage_disabled_falls_back_to_unknown():
     me = mk("garchomp", "jolly", {"atk": 32, "spe": 32}, ["earthquake"])
     a = analyze_turn(me, mk("incineroar", "careful", {}, []), use_usage=False)
     assert a.incoming.known is False
+
+
+# --- Changements (switch) ---------------------------------------------------
+
+def test_no_bench_means_no_switches():
+    me = mk("garchomp", "jolly", {"atk": 32, "spe": 32}, ["earthquake"])
+    opp = mk("tyranitar", "adamant", {"atk": 32}, ["crunch"])
+    a = analyze_turn(me, opp, opp_move="crunch")
+    assert a.switches == []
+
+
+def test_switches_ranked_by_value():
+    me = mk("garchomp", "jolly", {"atk": 32, "spe": 32}, ["earthquake"])
+    opp = mk("garchomp", "jolly", {"atk": 32, "spe": 32}, ["earthquake"])
+    # Skarmory (immunisé Sol) doit primer Rotom-W (au sol, encaisse) à l'entrée.
+    bench = [mk("rotomwash", "bold", {"hp": 32, "def": 32}, ["hydropump"]),
+             mk("skarmory", "impish", {"hp": 32, "def": 32}, ["bravebird"])]
+    a = analyze_turn(me, opp, opp_move="earthquake", bench=bench)
+    assert a.switches[0].species == "skarmory"
+    assert a.switches[0].incoming_pct == 0.0        # immunité Sol
+    assert a.switches[0].value >= a.switches[1].value
+
+
+def test_pivot_recommended_when_active_is_lost():
+    # Gengar entamé, ne tue pas, se fait OHKO au Sol ; Skarmory y est immunisé.
+    me = mk("gengar", "timid", {"spa": 32, "spe": 32}, ["shadowball"], hp=0.3)
+    opp = mk("garchomp", "jolly", {"atk": 32, "spe": 32}, ["earthquake"])
+    bench = [mk("skarmory", "impish", {"hp": 32, "def": 32}, ["bravebird"])]
+    a = analyze_turn(me, opp, opp_move="earthquake", bench=bench)
+    assert "Changer pour skarmory" in a.recommendation
+
+
+def test_evaluate_switches_flags_ohko_entry():
+    opp = mk("garchomp", "adamant", {"atk": 32}, ["earthquake"], item="choiceband")
+    bench = [mk("fluttermane", "timid", {"hp": 0}, ["moonblast"])]
+    sw = evaluate_switches(bench, opp, None, "earthquake")
+    assert sw[0].survives is False
+    assert any("KO à l'entrée" in n for n in sw[0].notes)
