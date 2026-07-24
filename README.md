@@ -22,7 +22,7 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 | 1 | B2 — Aide au tirage (Roster Ranch) | 🟡 v1 (sans priors d'usage) |
 | 2 | B3 — Team builder + team preview | 🟡 v1 (matchups par types) |
 | 3 | B1 — Mode analyse (Singles) | 🟡 v1 (analyse 1 tour) |
-| — | Seuils & optimiseur de SP (§11.1) | ✅ speed tiers + outspeed/survive/ko |
+| — | Seuils & optimiseur de SP (§11.1, §8.3) | ✅ speed tiers + outspeed/survive/ko + spread |
 | — | UI — page HTML autonome (§12) | 🟡 v1 (calc de dégâts) |
 | — | UI — serveur local (tous les modules) | 🟡 v1 (Dégâts/B1/B2/B3) |
 | 4 | B1 — Mode simultané (MCTS/ISMCTS) | ⏳ |
@@ -82,6 +82,7 @@ SimuPoke/
 │   ├── team.py                  # B3 — analyse d'équipe + assistant team preview
 │   ├── combat.py                # B1 — assistant de combat (mode analyse, 1 tour)
 │   ├── bench.py                 # seuils & optimiseur de SP (speed tiers, outspeed/survive/ko)
+│   ├── optimize.py              # optimiseur de spread complet (objectifs combinés → SP)
 │   ├── model.py                  # OwnedPokemon + état de combat (Doubles-ready)
 │   ├── i18n.py                   # couche d'affichage FR/EN
 │   ├── loaders.py                # chargement roster + régulation + lineup + équipe
@@ -270,7 +271,7 @@ les exemples de `data/`. L'onglet **Mon Box** charge, édite et **enregistre**
 `data/my_roster.json` directement. Rien ne sort de ta machine (§3).
 
 > API : `GET /api/meta|samples|roster`,
-> `POST /api/damage|analyze|draft|team|preview|stats|roster|speed|outspeed|survive|ko`.
+> `POST /api/damage|analyze|draft|team|preview|stats|roster|speed|outspeed|survive|ko|spread`.
 
 ## B1 — Assistant de combat (mode analyse)
 
@@ -310,6 +311,32 @@ dans [0, 32], §8.3) rend l'espace de recherche trivial : on énumère.
 > compte) ; la contrainte de budget global (66 SP au total) reste au joueur qui
 > assemble le spread complet. Exposés en CLI (`speed`/`outspeed`/`survive`/`ko`)
 > et par l'API (`POST /api/speed|outspeed|survive|ko`) + l'onglet **Seuils**.
+
+### Optimiseur de spread complet (§8.3)
+
+`simupoke.optimize.optimize_spread` **compose** ces seuils : à partir d'une liste
+d'**objectifs** (dépasser X, survivre à Y, tuer Z), il résout un spread SP
+**complet et légal** — total ≤ 66, ≤ 32 par stat — au coût minimal. La
+décomposition rend le problème facile : Vitesse (`spe`) et Offense (`atk`/`spa`)
+sont des axes indépendants (max des seuils), seule la **défense** est couplée
+(les PV sont partagés entre Déf et Déf.Spé) — on balaie alors les PV en
+minimisant `hp + def + spd`. Les objectifs hors de portée ou le dépassement de
+budget sont **signalés** (l'outil reste explicable) plutôt que de faire échouer
+le calcul.
+
+```bash
+# Tyranitar Rigide : OHKO Garchomp (Ice Punch), survivre au Séisme d'un Garchomp
+# max Atq, dépasser Amoonguss → spread SP complet
+python -m simupoke.cli spread tyranitar adamant \
+    --ko garchomp,jolly,icepunch \
+    --survive garchomp,adamant,earthquake,off=32 \
+    --outspeed amoonguss,sassy,spe=0
+#   -> Spread proposé : PV 2, Atq 15, Déf 22 (39/66) — tous objectifs tenus
+#   (ajoute item=choiceband au Séisme et l'objectif de survie passe hors de portée)
+```
+
+> Exposé aussi par l'API (`POST /api/spread`) et le panneau **Optimiseur de
+> spread** de l'onglet Seuils (éditeur d'objectifs dépasser/survivre/tuer).
 
 ```bash
 # Combien de SP en Vitesse pour dépasser un Flutter Mane vitesse max ?
@@ -390,6 +417,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Talents défensifs dans le calc (immunités + Thick Fat/Heatproof).
 - [x] B1 — Assistant de combat, mode analyse v1 (analyse 1 tour, §10.1).
 - [x] Seuils & optimiseur de SP : speed tiers + `outspeed`/`survive`/`ko` (CLI + API + onglet).
+- [x] Optimiseur de spread complet : objectifs combinés → spread SP légal (`spread`, API, UI).
 - [x] Delta Champions au calc : talents -ate (dont Dragonize, piloté par données) + Mega Sol.
 - [x] UI — page HTML autonome v1 (calculateur de dégâts, moteur JS à parité).
 - [x] UI — serveur local v1 : tous les modules (Dégâts/B1/B2/B3) via API Python.

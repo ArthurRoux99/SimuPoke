@@ -236,6 +236,26 @@
       </div>
       <div class="result" id="ko-result"></div>
     </div>
+
+    <!-- Optimiseur de spread -->
+    <div class="panel" style="margin-top:14px">
+      <h2>Optimiseur de spread — combine plusieurs objectifs</h2>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 10px">Donne des objectifs
+        (dépasser / survivre / tuer) : l'outil résout un spread SP légal (≤ budget,
+        ≤ 32 par stat) au coût minimal.</p>
+      <div class="controls" style="grid-template-columns: 1.4fr 1fr 1fr auto;">
+        <div><label>Mon Pokémon</label><input id="sp-species" list="species-list" value="Tyranitar" autocomplete="off"></div>
+        <div><label>Nature</label><select id="sp-nature"></select></div>
+        <div><label>Objet (optionnel)</label><input id="sp-item" autocomplete="off"></div>
+        <div><label>Budget</label><input id="sp-budget" type="number" min="0" max="66" value="66"></div>
+      </div>
+      <div id="sp-objs" style="margin-top:8px"></div>
+      <div class="builder-actions">
+        <button id="sp-add" type="button">+ Objectif</button>
+        <button class="primary" id="sp-run">Optimiser</button>
+      </div>
+      <div class="result" id="sp-result"></div>
+    </div>
   </section>
 
   <!-- ===== MON BOX ===== -->

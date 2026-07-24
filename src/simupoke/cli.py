@@ -19,6 +19,10 @@ Usage :
         [--atk-sp k=v,...] [--atk-item X] [--weather X]      # SP défensif mini pour survivre
     python -m simupoke.cli ko <atk_species> <atk_nature> <move> <def_species> <def_nature>
         [--hits N] [--def-sp k=v,...] [--def-hp 0..1] [--atk-item X]   # SP offensif mini pour KO
+    python -m simupoke.cli spread <species> <nature> [--item X] [--ability X] [--budget 66]
+        [--outspeed species,nature,spe=SP[,scarf][,tw][,tie]]          # objectifs répétables
+        [--survive atk_species,atk_nature,move[,off=SP][,item=X]]
+        [--ko def_species,def_nature,move[,hits=N][,hp=0..1][,item=X]] # -> spread SP complet
 """
 
 from __future__ import annotations
@@ -38,6 +42,7 @@ from .combat import analyze_turn
 from .bench import (
     speed_tiers, min_sp_to_outspeed, min_sp_to_survive, min_sp_to_ko,
 )
+from .optimize import optimize_spread, Outspeed, Survive, Ko
 
 
 def _print_stats(species: str, stats: dict[str, int]) -> None:
@@ -419,6 +424,97 @@ def cmd_ko(args: list[str]) -> int:
     return 0
 
 
+def _parse_spec(spec: str, n_pos: int) -> tuple[list[str], dict[str, str], set[str]]:
+    """Découpe 'garchomp,jolly,spe=32,scarf' en (positionnels, k=v, drapeaux)."""
+    parts = [p.strip() for p in spec.split(",") if p.strip()]
+    pos = parts[:n_pos]
+    kv: dict[str, str] = {}
+    flags: set[str] = set()
+    for p in parts[n_pos:]:
+        if "=" in p:
+            k, _, v = p.partition("=")
+            kv[k.strip()] = v.strip()
+        else:
+            flags.add(p)
+    return pos, kv, flags
+
+
+def cmd_spread(args: list[str]) -> int:
+    # Options répétables (--outspeed/--survive/--ko) : parseur dédié.
+    pos: list[str] = []
+    objectives: list = []
+    budget = 66
+    item = ability = None
+    i = 0
+    err = None
+    while i < len(args):
+        a = args[i]
+        if a.startswith("--"):
+            key = a[2:]
+            val = args[i + 1] if i + 1 < len(args) else ""
+            i += 2
+            try:
+                if key == "outspeed":
+                    p, kv, fl = _parse_spec(val, 2)
+                    objectives.append(Outspeed(
+                        target=PokemonState(species=p[0], nature=p[1],
+                            item="choicescarf" if "scarf" in fl else None,
+                            stat_points={"spe": int(kv.get("spe", 0))}),
+                        strict="tie" not in fl,
+                        target_tailwind="tw" in fl, label=p[0]))
+                elif key == "survive":
+                    p, kv, fl = _parse_spec(val, 3)
+                    off = int(kv.get("off", 0))
+                    objectives.append(Survive(
+                        attacker=PokemonState(species=p[0], nature=p[1],
+                            item=kv.get("item"),
+                            stat_points={"atk": off, "spa": off}),
+                        move=p[2], crit="crit" in fl, label=f"{p[2]} de {p[0]}"))
+                elif key == "ko":
+                    p, kv, fl = _parse_spec(val, 3)
+                    objectives.append(Ko(
+                        defender=PokemonState(species=p[0], nature=p[1],
+                            item=kv.get("item"),
+                            current_hp_pct=float(kv.get("hp", 1.0))),
+                        move=p[2], hits=int(kv.get("hits", 1)),
+                        crit="crit" in fl, label=f"{p[2]} sur {p[0]}"))
+                elif key == "budget":
+                    budget = int(val)
+                elif key == "item":
+                    item = val
+                elif key == "ability":
+                    ability = val
+            except (IndexError, ValueError):
+                err = a
+                break
+        else:
+            pos.append(a)
+            i += 1
+    if err or len(pos) != 2:
+        print("Usage : spread <species> <nature> [--item X] [--ability X] "
+              "[--budget 66]\n"
+              "  --outspeed <species,nature,spe=SP[,scarf][,tw][,tie]>   (répétable)\n"
+              "  --survive  <atk_species,atk_nature,move[,off=SP][,item=X][,crit]>\n"
+              "  --ko       <def_species,def_nature,move[,hits=N][,hp=0..1][,item=X]>",
+              file=sys.stderr)
+        return 2
+    me_species, me_nature = pos
+    if not is_known(me_species):
+        print(f"Espèce inconnue : {me_species!r}", file=sys.stderr)
+        return 1
+    try:
+        res = optimize_spread(me_species, me_nature, objectives,
+                              item=item, ability=ability, budget=budget)
+    except (ValueError, KeyError) as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    print(f"{label('species', me_species)} ({label('nature', me_nature)})"
+          + (f" @ {item}" if item else "") + "\n")
+    for line in res.lines():
+        print(line)
+    return 0
+
+
 def _force_utf8_stdout() -> None:
     """Évite les UnicodeEncodeError sur console Windows (cp1252) : la sortie
     contient des accents et le séparateur « • ». Sans effet ailleurs."""
@@ -460,6 +556,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_survive(rest)
     if cmd == "ko":
         return cmd_ko(rest)
+    if cmd == "spread":
+        return cmd_spread(rest)
     print(f"Commande inconnue : {cmd!r}", file=sys.stderr)
     return 2
 

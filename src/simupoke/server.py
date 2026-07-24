@@ -22,6 +22,7 @@ Endpoints :
     POST /api/outspeed          SP mini en Vitesse pour dépasser une cible
     POST /api/survive           SP défensif mini pour survivre à une attaque
     POST /api/ko                SP offensif mini pour garantir un KO en N coups
+    POST /api/spread            optimiseur de spread SP (objectifs combinés)
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ from .combat import analyze_turn
 from .bench import (
     speed_tiers, min_sp_to_outspeed, min_sp_to_survive, min_sp_to_ko,
 )
+from .optimize import optimize_spread, Outspeed, Survive, Ko
 from .draft import rank_lineup
 from .team import analyze_team, select_team_preview
 from .usage import usage_prior, has_usage, likely_set
@@ -209,6 +211,39 @@ def api_ko(body: dict) -> dict:
             "line": res.line()}
 
 
+def _objective(d: dict):
+    """Construit un objectif d'optimisation depuis le JSON entrant."""
+    kind = d.get("kind")
+    field = FieldState(**(d.get("field") or {}))
+    if kind == "outspeed":
+        return Outspeed(target=_state(d["target"]),
+                        strict=d.get("strict", True),
+                        me_tailwind=d.get("me_tailwind", False),
+                        target_tailwind=d.get("target_tailwind", False),
+                        label=d.get("label", ""))
+    if kind == "survive":
+        return Survive(attacker=_state(d["attacker"]), move=d["move"],
+                       field=field, crit=d.get("crit", False),
+                       label=d.get("label", ""))
+    if kind == "ko":
+        return Ko(defender=_state(d["defender"]), move=d["move"],
+                  hits=int(d.get("hits", 1)), field=field,
+                  crit=d.get("crit", False), label=d.get("label", ""))
+    raise ValueError(f"objectif inconnu : {kind!r}")
+
+
+def api_spread(body: dict) -> dict:
+    """Optimiseur de spread : résout un spread SP couvrant tous les objectifs."""
+    objectives = [_objective(o) for o in body.get("objectives", [])]
+    res = optimize_spread(
+        body["species"], body.get("nature", "serious"), objectives,
+        item=body.get("item") or None, ability=body.get("ability") or None,
+        budget=int(body.get("budget", 66)))
+    return {"feasible": res.feasible, "sp": res.sp, "total": res.total,
+            "budget": res.budget, "leftover": res.leftover,
+            "stats": res.stats, "unmet": res.unmet, "lines": res.lines()}
+
+
 def api_draft(body: dict) -> dict:
     lineup = _owned_list(body["lineup"])
     roster = (_owned_list(body["roster"]) if body.get("roster") is not None
@@ -302,7 +337,7 @@ _POST_ROUTES = {
     "/api/draft": api_draft, "/api/team": api_team, "/api/preview": api_preview,
     "/api/roster": api_roster_save,
     "/api/speed": api_speed, "/api/outspeed": api_outspeed,
-    "/api/survive": api_survive, "/api/ko": api_ko,
+    "/api/survive": api_survive, "/api/ko": api_ko, "/api/spread": api_spread,
 }
 _GET_API = {"/api/meta": api_meta, "/api/samples": api_samples,
             "/api/roster": api_roster_get}

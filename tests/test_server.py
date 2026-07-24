@@ -161,6 +161,33 @@ def test_ko_endpoint():
     assert out["minPct"] >= 100.0
 
 
+def test_spread_endpoint_combines_objectives():
+    out = server.api_spread({
+        "species": "tyranitar", "nature": "adamant",
+        "objectives": [
+            {"kind": "ko", "defender": {"species": "garchomp", "nature": "jolly",
+             "sp": {"spe": 32}}, "move": "icepunch", "hits": 1},
+            {"kind": "survive", "attacker": {"species": "garchomp",
+             "nature": "adamant", "sp": {"atk": 32}}, "move": "earthquake"},
+            {"kind": "outspeed", "target": {"species": "amoonguss",
+             "nature": "sassy", "sp": {"spe": 0}}},
+        ],
+    })
+    assert out["feasible"] is True
+    assert out["total"] <= out["budget"]
+    assert "sp" in out and "lines" in out
+
+
+def test_spread_endpoint_flags_unmet():
+    out = server.api_spread({
+        "species": "magikarp", "nature": "serious",
+        "objectives": [{"kind": "ko", "defender": {"species": "blissey",
+                        "nature": "calm"}, "move": "tackle"}],
+    })
+    assert out["feasible"] is False
+    assert out["unmet"]
+
+
 def test_likely_endpoint():
     # Agnostique aux données importées : on valide le comportement de l'endpoint.
     out = server.api_likely("incineroar")

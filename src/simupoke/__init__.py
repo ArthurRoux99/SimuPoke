@@ -34,6 +34,9 @@ from .bench import (
     speed_tiers, compute_speed, min_sp_to_outspeed, min_sp_to_survive,
     min_sp_to_ko, SpeedEntry, OutspeedResult, SurviveResult, KoResult,
 )
+from .optimize import (
+    optimize_spread, Outspeed, Survive, Ko, SpreadResult,
+)
 from .usage import load_usage, usage_prior, likely_set, has_usage, LikelySet
 from . import i18n
 
@@ -54,6 +57,7 @@ __all__ = [
     "analyze_turn", "TurnAnalysis", "MoveEval", "effective_speed", "moves_first",
     "speed_tiers", "compute_speed", "min_sp_to_outspeed", "min_sp_to_survive",
     "min_sp_to_ko", "SpeedEntry", "OutspeedResult", "SurviveResult", "KoResult",
+    "optimize_spread", "Outspeed", "Survive", "Ko", "SpreadResult",
     "load_usage", "usage_prior", "likely_set", "has_usage", "LikelySet",
     "i18n",
 ]

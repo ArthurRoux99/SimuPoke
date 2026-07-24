@@ -8,6 +8,7 @@
   let META = { species: [], moves: [], natures: [] };
   let SAMPLES = {};
   const builders = {};
+  let spObjs = null;   // conteneur des lignes d'objectifs de l'optimiseur
 
   async function api(path, body) {
     const opt = body ? { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -227,6 +228,55 @@
     } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
   }
 
+  // ---------- Optimiseur de spread ----------
+  function addObjRow(d) {
+    d = d || {};
+    const row = document.createElement('div');
+    row.className = 'builder-row';
+    row.innerHTML =
+      `<select class="o-kind">
+         <option value="outspeed">dépasser</option>
+         <option value="survive">survivre</option>
+         <option value="ko">tuer</option></select>` +
+      `<input class="o-species" list="species-list" placeholder="espèce cible" value="${esc(d.species)}">` +
+      `<select class="o-nature">${natureOptions(d.nature || 'serious')}</select>` +
+      `<input class="o-move" list="move-list" placeholder="capacité (survivre/tuer)" value="${esc(d.move)}">` +
+      `<input class="o-num" type="number" placeholder="SP / coups" style="max-width:88px" value="${d.num != null ? d.num : ''}">` +
+      `<input class="o-item" placeholder="objet cible" value="${esc(d.item)}">` +
+      `<button class="b-del" type="button" title="retirer">✕</button>`;
+    row.querySelector('.o-kind').value = d.kind || 'outspeed';
+    row.querySelector('.b-del').addEventListener('click', () => spObjs.removeChild(row));
+    spObjs.appendChild(row);
+  }
+  function collectObjectives() {
+    return Array.from(spObjs.querySelectorAll('.builder-row')).map((row) => {
+      const kind = row.querySelector('.o-kind').value;
+      const species = row.querySelector('.o-species').value.trim();
+      const nature = row.querySelector('.o-nature').value;
+      const move = row.querySelector('.o-move').value.trim();
+      const num = parseInt(row.querySelector('.o-num').value || '0', 10);
+      const item = row.querySelector('.o-item').value.trim() || null;
+      if (!species) return null;
+      if (kind === 'outspeed') return { kind, target: { species, nature, sp: { spe: num || 0 }, item } };
+      if (kind === 'survive') return { kind, attacker: { species, nature, sp: { atk: num || 0, spa: num || 0 }, item }, move };
+      return { kind: 'ko', defender: { species, nature, item }, move, hits: num || 1 };
+    }).filter(Boolean);
+  }
+  async function runSpread() {
+    const out = $('sp-result');
+    try {
+      const r = await api('/api/spread', {
+        species: $('sp-species').value, nature: $('sp-nature').value,
+        item: $('sp-item').value || null,
+        budget: parseInt($('sp-budget').value || '66', 10),
+        objectives: collectObjectives(),
+      });
+      out.innerHTML = `<div class="${r.feasible ? 'headline' : 'headline error'}">`
+        + (r.feasible ? '✓ spread trouvé' : '⚠ objectifs non tous tenus') + '</div>'
+        + `<pre class="report" style="margin-top:8px">${esc(r.lines.join('\n'))}</pre>`;
+    } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
+  }
+
   // ---------- Mon Box ----------
   async function loadBox() {
     try { const r = await api('/api/roster'); builders.box.setEntries(r.roster);
@@ -292,6 +342,16 @@
     $('os-run').addEventListener('click', runOutspeed);
     $('sv-run').addEventListener('click', runSurvive);
     $('ko-run').addEventListener('click', runKo);
+    // Optimiseur de spread : conteneur d'objectifs + exemples de départ.
+    spObjs = $('sp-objs');
+    if (spObjs) {
+      $('sp-nature').value = 'adamant';
+      addObjRow({ kind: 'ko', species: 'Garchomp', nature: 'jolly', move: 'icepunch', num: 1 });
+      addObjRow({ kind: 'survive', species: 'Garchomp', nature: 'adamant', move: 'earthquake', num: 32 });
+      addObjRow({ kind: 'outspeed', species: 'Amoonguss', nature: 'sassy', num: 0 });
+      $('sp-add').addEventListener('click', () => addObjRow({}));
+      $('sp-run').addEventListener('click', runSpread);
+    }
     // Natures par défaut plus parlantes pour les seuils.
     if ($('os-me-nature')) { $('os-me-nature').value = 'jolly'; $('sv-def-nature').value = 'careful'; }
     if ($('sv-atk-nature')) { $('sv-atk-nature').value = 'adamant'; $('ko-atk-nature').value = 'adamant'; }
