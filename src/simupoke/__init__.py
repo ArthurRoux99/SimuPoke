@@ -40,6 +40,7 @@ from .bench import (
 from .optimize import (
     optimize_spread, Outspeed, Survive, Ko, SpreadResult,
 )
+from .sim import Mon, simulate_turn, rollout, action_order, TurnResult
 from .usage import load_usage, usage_prior, likely_set, has_usage, LikelySet
 from . import i18n
 
@@ -62,6 +63,7 @@ __all__ = [
     "speed_tiers", "compute_speed", "min_sp_to_outspeed", "min_sp_to_survive",
     "min_sp_to_ko", "SpeedEntry", "OutspeedResult", "SurviveResult", "KoResult",
     "optimize_spread", "Outspeed", "Survive", "Ko", "SpreadResult",
+    "Mon", "simulate_turn", "rollout", "action_order", "TurnResult",
     "load_usage", "usage_prior", "likely_set", "has_usage", "LikelySet",
     "i18n",
 ]

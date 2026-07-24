@@ -25,7 +25,7 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 | — | Seuils & optimiseur de SP (§11.1, §8.3) | ✅ speed tiers + outspeed/survive/ko + spread |
 | — | UI — page HTML autonome (§12) | 🟡 v1 (calc de dégâts) |
 | — | UI — serveur local (tous les modules) | 🟡 v1 (Dégâts/B1/B2/B3) |
-| 4 | B1 — Mode simultané (MCTS/ISMCTS) | ⏳ |
+| 4 | B1 — Mode simultané (MCTS/ISMCTS) | 🟡 simulateur de tour livré (recherche à venir) |
 | 5 | Doubles | ⏳ |
 | 6 | (optionnel) Apprentissage | ⏳ |
 
@@ -81,6 +81,7 @@ SimuPoke/
 │   ├── draft.py                 # B2 — scoring/classement du tirage
 │   ├── team.py                  # B3 — analyse d'équipe + assistant team preview
 │   ├── combat.py                # B1 — assistant de combat (mode analyse, 1 tour)
+│   ├── sim.py                   # simulateur de tour (ordre, dégâts, statut, fin de tour) — fondation Phase 4
 │   ├── bench.py                 # seuils & optimiseur de SP (speed tiers, outspeed/survive/ko)
 │   ├── optimize.py              # optimiseur de spread complet (objectifs combinés → SP)
 │   ├── model.py                  # OwnedPokemon + état de combat (Doubles-ready)
@@ -398,6 +399,28 @@ python -m simupoke.cli ko garchomp adamant earthquake tyranitar adamant --atk-it
 python -m simupoke.cli speed data/sample_team.json --trick-room
 ```
 
+## Simulateur de tour (fondation Phase 4, §10.2)
+
+`simupoke.sim` **résout un tour complet** en Singles — au-delà du calcul mono-coup :
+ordre d'action (priorité + vitesse effective, paralysie/Scarf/Trick Room), dégâts
+(via le calc figé, à un roll paramétrable), coups de **statut/setup/protection/soin**,
+sommeil/gel, puis effets de **fin de tour** (brûlure, poison/toxik à compteur,
+Vestiges, tempête de sable, Orbe Vie). `rollout` enchaîne les tours pour **rejouer
+une ligne** (revue de partie, §10.1) et servira de substrat à la recherche
+simultanée (MCTS/ISMCTS).
+
+```bash
+# Rejoue une ligne tour par tour (séquences de coups séparées par des virgules)
+python -m simupoke.cli sim garchomp jolly swordsdance,earthquake amoonguss sassy spore,sludgebomb \
+    --me-sp atk=32,spe=32 --opp-sp hp=32,spd=32
+#   -> déroulé commenté (setup, sommeil, KO) + verdict de la ligne
+```
+
+> Périmètre v1 (assumé, extensible) : Singles, **sans changement** (deux coups
+> résolus) ; dégâts déterministes à un roll ; effets secondaires probabilistes
+> non modélisés (para 25 %, gel/dégel…). C'est la brique qui manquait pour la
+> **Phase 4** (recherche multi-tours).
+
 ## Démarrage rapide
 
 ```bash
@@ -480,5 +503,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Lancer l'import sur une vraie source (Smogon chaos, Champions Reg M-A 1630, 2026-05) → remplace l'échantillon.
 - [x] Base stats des nouvelles Méga Champions : `@pkmn/dex` ≥ 0.10.11 + régénération de `data/pokedex.json` (24 Méga ajoutées, p. ex. Feraligatr/Meganium/Floette-Mega).
 - [ ] Ré-importer l'usage sur Reg M-B dès que Smogon le publie (`simupoke-import-usage`).
-- [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4.
+- [x] Simulateur de tour (ordre, dégâts, statut/setup/protection, fin de tour) + `rollout`/CLI `sim` — fondation Phase 4.
+- [ ] B1 — Mode décision simultané (MCTS/ISMCTS, §10.2) — Phase 4 (recherche par-dessus le simulateur).
+- [ ] Simulateur : changements (switch) + effets secondaires probabilistes.
 - [ ] Doubles (Phase 5) ; apprentissage optionnel (Phase 6).

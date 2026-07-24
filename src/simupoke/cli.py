@@ -24,6 +24,9 @@ Usage :
         [--outspeed species,nature,spe=SP[,scarf][,tw][,tie]]          # objectifs répétables
         [--survive atk_species,atk_nature,move[,off=SP][,item=X]]
         [--ko def_species,def_nature,move[,hits=N][,hp=0..1][,item=X]] # -> spread SP complet
+    python -m simupoke.cli sim <me_species> <me_nature> <me_moves> <opp_species> <opp_nature> <opp_moves>
+        [--me-sp k=v,...] [--opp-sp k=v,...] [--me-item X] [--roll 0..1] [--weather X]
+        # rejoue une ligne tour par tour (séquences de coups séparées par des virgules)
 """
 
 from __future__ import annotations
@@ -44,6 +47,7 @@ from .bench import (
     speed_tiers, min_sp_to_outspeed, min_sp_to_survive, min_sp_to_ko,
 )
 from .optimize import optimize_spread, Outspeed, Survive, Ko
+from .sim import Mon, rollout
 
 
 def _print_stats(species: str, stats: dict[str, int]) -> None:
@@ -534,6 +538,53 @@ def cmd_spread(args: list[str]) -> int:
     return 0
 
 
+def cmd_sim(args: list[str]) -> int:
+    pos, opts, _ = _split_args(args, set())
+    if len(pos) != 6:
+        print("Usage : sim <me_species> <me_nature> <me_moves> "
+              "<opp_species> <opp_nature> <opp_moves> "
+              "[--me-sp k=v] [--opp-sp k=v] [--me-item X] [--opp-item X] "
+              "[--roll 0..1] [--weather X] [--terrain X] [--trick-room]",
+              file=sys.stderr)
+        return 2
+    me_sp, me_nat, me_moves, opp_sp, opp_nat, opp_moves = pos
+    for sp in (me_sp, opp_sp):
+        if not is_known(sp):
+            print(f"Espèce inconnue : {sp!r}", file=sys.stderr)
+            return 1
+    me = Mon.from_state(PokemonState(
+        species=me_sp, nature=me_nat, stat_points=_parse_sp(opts.get("me-sp", "")),
+        item=opts.get("me-item"), ability=opts.get("me-ability")))
+    opp = Mon.from_state(PokemonState(
+        species=opp_sp, nature=opp_nat, stat_points=_parse_sp(opts.get("opp-sp", "")),
+        item=opts.get("opp-item"), ability=opts.get("opp-ability")))
+    field = FieldState(weather=opts.get("weather"), terrain=opts.get("terrain"),
+                       trick_room="trick-room" in args)
+    seq_me = [m.strip() for m in me_moves.split(",") if m.strip()]
+    seq_opp = [m.strip() for m in opp_moves.split(",") if m.strip()]
+    try:
+        roll = float(opts.get("roll", 0.5))
+        results = rollout(me, opp, seq_me, seq_opp, field, roll=roll)
+    except (ValueError, KeyError) as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    print(f"{label('species', me_sp)}  vs  {label('species', opp_sp)}  "
+          f"(roll {roll:g})\n")
+    for i, tr in enumerate(results, 1):
+        print(f"— Tour {i} —")
+        for line in tr.log:
+            print(line)
+        print(f"   État : {label('species', me_sp)} {tr.me_hp}/{tr.me_max} · "
+              f"{label('species', opp_sp)} {tr.opp_hp}/{tr.opp_max}")
+        if tr.me_fainted or tr.opp_fainted:
+            winner = me_sp if tr.opp_fainted and not tr.me_fainted else \
+                opp_sp if tr.me_fainted and not tr.opp_fainted else None
+            if winner:
+                print(f"\n➤ {label('species', winner)} l'emporte sur cette ligne.")
+            break
+    return 0
+
+
 def _force_utf8_stdout() -> None:
     """Évite les UnicodeEncodeError sur console Windows (cp1252) : la sortie
     contient des accents et le séparateur « • ». Sans effet ailleurs."""
@@ -577,6 +628,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_ko(rest)
     if cmd == "spread":
         return cmd_spread(rest)
+    if cmd == "sim":
+        return cmd_sim(rest)
     print(f"Commande inconnue : {cmd!r}", file=sys.stderr)
     return 2
 
