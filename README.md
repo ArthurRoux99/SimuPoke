@@ -122,11 +122,23 @@ node gen_moves.mjs     # réécrit ../data/moves.json + typechart.json
 **parité vérifiée contre `@smogon/calc`** (12 scénarios, `tests/test_damage.py`).
 
 Couvert : STAB (×1.5 / ×2 Adaptability), efficacité des types, coup critique,
-brûlure, météo, terrains, esquive multi-cibles, boosts ; items Choice
-Band/Specs, Life Orb, Expert Belt, Assault Vest ; talents Huge/Pure Power,
-Guts, Technician, Tinted Lens, Neuroforce, Multiscale, Filter & co. ; **talents
-défensifs** : immunités (Lévitation, Torche, Absorbe-Volt/Eau, etc.) et
-réductions (Thick Fat, Heatproof).
+brûlure, météo, terrains, esquive multi-cibles, boosts.
+
+- **Items** : Choice Band/Specs, Life Orb, Expert Belt, Assault Vest ; items
+  « type-boost » (Charbon, Eau Mystique…) ×1.2 ; Muscle Band / Wise Glasses ×1.1.
+- **Talents offensifs** : Huge/Pure Power, Guts, Technician, Tinted Lens,
+  Neuroforce, Water Bubble, Solar Power, Sand Force, **Protosynthèse / Charge
+  Quantique** (Paradox : dope la plus haute stat sous soleil / champ électrifié
+  ou Énergie Booster) et type-boost (Steelworker, Dragon's Maw, Rocky Payload,
+  Transistor).
+- **Talents défensifs** : Multiscale, Filter & co., immunités (Lévitation,
+  Torche, Absorbe-Volt/Eau…), réductions (Thick Fat, Heatproof) et **Fluffy,
+  Ice Scales, Sel Purifiant, Water Bubble, Peau Sèche**.
+
+> Nouveaux modificateurs vérifiés par **ratio** contre les valeurs Showdown
+> (`tests/test_damage_coverage.py`) ; les 12 scénarios de parité `@smogon/calc`
+> historiques restent verts. **Tera** est volontairement absent : il n'est pas
+> dans Champions au lancement (§4.6 du document socle).
 
 ### Delta Champions (§7.2)
 
@@ -217,9 +229,13 @@ local. Format détaillé en tête de `src/simupoke/usage_import.py`.
 ## UI — page HTML autonome (thème sombre)
 
 Une interface graphique **hors-ligne, en un seul fichier** (§12), pour le
-calculateur de dégâts. Le moteur JS (`web/engine.js`) est un **port fidèle** de
-`src/simupoke/damage.py`, vérifié contre les **mêmes vecteurs de parité
+calculateur de dégâts. Le moteur JS (`web/engine.js`) est un **port fidèle** du
+socle de `src/simupoke/damage.py`, vérifié contre les **mêmes vecteurs de parité
 `@smogon/calc`** (`node web/verify_engine.mjs` → 18/18).
+
+> Les modificateurs avancés récemment ajoutés côté Python (items type-boost,
+> Paradox, Fluffy/Ice Scales…) ne sont **pas encore portés dans `engine.js`** :
+> la page autonome couvre le socle ; l'UI hébergée (serveur Python) les applique.
 
 ```bash
 # Construire le fichier autonome (stdlib Python, aucune dépendance)
@@ -418,6 +434,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] B1 — Assistant de combat, mode analyse v1 (analyse 1 tour, §10.1).
 - [x] Seuils & optimiseur de SP : speed tiers + `outspeed`/`survive`/`ko` (CLI + API + onglet).
 - [x] Optimiseur de spread complet : objectifs combinés → spread SP légal (`spread`, API, UI).
+- [x] Couverture calc étendue : items type-boost, Paradox (Protosynthèse/Charge Quantique), Fluffy/Ice Scales/Water Bubble & co.
 - [x] Delta Champions au calc : talents -ate (dont Dragonize, piloté par données) + Mega Sol.
 - [x] UI — page HTML autonome v1 (calculateur de dégâts, moteur JS à parité).
 - [x] UI — serveur local v1 : tous les modules (Dégâts/B1/B2/B3) via API Python.
