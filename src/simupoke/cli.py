@@ -12,6 +12,13 @@ Usage :
     python -m simupoke.cli analyze <me_species> <me_nature> <me_moves> <opp_species> <opp_nature>
         [--opp-move X] [--opp-moves a,b,c] [--me-sp k=v,...] [--opp-sp k=v,...]
         [--me-item X] [--opp-item X] [--me-hp 0..1] [--opp-hp 0..1] [--weather X]
+    python -m simupoke.cli speed <team.json> [<team2.json> ...] [--trick-room]
+    python -m simupoke.cli outspeed <me_species> <me_nature> <target_species> <target_nature>
+        [--target-sp k=v,...] [--me-tailwind] [--target-tailwind] [--tie]
+    python -m simupoke.cli survive <def_species> <def_nature> <atk_species> <atk_nature> <move>
+        [--atk-sp k=v,...] [--atk-item X] [--weather X]      # SP défensif mini pour survivre
+    python -m simupoke.cli ko <atk_species> <atk_nature> <move> <def_species> <def_nature>
+        [--hits N] [--def-sp k=v,...] [--def-hp 0..1] [--atk-item X]   # SP offensif mini pour KO
 """
 
 from __future__ import annotations
@@ -28,6 +35,9 @@ from .loaders import load_lineup, load_team
 from .draft import rank_lineup
 from .team import analyze_team, select_team_preview
 from .combat import analyze_turn
+from .bench import (
+    speed_tiers, min_sp_to_outspeed, min_sp_to_survive, min_sp_to_ko,
+)
 
 
 def _print_stats(species: str, stats: dict[str, int]) -> None:
@@ -274,6 +284,141 @@ def cmd_analyze(args: list[str]) -> int:
     return 0
 
 
+def _split_args(args: list[str], flag_names: set[str]) -> tuple[list[str], dict, set]:
+    """Sépare positionnels, drapeaux booléens et options `--clé valeur`."""
+    pos: list[str] = []
+    opts: dict[str, str] = {}
+    flags: set[str] = set()
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a.startswith("--"):
+            key = a[2:]
+            if key in flag_names:
+                flags.add(key)
+            else:
+                opts[key] = args[i + 1] if i + 1 < len(args) else ""
+                i += 1
+        else:
+            pos.append(a)
+        i += 1
+    return pos, opts, flags
+
+
+def _owned_to_state(mon) -> PokemonState:
+    return PokemonState(species=mon.species, nature=mon.nature,
+                        stat_points=mon.stat_points, item=mon.item,
+                        ability=mon.ability, moves=mon.moves)
+
+
+def cmd_speed(args: list[str]) -> int:
+    pos, _, flags = _split_args(args, {"trick-room", "tr"})
+    if not pos:
+        print("Usage : speed <team.json> [<team2.json> ...] [--trick-room]",
+              file=sys.stderr)
+        return 2
+    states: list[PokemonState] = []
+    for path in pos:
+        try:
+            states.extend(_owned_to_state(m) for m in load_team(path))
+        except FileNotFoundError as exc:
+            print(f"Erreur : {exc}", file=sys.stderr)
+            return 1
+    tr = bool(flags & {"trick-room", "tr"})
+    tiers = speed_tiers(states, trick_room=tr)
+    header = "Speed tiers" + (" (Trick Room : le plus lent agit en premier)" if tr else "")
+    print(header + "\n")
+    for i, e in enumerate(tiers, 1):
+        note = f"  [{', '.join(e.notes)}]" if e.notes else ""
+        print(f"{i:2}. {label('species', e.species):<16} {e.speed:>4}{note}")
+    return 0
+
+
+def cmd_outspeed(args: list[str]) -> int:
+    pos, opts, flags = _split_args(args, {"me-tailwind", "target-tailwind", "tie"})
+    if len(pos) != 4:
+        print("Usage : outspeed <me_species> <me_nature> <target_species> "
+              "<target_nature> [--target-sp k=v] [--me-tailwind] "
+              "[--target-tailwind] [--tie]", file=sys.stderr)
+        return 2
+    me_sp, me_nat, tg_sp, tg_nat = pos
+    for sp in (me_sp, tg_sp):
+        if not is_known(sp):
+            print(f"Espèce inconnue : {sp!r}", file=sys.stderr)
+            return 1
+    me = PokemonState(species=me_sp, nature=me_nat,
+                      item=opts.get("me-item"),
+                      stat_points=_parse_sp(opts.get("me-sp", "")))
+    target = PokemonState(species=tg_sp, nature=tg_nat,
+                          item=opts.get("target-item"),
+                          stat_points=_parse_sp(opts.get("target-sp", "")))
+    res = min_sp_to_outspeed(
+        me, target, me_tailwind="me-tailwind" in flags,
+        target_tailwind="target-tailwind" in flags, strict="tie" not in flags)
+    print(f"{label('species', me_sp)} vs {label('species', tg_sp)}")
+    print(res.line())
+    return 0
+
+
+def cmd_survive(args: list[str]) -> int:
+    pos, opts, _ = _split_args(args, {"crit"})
+    if len(pos) != 5:
+        print("Usage : survive <def_species> <def_nature> <atk_species> "
+              "<atk_nature> <move> [--atk-sp k=v] [--atk-item X] [--weather X]",
+              file=sys.stderr)
+        return 2
+    def_sp, def_nat, atk_sp, atk_nat, move = pos
+    for sp in (def_sp, atk_sp):
+        if not is_known(sp):
+            print(f"Espèce inconnue : {sp!r}", file=sys.stderr)
+            return 1
+    defender = PokemonState(species=def_sp, nature=def_nat)
+    attacker = PokemonState(species=atk_sp, nature=atk_nat,
+                            item=opts.get("atk-item"),
+                            ability=opts.get("atk-ability"),
+                            stat_points=_parse_sp(opts.get("atk-sp", "")))
+    field = FieldState(weather=opts.get("weather"), terrain=opts.get("terrain"))
+    try:
+        res = min_sp_to_survive(defender, attacker, move, field)
+    except (ValueError, KeyError) as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    print(f"{label('species', def_sp)} face à {label('species', atk_sp)}")
+    print(res.line())
+    return 0
+
+
+def cmd_ko(args: list[str]) -> int:
+    pos, opts, _ = _split_args(args, {"crit"})
+    if len(pos) != 5:
+        print("Usage : ko <atk_species> <atk_nature> <move> <def_species> "
+              "<def_nature> [--hits N] [--def-sp k=v] [--def-hp 0..1] "
+              "[--atk-item X]", file=sys.stderr)
+        return 2
+    atk_sp, atk_nat, move, def_sp, def_nat = pos
+    for sp in (atk_sp, def_sp):
+        if not is_known(sp):
+            print(f"Espèce inconnue : {sp!r}", file=sys.stderr)
+            return 1
+    attacker = PokemonState(species=atk_sp, nature=atk_nat,
+                            item=opts.get("atk-item"),
+                            ability=opts.get("atk-ability"))
+    defender = PokemonState(species=def_sp, nature=def_nat,
+                            item=opts.get("def-item"),
+                            stat_points=_parse_sp(opts.get("def-sp", "")),
+                            current_hp_pct=float(opts.get("def-hp", 1.0)))
+    field = FieldState(weather=opts.get("weather"), terrain=opts.get("terrain"))
+    try:
+        res = min_sp_to_ko(attacker, defender, move, field,
+                           hits=int(opts.get("hits", 1)))
+    except (ValueError, KeyError) as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    print(f"{label('species', atk_sp)} -> {label('species', def_sp)}")
+    print(res.line())
+    return 0
+
+
 def _force_utf8_stdout() -> None:
     """Évite les UnicodeEncodeError sur console Windows (cp1252) : la sortie
     contient des accents et le séparateur « • ». Sans effet ailleurs."""
@@ -307,6 +452,14 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_preview(rest)
     if cmd == "analyze":
         return cmd_analyze(rest)
+    if cmd == "speed":
+        return cmd_speed(rest)
+    if cmd == "outspeed":
+        return cmd_outspeed(rest)
+    if cmd == "survive":
+        return cmd_survive(rest)
+    if cmd == "ko":
+        return cmd_ko(rest)
     print(f"Commande inconnue : {cmd!r}", file=sys.stderr)
     return 2
 

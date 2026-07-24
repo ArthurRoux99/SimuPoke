@@ -185,6 +185,48 @@
     } catch (e) { $('preview-result').textContent = '⚠ ' + e.message; }
   }
 
+  // ---------- Seuils (benchmarks) ----------
+  function benchClass(ok) { return ok ? 'headline' : 'headline error'; }
+  async function runOutspeed() {
+    const out = $('os-result');
+    try {
+      const r = await api('/api/outspeed', {
+        me: { species: $('os-me-species').value, nature: $('os-me-nature').value },
+        target: { species: $('os-tg-species').value, nature: $('os-tg-nature').value,
+          sp: { spe: parseInt($('os-tg-spe').value || '0', 10) } },
+        me_tailwind: $('os-me-tw').checked, target_tailwind: $('os-tg-tw').checked,
+        strict: !$('os-tie').checked,
+      });
+      out.innerHTML = `<div class="${benchClass(r.feasible)}">${esc(r.line)}</div>`;
+    } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
+  }
+  async function runSurvive() {
+    const out = $('sv-result');
+    try {
+      const off = parseInt($('sv-atk-off').value || '0', 10);
+      const r = await api('/api/survive', {
+        defender: { species: $('sv-def-species').value, nature: $('sv-def-nature').value },
+        attacker: { species: $('sv-atk-species').value, nature: $('sv-atk-nature').value,
+          item: $('sv-atk-item').value, sp: { atk: off, spa: off } },
+        move: $('sv-move').value,
+      });
+      out.innerHTML = `<div class="${benchClass(r.feasible)}">${esc(r.line)}</div>`;
+    } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
+  }
+  async function runKo() {
+    const out = $('ko-result');
+    try {
+      const r = await api('/api/ko', {
+        attacker: { species: $('ko-atk-species').value, nature: $('ko-atk-nature').value,
+          item: $('ko-atk-item').value },
+        defender: { species: $('ko-def-species').value, nature: $('ko-def-nature').value,
+          hpPct: parseFloat($('ko-def-hp').value || '100') / 100 },
+        move: $('ko-move').value, hits: parseInt($('ko-hits').value || '1', 10),
+      });
+      out.innerHTML = `<div class="${benchClass(r.feasible)}">${esc(r.line)}</div>`;
+    } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
+  }
+
   // ---------- Mon Box ----------
   async function loadBox() {
     try { const r = await api('/api/roster'); builders.box.setEntries(r.roster);
@@ -207,7 +249,7 @@
     try { META = await api('/api/meta'); } catch (e) { /* listes vides */ }
     try { SAMPLES = await api('/api/samples'); } catch (e) { SAMPLES = {}; }
 
-    document.querySelectorAll('#tab-damage select[id$="-nature"], #tab-combat select[id$="-nature"]')
+    document.querySelectorAll('#tab-damage select[id$="-nature"], #tab-combat select[id$="-nature"], #tab-bench select[id$="-nature"]')
       .forEach((s) => { s.innerHTML = natureOptions('serious'); });
     document.querySelectorAll('.boost').forEach(fillBoost);
     ['a', 'd', 'c-me'].forEach((p) => { const el = $(`${p}-sp`); if (el) fillSP(el, p); });
@@ -247,6 +289,13 @@
       builders.prevMine.setEntries(entriesFrom(SAMPLES.team, 'team'));
       builders.prevOpp.setEntries(entriesFrom(SAMPLES.opponent, 'team'));
     });
+    $('os-run').addEventListener('click', runOutspeed);
+    $('sv-run').addEventListener('click', runSurvive);
+    $('ko-run').addEventListener('click', runKo);
+    // Natures par défaut plus parlantes pour les seuils.
+    if ($('os-me-nature')) { $('os-me-nature').value = 'jolly'; $('sv-def-nature').value = 'careful'; }
+    if ($('sv-atk-nature')) { $('sv-atk-nature').value = 'adamant'; $('ko-atk-nature').value = 'adamant'; }
+    if ($('ko-def-nature')) $('ko-def-nature').value = 'jolly';
     $('box-save').addEventListener('click', saveBox);
     $('box-reload').addEventListener('click', loadBox);
 

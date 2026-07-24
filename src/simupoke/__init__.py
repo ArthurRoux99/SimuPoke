@@ -30,6 +30,10 @@ from .team import (
     matchup_score, check_clauses,
 )
 from .combat import analyze_turn, TurnAnalysis, MoveEval, effective_speed, moves_first
+from .bench import (
+    speed_tiers, compute_speed, min_sp_to_outspeed, min_sp_to_survive,
+    min_sp_to_ko, SpeedEntry, OutspeedResult, SurviveResult, KoResult,
+)
 from .usage import load_usage, usage_prior, likely_set, has_usage, LikelySet
 from . import i18n
 
@@ -48,6 +52,8 @@ __all__ = [
     "analyze_team", "select_team_preview", "TeamReport", "PreviewResult",
     "matchup_score", "check_clauses",
     "analyze_turn", "TurnAnalysis", "MoveEval", "effective_speed", "moves_first",
+    "speed_tiers", "compute_speed", "min_sp_to_outspeed", "min_sp_to_survive",
+    "min_sp_to_ko", "SpeedEntry", "OutspeedResult", "SurviveResult", "KoResult",
     "load_usage", "usage_prior", "likely_set", "has_usage", "LikelySet",
     "i18n",
 ]

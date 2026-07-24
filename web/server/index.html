@@ -19,6 +19,7 @@
   <button data-tab="draft">Tirage (B2)</button>
   <button data-tab="team">Équipe (B3)</button>
   <button data-tab="preview">Team preview</button>
+  <button data-tab="bench">Seuils</button>
   <button data-tab="box">Mon Box</button>
 </div>
 
@@ -166,6 +167,75 @@
       <button id="prev-sample">Charger les exemples</button>
     </div>
     <pre class="report" id="preview-result" style="margin-top:14px"></pre>
+  </section>
+
+  <!-- ===== SEUILS (BENCHMARKS) ===== -->
+  <section class="tab-panel" id="tab-bench">
+    <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Questions inverses du damage calc : combien de SP pour dépasser,
+      survivre ou tuer. Le budget global (66 SP) reste à ta charge — l'outil dit
+      « au moins X SP ici ».</p>
+
+    <!-- Vitesse -->
+    <div class="panel">
+      <h2>Vitesse — combien de SP pour dépasser ?</h2>
+      <div class="controls" style="grid-template-columns: 1.4fr 1fr auto;">
+        <div><label>Mon Pokémon</label><input id="os-me-species" list="species-list" value="Garchomp" autocomplete="off"></div>
+        <div><label>Nature</label><select id="os-me-nature"></select></div>
+        <div class="check"><input type="checkbox" id="os-me-tw"><label for="os-me-tw">mon Tailwind</label></div>
+      </div>
+      <div class="controls" style="grid-template-columns: 1.4fr 1fr auto;">
+        <div><label>Cible</label><input id="os-tg-species" list="species-list" value="Flutter Mane" autocomplete="off"></div>
+        <div><label>Nature</label><select id="os-tg-nature"></select></div>
+        <div class="check"><input type="checkbox" id="os-tg-tw"><label for="os-tg-tw">Tailwind cible</label></div>
+      </div>
+      <div class="controls" style="grid-template-columns: 1fr auto auto;">
+        <div><label>SP Vitesse cible</label><input id="os-tg-spe" type="number" min="0" max="32" value="32"></div>
+        <div class="check"><input type="checkbox" id="os-tie"><label for="os-tie">égaliser suffit</label></div>
+        <button class="primary" id="os-run">Calculer</button>
+      </div>
+      <div class="result" id="os-result"></div>
+    </div>
+
+    <!-- Survie -->
+    <div class="panel" style="margin-top:14px">
+      <h2>Survie — SP défensifs pour encaisser</h2>
+      <div class="controls" style="grid-template-columns: 1.4fr 1fr;">
+        <div><label>Défenseur (moi)</label><input id="sv-def-species" list="species-list" value="Tyranitar" autocomplete="off"></div>
+        <div><label>Nature</label><select id="sv-def-nature"></select></div>
+      </div>
+      <div class="controls" style="grid-template-columns: 1.4fr 1fr 1fr;">
+        <div><label>Attaquant</label><input id="sv-atk-species" list="species-list" value="Garchomp" autocomplete="off"></div>
+        <div><label>Nature</label><select id="sv-atk-nature"></select></div>
+        <div><label>Objet attaquant</label><input id="sv-atk-item" value="choiceband" autocomplete="off"></div>
+      </div>
+      <div class="controls" style="grid-template-columns: 1.4fr 1fr auto;">
+        <div><label>Capacité</label><input id="sv-move" list="move-list" value="Earthquake" autocomplete="off"></div>
+        <div><label>SP Atq/A.Sp attaquant</label><input id="sv-atk-off" type="number" min="0" max="32" value="32"></div>
+        <button class="primary" id="sv-run">Calculer</button>
+      </div>
+      <div class="result" id="sv-result"></div>
+    </div>
+
+    <!-- KO -->
+    <div class="panel" style="margin-top:14px">
+      <h2>KO — SP offensifs pour tuer</h2>
+      <div class="controls" style="grid-template-columns: 1.4fr 1fr 1fr;">
+        <div><label>Attaquant (moi)</label><input id="ko-atk-species" list="species-list" value="Garchomp" autocomplete="off"></div>
+        <div><label>Nature</label><select id="ko-atk-nature"></select></div>
+        <div><label>Objet</label><input id="ko-atk-item" value="choiceband" autocomplete="off"></div>
+      </div>
+      <div class="controls" style="grid-template-columns: 1.4fr 1fr 1fr;">
+        <div><label>Défenseur</label><input id="ko-def-species" list="species-list" value="Tyranitar" autocomplete="off"></div>
+        <div><label>Nature</label><select id="ko-def-nature"></select></div>
+        <div><label>PV cible (%)</label><input id="ko-def-hp" type="number" min="1" max="100" value="100"></div>
+      </div>
+      <div class="controls" style="grid-template-columns: 1.4fr auto auto;">
+        <div><label>Capacité</label><input id="ko-move" list="move-list" value="Earthquake" autocomplete="off"></div>
+        <div><label>KO en (coups)</label><input id="ko-hits" type="number" min="1" max="6" value="1"></div>
+        <button class="primary" id="ko-run">Calculer</button>
+      </div>
+      <div class="result" id="ko-result"></div>
+    </div>
   </section>
 
   <!-- ===== MON BOX ===== -->

@@ -18,6 +18,10 @@ Endpoints :
     POST /api/draft             B2 — classement d'un tirage
     POST /api/team              B3 — analyse d'équipe
     POST /api/preview           B3 — assistant team preview
+    POST /api/speed             speed tiers (Tailwind/Trick Room)
+    POST /api/outspeed          SP mini en Vitesse pour dépasser une cible
+    POST /api/survive           SP défensif mini pour survivre à une attaque
+    POST /api/ko                SP offensif mini pour garantir un KO en N coups
 """
 
 from __future__ import annotations
@@ -32,6 +36,9 @@ from .stats import STAT_KEYS, NATURES, compute_all_stats, validate_sp
 from .basestats import get_base_stats, is_known, get_species
 from .damage import calculate, DamageResult
 from .combat import analyze_turn
+from .bench import (
+    speed_tiers, min_sp_to_outspeed, min_sp_to_survive, min_sp_to_ko,
+)
 from .draft import rank_lineup
 from .team import analyze_team, select_team_preview
 from .usage import usage_prior, has_usage, likely_set
@@ -158,6 +165,50 @@ def api_analyze(body: dict) -> dict:
     }
 
 
+def api_speed(body: dict) -> dict:
+    """Speed tiers d'une liste de Pokémon (avec Tailwind/Trick Room)."""
+    states = [_state(d) for d in body.get("mons", [])]
+    tailwinds = body.get("tailwinds")
+    tiers = speed_tiers(states, tailwinds=tailwinds,
+                        trick_room=body.get("trick_room", False))
+    return {"trickRoom": body.get("trick_room", False),
+            "tiers": [{"species": e.species, "speed": e.speed, "notes": e.notes}
+                      for e in tiers]}
+
+
+def api_outspeed(body: dict) -> dict:
+    """SP minimal en Vitesse pour (dé)passer une cible."""
+    res = min_sp_to_outspeed(
+        _state(body["me"]), _state(body["target"]),
+        me_tailwind=body.get("me_tailwind", False),
+        target_tailwind=body.get("target_tailwind", False),
+        strict=body.get("strict", True))
+    return {"feasible": res.feasible, "sp": res.sp, "mySpeed": res.my_speed,
+            "targetSpeed": res.target_speed, "tiesOnly": res.ties_only,
+            "line": res.line()}
+
+
+def api_survive(body: dict) -> dict:
+    """SP défensif minimal (PV + Déf/Déf.Spé) pour survivre à une attaque."""
+    res = min_sp_to_survive(
+        _state(body["defender"]), _state(body["attacker"]), body["move"],
+        FieldState(**(body.get("field") or {})), crit=body.get("crit", False))
+    return {"feasible": res.feasible, "hpSp": res.hp_sp, "defSp": res.def_sp,
+            "totalSp": res.total_sp, "stat": res.stat, "move": res.move,
+            "maxPct": res.max_pct, "line": res.line()}
+
+
+def api_ko(body: dict) -> dict:
+    """SP offensif minimal (Atq/Atq.Spé) pour garantir un KO en N coups."""
+    res = min_sp_to_ko(
+        _state(body["attacker"]), _state(body["defender"]), body["move"],
+        FieldState(**(body.get("field") or {})),
+        hits=int(body.get("hits", 1)), crit=body.get("crit", False))
+    return {"feasible": res.feasible, "sp": res.sp, "stat": res.stat,
+            "move": res.move, "hits": res.hits, "minPct": res.min_pct,
+            "line": res.line()}
+
+
 def api_draft(body: dict) -> dict:
     lineup = _owned_list(body["lineup"])
     roster = (_owned_list(body["roster"]) if body.get("roster") is not None
@@ -250,6 +301,8 @@ _POST_ROUTES = {
     "/api/stats": api_stats, "/api/damage": api_damage, "/api/analyze": api_analyze,
     "/api/draft": api_draft, "/api/team": api_team, "/api/preview": api_preview,
     "/api/roster": api_roster_save,
+    "/api/speed": api_speed, "/api/outspeed": api_outspeed,
+    "/api/survive": api_survive, "/api/ko": api_ko,
 }
 _GET_API = {"/api/meta": api_meta, "/api/samples": api_samples,
             "/api/roster": api_roster_get}

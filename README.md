@@ -22,6 +22,7 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 | 1 | B2 — Aide au tirage (Roster Ranch) | 🟡 v1 (sans priors d'usage) |
 | 2 | B3 — Team builder + team preview | 🟡 v1 (matchups par types) |
 | 3 | B1 — Mode analyse (Singles) | 🟡 v1 (analyse 1 tour) |
+| — | Seuils & optimiseur de SP (§11.1) | ✅ speed tiers + outspeed/survive/ko |
 | — | UI — page HTML autonome (§12) | 🟡 v1 (calc de dégâts) |
 | — | UI — serveur local (tous les modules) | 🟡 v1 (Dégâts/B1/B2/B3) |
 | 4 | B1 — Mode simultané (MCTS/ISMCTS) | ⏳ |
@@ -80,6 +81,7 @@ SimuPoke/
 │   ├── draft.py                 # B2 — scoring/classement du tirage
 │   ├── team.py                  # B3 — analyse d'équipe + assistant team preview
 │   ├── combat.py                # B1 — assistant de combat (mode analyse, 1 tour)
+│   ├── bench.py                 # seuils & optimiseur de SP (speed tiers, outspeed/survive/ko)
 │   ├── model.py                  # OwnedPokemon + état de combat (Doubles-ready)
 │   ├── i18n.py                   # couche d'affichage FR/EN
 │   ├── loaders.py                # chargement roster + régulation + lineup + équipe
@@ -260,7 +262,7 @@ python -m simupoke.server            # http://127.0.0.1:8000
 ```
 
 Puis ouvrir <http://127.0.0.1:8000> : une UI sombre à onglets **Dégâts, Combat
-(B1), Tirage (B2), Équipe (B3), Team preview** et **Mon Box**. Le frontend
+(B1), Tirage (B2), Équipe (B3), Team preview, Seuils** et **Mon Box**. Le frontend
 (`web/server/`) appelle l'API JSON `/api/*` ; toute la logique de jeu reste côté
 Python. Les onglets Tirage/Équipe/Preview utilisent un **éditeur de Pokémon**
 (lignes ajoutables : espèce, nature, objet, talent, capacités), préremplis avec
@@ -268,7 +270,7 @@ les exemples de `data/`. L'onglet **Mon Box** charge, édite et **enregistre**
 `data/my_roster.json` directement. Rien ne sort de ta machine (§3).
 
 > API : `GET /api/meta|samples|roster`,
-> `POST /api/damage|analyze|draft|team|preview|stats|roster`.
+> `POST /api/damage|analyze|draft|team|preview|stats|roster|speed|outspeed|survive|ko`.
 
 ## B1 — Assistant de combat (mode analyse)
 
@@ -285,6 +287,44 @@ signalée « estimé via l'usage »).
 > coups de statut sont listés mais non évalués) ; pas de changement ni de
 > recherche d'arbre — ce sera la **Phase 4** (MCTS/ISMCTS, §10.2). Build adverse
 > inconnu ⇒ nature neutre / 0 SP (le modèle d'usage §10.3 affinera).
+
+## Seuils & optimiseur de SP (§11.1 — « seuils de survie / de KO »)
+
+`simupoke.bench` répond aux questions **inverses** du damage calc — celles que
+se pose un joueur VGC en réglant son spread. Le modèle de SP Champions (entiers
+dans [0, 32], §8.3) rend l'espace de recherche trivial : on énumère.
+
+- **Speed tiers** (`speed_tiers`) : classe des Pokémon par vitesse effective,
+  Choice Scarf / Tailwind / paralysie / boosts inclus, avec inversion sous
+  **Trick Room**.
+- **Vitesse** (`min_sp_to_outspeed`) : SP minimal en Vitesse pour (dé)passer une
+  cible (option « égaliser suffit », Tailwind des deux côtés).
+- **Survie** (`min_sp_to_survive`) : SP défensif total minimal (PV + Déf/Déf.Spé)
+  pour encaisser le **roll haut** d'une attaque, avec la répartition de coût
+  minimal.
+- **KO** (`min_sp_to_ko`) : SP offensif minimal (Atq/Atq.Spé) pour un KO
+  **garanti** (roll bas) en N coups — tient compte des PV courants de la cible
+  (finir un adversaire entamé).
+
+> Ces optimiseurs raisonnent **stat par stat** (le minimum requis là où ça
+> compte) ; la contrainte de budget global (66 SP au total) reste au joueur qui
+> assemble le spread complet. Exposés en CLI (`speed`/`outspeed`/`survive`/`ko`)
+> et par l'API (`POST /api/speed|outspeed|survive|ko`) + l'onglet **Seuils**.
+
+```bash
+# Combien de SP en Vitesse pour dépasser un Flutter Mane vitesse max ?
+python -m simupoke.cli outspeed garchomp jolly fluttermane timid --target-sp spe=32
+
+# Quel investissement défensif pour survivre à un Séisme Choice Band ?
+python -m simupoke.cli survive tyranitar careful garchomp adamant earthquake \
+    --atk-sp atk=32 --atk-item choiceband
+
+# Combien d'Attaque pour OHKO garanti ?
+python -m simupoke.cli ko garchomp adamant earthquake tyranitar adamant --atk-item choiceband
+
+# Speed tiers d'une équipe (fichier), inversion possible sous Trick Room
+python -m simupoke.cli speed data/sample_team.json --trick-room
+```
 
 ## Démarrage rapide
 
@@ -349,6 +389,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] B3 — Team builder + assistant team preview v1 (clauses, trous, matchups).
 - [x] Talents défensifs dans le calc (immunités + Thick Fat/Heatproof).
 - [x] B1 — Assistant de combat, mode analyse v1 (analyse 1 tour, §10.1).
+- [x] Seuils & optimiseur de SP : speed tiers + `outspeed`/`survive`/`ko` (CLI + API + onglet).
 - [x] Delta Champions au calc : talents -ate (dont Dragonize, piloté par données) + Mega Sol.
 - [x] UI — page HTML autonome v1 (calculateur de dégâts, moteur JS à parité).
 - [x] UI — serveur local v1 : tous les modules (Dégâts/B1/B2/B3) via API Python.

@@ -118,6 +118,49 @@ def test_draft_endpoint_applies_usage():
     assert out["usageApplied"] is True
 
 
+def test_speed_endpoint_sorts_and_tags():
+    out = server.api_speed({"mons": [
+        {"species": "snorlax", "nature": "brave"},
+        {"species": "garchomp", "nature": "jolly", "sp": {"spe": 32},
+         "item": "choicescarf"},
+    ]})
+    assert out["tiers"][0]["species"] == "garchomp"
+    assert "Choice Scarf" in out["tiers"][0]["notes"]
+
+
+def test_outspeed_endpoint():
+    out = server.api_outspeed({
+        "me": {"species": "garchomp", "nature": "serious"},
+        "target": {"species": "garchomp", "nature": "serious", "sp": {"spe": 20}},
+    })
+    assert out["feasible"] is True
+    assert out["sp"] > 20
+
+
+def test_survive_endpoint():
+    out = server.api_survive({
+        "defender": {"species": "tyranitar", "nature": "careful"},
+        "attacker": {"species": "garchomp", "nature": "adamant",
+                     "item": "choiceband", "sp": {"atk": 32}},
+        "move": "earthquake",
+    })
+    # Séisme est physique -> côté Déf sollicité.
+    assert out["stat"] == "def"
+    assert "feasible" in out
+
+
+def test_ko_endpoint():
+    out = server.api_ko({
+        "attacker": {"species": "garchomp", "nature": "adamant",
+                     "item": "choiceband"},
+        "defender": {"species": "tyranitar", "nature": "adamant"},
+        "move": "earthquake", "hits": 1,
+    })
+    assert out["feasible"] is True
+    assert out["stat"] == "atk"
+    assert out["minPct"] >= 100.0
+
+
 def test_likely_endpoint():
     # Agnostique aux données importées : on valide le comportement de l'endpoint.
     out = server.api_likely("incineroar")
