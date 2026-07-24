@@ -234,13 +234,12 @@ local. Format détaillé en tête de `src/simupoke/usage_import.py`.
 ## UI — page HTML autonome (thème sombre)
 
 Une interface graphique **hors-ligne, en un seul fichier** (§12), pour le
-calculateur de dégâts. Le moteur JS (`web/engine.js`) est un **port fidèle** du
-socle de `src/simupoke/damage.py`, vérifié contre les **mêmes vecteurs de parité
-`@smogon/calc`** (`node web/verify_engine.mjs` → 18/18).
-
-> Les modificateurs avancés récemment ajoutés côté Python (items type-boost,
-> Paradox, Fluffy/Ice Scales…) ne sont **pas encore portés dans `engine.js`** :
-> la page autonome couvre le socle ; l'UI hébergée (serveur Python) les applique.
+calculateur de dégâts. Le moteur JS (`web/engine.js`) est un **port fidèle** de
+`src/simupoke/damage.py` — socle **et** modificateurs avancés (items type-boost,
+Muscle Band/Wise Glasses, Water Bubble, Solar Power, Sand Force, Protosynthèse /
+Charge Quantique, type-boost, Fluffy/Ice Scales/Sel Purifiant/Peau Sèche) —
+vérifié par **parité** (`node web/verify_engine.mjs` → **31/31**) : 18 vecteurs
+`@smogon/calc` historiques + 13 vecteurs de référence issus du moteur Python.
 
 ```bash
 # Construire le fichier autonome (stdlib Python, aucune dépendance)
@@ -461,6 +460,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Focus Sash / Fermeté dans les seuils de survie/KO et l'optimiseur de spread.
 - [x] B1 — évaluation des changements (switch) : sûreté à l'entrée + menace, reco de pivot.
 - [x] B3 — team preview affiné par le vrai calc de dégâts (coups pour KO) + repli types.
+- [x] Port `engine.js` : modificateurs avancés dans la page autonome (parité 31/31).
 - [x] Delta Champions au calc : talents -ate (dont Dragonize, piloté par données) + Mega Sol.
 - [x] UI — page HTML autonome v1 (calculateur de dégâts, moteur JS à parité).
 - [x] UI — serveur local v1 : tous les modules (Dégâts/B1/B2/B3) via API Python.

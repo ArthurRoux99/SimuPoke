@@ -41,6 +41,20 @@ const cases = [
   ['flashfire', mk('garchomp', 'modest', { spa: 31 }), mk('heatran', 'serious', {}, { ability: 'flashfire' }), 'fireblast', {}, 0, 0],
   ['pixilate', mk('sylveon', 'modest', { spa: 31 }, { ability: 'pixilate' }), mk('garchomp', 'jolly'), 'hypervoice', {}, 206, 246],
   ['plain_hv', mk('sylveon', 'modest', { spa: 31 }, { ability: 'cutecharm' }), mk('garchomp', 'jolly'), 'hypervoice', {}, 57, 68],
+  // Couverture étendue (valeurs de référence issues du moteur Python).
+  ['charcoal', mk('charizard', 'modest', { spa: 31 }, { item: 'charcoal' }), mk('venusaur', 'bold'), 'flamethrower', {}, 180, 212],
+  ['muscleband', mk('garchomp', 'adamant', { atk: 31 }, { item: 'muscleband' }), mk('snorlax', 'careful'), 'earthquake', {}, 145, 172],
+  ['wiseglasses', mk('charizard', 'modest', { spa: 31 }, { item: 'wiseglasses' }), mk('venusaur', 'bold'), 'flamethrower', {}, 164, 194],
+  ['waterbubble_off', mk('azumarill', 'modest', { spa: 31 }, { ability: 'waterbubble' }), mk('blissey', 'calm'), 'hydropump', {}, 90, 106],
+  ['transistor', mk('pikachu', 'timid', { spa: 31 }, { ability: 'transistor' }), mk('snorlax', 'careful'), 'thunderbolt', {}, 48, 57],
+  ['proto_sun', mk('roaringmoon', 'adamant', { atk: 31 }, { ability: 'protosynthesis' }), mk('garchomp', 'jolly'), 'crunch', { field: { weather: 'sun' } }, 108, 127],
+  ['proto_booster', mk('roaringmoon', 'adamant', { atk: 31 }, { ability: 'protosynthesis', item: 'boosterenergy' }), mk('garchomp', 'jolly'), 'crunch', {}, 108, 127],
+  ['sandforce', mk('excadrill', 'adamant', { atk: 31 }, { ability: 'sandforce' }), mk('tyranitar', 'jolly'), 'earthquake', { field: { weather: 'sand' } }, 230, 272],
+  ['fluffy_fire', mk('charizard', 'modest', { spa: 31 }), mk('snorlax', 'careful', {}, { ability: 'fluffy' }), 'flamethrower', {}, 126, 150],
+  ['fluffy_contact', mk('machamp', 'adamant', { atk: 31 }), mk('snorlax', 'careful', {}, { ability: 'fluffy' }), 'closecombat', {}, 159, 187],
+  ['icescales', mk('charizard', 'modest', { spa: 31 }), mk('blissey', 'calm', {}, { ability: 'icescales' }), 'airslash', {}, 22, 27],
+  ['dryskin_fire', mk('charizard', 'modest', { spa: 31 }), mk('snorlax', 'careful', {}, { ability: 'dryskin' }), 'flamethrower', {}, 79, 94],
+  ['purifyingsalt', mk('gengar', 'modest', { spa: 31 }), mk('garchomp', 'careful', {}, { ability: 'purifyingsalt' }), 'shadowball', {}, 39, 46],
 ];
 
 let pass = 0, fail = 0;
