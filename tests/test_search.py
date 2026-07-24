@@ -5,7 +5,7 @@ from __future__ import annotations
 from simupoke.model import PokemonState, FieldState
 from simupoke.sim import Mon
 from simupoke.search import (
-    rank_actions, evaluate_state, opponent_moves,
+    rank_actions, rank_actions_sampled, evaluate_state, opponent_moves,
 )
 
 
@@ -169,6 +169,39 @@ def test_deep_ko_move_tops_when_lethal():
     r = rank_actions(me, opp, depth=2, roll=1.0)
     assert r.actions[0].move == "Earthquake"
     assert r.actions[0].ko_chance is True
+
+
+def test_sampled_search_determinizes_unknown_opponent():
+    me = mon("garchomp", "jolly", {"atk": 32, "spe": 32},
+             moves=["earthquake", "dragonclaw", "stoneedge"])
+    opp = mon("incineroar", "careful", {"hp": 32, "spd": 32})  # build inconnu
+    r = rank_actions_sampled(me, opp, n_samples=6, seed=1)
+    assert r.actions[0].move == "Earthquake"          # 2x sur Feu/Ténèbres
+    assert "échantillonné" in r.opp_moves[0]
+
+
+def test_sampled_search_reproducible_with_seed():
+    me = mon("garchomp", "jolly", {"atk": 32, "spe": 32}, moves=["earthquake"])
+    opp = mon("incineroar", "careful")
+    a = rank_actions_sampled(me, opp, n_samples=6, seed=42)
+    b = rank_actions_sampled(me, opp, n_samples=6, seed=42)
+    assert [round(x.expected, 6) for x in a.actions] == \
+           [round(x.expected, 6) for x in b.actions]
+
+
+def test_sampled_falls_back_when_opp_moves_known():
+    me = mon("garchomp", "jolly", {"atk": 32, "spe": 32}, moves=["earthquake"])
+    opp = mon("incineroar", "careful", moves=["knockoff", "flareblitz"])
+    r = rank_actions_sampled(me, opp, n_samples=6)
+    # Coups connus -> pas d'échantillonnage, la distribution vient des coups.
+    assert r.opp_moves == ["knockoff", "flareblitz"]
+
+
+def test_sampled_falls_back_for_species_absent_from_usage():
+    me = mon("garchomp", "jolly", {"atk": 32, "spe": 32}, moves=["earthquake"])
+    opp = mon("magikarp", "serious")                  # hors usage
+    r = rank_actions_sampled(me, opp, n_samples=6)
+    assert r.actions                                  # ne lève pas, reste utilisable
 
 
 def test_safe_compromise_recommendation():

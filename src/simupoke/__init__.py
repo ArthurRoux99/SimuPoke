@@ -45,10 +45,10 @@ from .sim import (
     TurnResult, ActionResult,
 )
 from .search import (
-    rank_actions, evaluate_state, evaluate_side, opponent_moves,
-    ActionValue, SearchResult,
+    rank_actions, rank_actions_sampled, evaluate_state, evaluate_side,
+    opponent_moves, ActionValue, SearchResult,
 )
-from .usage import load_usage, usage_prior, likely_set, has_usage, LikelySet
+from .usage import load_usage, usage_prior, likely_set, sample_set, has_usage, LikelySet
 from . import i18n
 
 __all__ = [
@@ -72,8 +72,8 @@ __all__ = [
     "optimize_spread", "Outspeed", "Survive", "Ko", "SpreadResult",
     "Mon", "Side", "simulate_turn", "simulate_turn_actions", "rollout",
     "action_order", "TurnResult", "ActionResult",
-    "rank_actions", "evaluate_state", "evaluate_side", "opponent_moves",
-    "ActionValue", "SearchResult",
-    "load_usage", "usage_prior", "likely_set", "has_usage", "LikelySet",
+    "rank_actions", "rank_actions_sampled", "evaluate_state", "evaluate_side",
+    "opponent_moves", "ActionValue", "SearchResult",
+    "load_usage", "usage_prior", "likely_set", "sample_set", "has_usage", "LikelySet",
     "i18n",
 ]

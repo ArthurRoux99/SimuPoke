@@ -26,8 +26,11 @@ from dataclasses import dataclass, field as dfield
 from .model import PokemonState, FieldState
 from .basestats import is_known
 from .moves import get_move, is_known as move_known
+import random
+from dataclasses import replace
+
 from .sim import Mon, Side, simulate_turn_actions
-from .usage import likely_set
+from .usage import likely_set, sample_set, has_usage
 
 _STATUSES = ("brn", "par", "tox", "slp", "frz", "psn")
 
@@ -266,6 +269,69 @@ def _phrase(a: ActionValue) -> str:
     if a.kind == "switch":
         return f"Changer pour {a.move[2:]}"      # retire le préfixe « → »
     return a.move
+
+
+def _sampled_opp(opp: Mon, ls, reg_id: str) -> Mon:
+    """Applique un build échantillonné à l'adversaire, en respectant l'info déjà
+    observée (§10.3 : ce qui est renseigné n'est pas ré-échantillonné)."""
+    st = opp.build
+    moves = st.moves or (ls.moves or [])
+    nature = st.nature if st.nature not in (None, "serious") else (ls.nature or "serious")
+    return Mon.from_state(replace(
+        st, moves=list(moves), item=st.item or ls.item,
+        ability=st.ability or ls.ability, nature=nature))
+
+
+def rank_actions_sampled(me: Mon, opp: Mon, field: FieldState | None = None, *,
+                         my_bench: list[Mon] | None = None, depth: int = 1,
+                         opp_model: str = "expected", roll: float = 0.5,
+                         n_samples: int = 8, reg_id: str = "reg_m_b",
+                         seed: int | None = 0) -> SearchResult:
+    """Recherche **déterminisée** (ISMCTS-lite, §0.1) : quand le build adverse est
+    inconnu, échantillonne `n_samples` builds plausibles depuis l'usage, lance la
+    recherche pour chacun et **agrège** les valeurs par action.
+
+    Si l'adversaire a déjà des coups renseignés, ou s'il n'y a pas de données
+    d'usage, on retombe sur `rank_actions` (une seule évaluation).
+    """
+    if opp.build.moves or not has_usage(reg_id):
+        return rank_actions(me, opp, field, my_bench=my_bench, depth=depth,
+                            opp_model=opp_model, roll=roll)
+    rng = random.Random(seed)
+    agg: dict[str, dict] = {}
+    order: list[str] = []
+    n_ok = 0
+    for _ in range(max(1, n_samples)):
+        ls = sample_set(opp.build.species, reg_id, rng=rng)
+        if not ls.moves:
+            break                            # espèce absente de l'usage
+        sopp = _sampled_opp(opp, ls, reg_id)
+        res = rank_actions(me, sopp, field, my_bench=my_bench, depth=depth,
+                          opp_model=opp_model, roll=roll, use_usage=False)
+        n_ok += 1
+        for a in res.actions:
+            if a.move not in agg:
+                agg[a.move] = {"e": 0.0, "w": 0.0, "ko": False, "sv": True,
+                               "kind": a.kind}
+                order.append(a.move)
+            d = agg[a.move]
+            d["e"] += a.expected
+            d["w"] += a.worst
+            d["ko"] = d["ko"] or a.ko_chance
+            d["sv"] = d["sv"] and a.survives_worst
+    if n_ok == 0:
+        return rank_actions(me, opp, field, my_bench=my_bench, depth=depth,
+                            opp_model=opp_model, roll=roll)
+    actions = [ActionValue(move=label, expected=agg[label]["e"] / n_ok,
+                           worst=agg[label]["w"] / n_ok, ko_chance=agg[label]["ko"],
+                           survives_worst=agg[label]["sv"], kind=agg[label]["kind"])
+               for label in order]
+    key = ((lambda a: (a.worst, a.expected)) if opp_model == "worst"
+           else (lambda a: (a.expected, a.worst)))
+    actions.sort(key=key, reverse=True)
+    return SearchResult(actions=actions,
+                        opp_moves=[f"échantillonné ({n_ok} builds d'usage)"],
+                        recommendation=_recommend(actions, opp_model))
 
 
 def _recommend(actions: list[ActionValue], opp_model: str = "expected") -> str:

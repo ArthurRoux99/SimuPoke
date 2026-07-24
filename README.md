@@ -485,6 +485,24 @@ Dans l'**UI hébergée**, l'onglet Combat expose cette recherche : bouton
 « Décider (recherche §10.2) », sélecteur de **profondeur** et case **prudent
 (pire cas)**, sur les mêmes champs (moi / adverse / banc / terrain).
 
+### Déterminisation du build adverse (ISMCTS-lite, §0.1)
+
+En vrai combat on connaît l'**espèce** adverse, rarement son build. `--samples N`
+(ou `rank_actions_sampled`) **échantillonne** N builds adverses plausibles depuis
+l'usage — objet, talent, nature et capacités tirés selon leurs distributions
+(`usage.sample_set`) — lance la recherche pour chacun et **agrège** les valeurs
+par action. La décision devient robuste à l'incertitude sur l'adversaire, au lieu
+de parier sur un seul set. Reproductible (graine), respecte l'info déjà observée
+(§10.3 : ce qui est renseigné n'est pas ré-échantillonné) et **retombe** sur la
+recherche simple si les coups adverses sont connus ou l'usage indisponible.
+
+```bash
+# Adversaire dont on ne connaît que l'espèce : moyenne sur 8 builds d'usage
+python -m simupoke.cli decide garchomp jolly earthquake,dragonclaw,stoneedge \
+    incineroar careful --me-sp atk=32,spe=32 --samples 8
+#   -> Adversaire modélisé : échantillonné (8 builds d'usage) ; Earthquake en tête
+```
+
 ## Démarrage rapide
 
 ```bash
@@ -571,6 +589,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Recherche 1-ply à coups simultanés (`rank_actions`/CLI `decide`/API) : valeur attendue + pire cas.
 - [x] Changements (switch) dans le simulateur (`simulate_turn_actions`/`Side`) et la recherche (reco de pivot chiffrée).
 - [x] B1 — recherche multi-tours (expectimax déterminisé `depth≥2` + escompte) par-dessus le simulateur.
-- [ ] Passage à ISMCTS/déterminisations (builds adverses échantillonnés) — raffinement de la recherche.
+- [x] Déterminisation du build adverse (ISMCTS-lite) : `sample_set` + `rank_actions_sampled` (CLI `--samples`, API).
 - [ ] Effets secondaires probabilistes (para 25 %, flinch, gel/dégel) dans le simulateur.
+- [ ] Déterminisations profondes (ré-échantillonnage par nœud) + budget temps — vers l'ISMCTS complet.
 - [ ] Doubles (Phase 5) ; apprentissage optionnel (Phase 6).

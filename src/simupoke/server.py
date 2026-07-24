@@ -43,7 +43,7 @@ from .bench import (
 )
 from .optimize import optimize_spread, Outspeed, Survive, Ko
 from .sim import Mon
-from .search import rank_actions
+from .search import rank_actions, rank_actions_sampled
 from .draft import rank_lineup
 from .team import analyze_team, select_team_preview
 from .usage import usage_prior, has_usage, likely_set
@@ -260,11 +260,18 @@ def api_decide(body: dict) -> dict:
     opp = Mon.from_state(_state(body["opp"]))
     field = FieldState(**(body.get("field") or {}))
     bench = [Mon.from_state(_state(d)) for d in (body.get("bench") or [])]
-    res = rank_actions(me, opp, field, my_bench=bench,
-                       use_usage=body.get("use_usage", True),
-                       roll=float(body.get("roll", 0.5)),
-                       depth=int(body.get("depth", 1)),
-                       opp_model=body.get("opp_model", "expected"))
+    samples = int(body.get("samples", 0))
+    if samples > 0:
+        res = rank_actions_sampled(
+            me, opp, field, my_bench=bench, depth=int(body.get("depth", 1)),
+            opp_model=body.get("opp_model", "expected"),
+            roll=float(body.get("roll", 0.5)), n_samples=samples)
+    else:
+        res = rank_actions(me, opp, field, my_bench=bench,
+                           use_usage=body.get("use_usage", True),
+                           roll=float(body.get("roll", 0.5)),
+                           depth=int(body.get("depth", 1)),
+                           opp_model=body.get("opp_model", "expected"))
     return {"oppMoves": res.opp_moves,
             "actions": [{"move": a.move, "kind": a.kind, "expected": a.expected,
                          "worst": a.worst, "koChance": a.ko_chance,
