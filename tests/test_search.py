@@ -118,6 +118,35 @@ def test_switch_not_preferred_when_attacking_is_better():
     assert r.actions[0].move == "Earthquake"
 
 
+def test_deep_search_runs_and_prefers_winning_line():
+    me = mon("garchomp", "jolly", {"atk": 32, "spe": 32},
+             moves=["earthquake", "swordsdance"])
+    opp = mon("amoonguss", "sassy", {"hp": 32, "spd": 32},
+              moves=["sludgebomb", "gigadrain"])
+    r1 = rank_actions(me, opp, depth=1)
+    r2 = rank_actions(me, opp, depth=2)
+    # En profondeur, la valeur reflète l'issue (Garchomp gagne) -> plus haute.
+    assert r2.actions[0].expected > r1.actions[0].expected
+    assert r2.actions[0].expected <= 2.0
+
+
+def test_depth_is_clamped():
+    me = mon("garchomp", "jolly", {"atk": 32, "spe": 32}, moves=["earthquake"])
+    opp = mon("tyranitar", "adamant", {"atk": 32}, moves=["crunch"])
+    # depth=99 est ramené dans [1,5] : ne doit pas exploser ni lever.
+    r = rank_actions(me, opp, depth=99)
+    assert r.actions
+
+
+def test_deep_ko_move_tops_when_lethal():
+    me = mon("garchomp", "adamant", {"atk": 32}, item="choiceband",
+             moves=["earthquake", "swordsdance"])
+    opp = mon("tyranitar", "jolly", moves=["crunch"], hp=0.5)
+    r = rank_actions(me, opp, depth=2, roll=1.0)
+    assert r.actions[0].move == "Earthquake"
+    assert r.actions[0].ko_chance is True
+
+
 def test_safe_compromise_recommendation():
     # Face à une menace, une option qui ne se fait pas KO peut primer.
     me = mon("garchomp", "jolly", {"atk": 32, "spe": 32},

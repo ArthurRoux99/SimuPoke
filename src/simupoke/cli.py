@@ -29,8 +29,8 @@ Usage :
         # rejoue une ligne tour par tour (séquences de coups séparées par des virgules)
     python -m simupoke.cli decide <me_species> <me_nature> <me_moves> <opp_species> <opp_nature>
         [--opp-moves a,b,c] [--me-sp k=v] [--opp-sp k=v] [--roll 0..1] [--weather X]
-        [--bench "species,nature,move1|move2;species2,..."]   # inclut les changements
-        # classe mes actions (coups ET switchs) par valeur attendue (1-ply sur le simulateur)
+        [--bench "species,nature,move1|move2;species2,..."] [--depth 1..5]  # inclut les changements
+        # classe mes actions (coups ET switchs) par valeur attendue ; --depth ≥2 = recherche multi-tours
 """
 
 from __future__ import annotations
@@ -629,11 +629,14 @@ def cmd_decide(args: list[str]) -> int:
                                                  moves=mvs)))
     try:
         res = rank_actions(me, opp, field, my_bench=bench,
-                           roll=float(opts.get("roll", 0.5)))
+                           roll=float(opts.get("roll", 0.5)),
+                           depth=int(opts.get("depth", 1)))
     except (ValueError, KeyError) as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 1
-    print(f"{label('species', me_sp)}  vs  {label('species', opp_sp)}\n")
+    depth = max(1, min(5, int(opts.get("depth", 1))))
+    print(f"{label('species', me_sp)}  vs  {label('species', opp_sp)}"
+          + (f"  (profondeur {depth})" if depth > 1 else "") + "\n")
     for line in res.lines():
         print(line)
     return 0

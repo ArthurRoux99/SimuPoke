@@ -262,7 +262,8 @@ def api_decide(body: dict) -> dict:
     bench = [Mon.from_state(_state(d)) for d in (body.get("bench") or [])]
     res = rank_actions(me, opp, field, my_bench=bench,
                        use_usage=body.get("use_usage", True),
-                       roll=float(body.get("roll", 0.5)))
+                       roll=float(body.get("roll", 0.5)),
+                       depth=int(body.get("depth", 1)))
     return {"oppMoves": res.opp_moves,
             "actions": [{"move": a.move, "kind": a.kind, "expected": a.expected,
                          "worst": a.worst, "koChance": a.ko_chance,

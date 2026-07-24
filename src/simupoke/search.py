@@ -1,15 +1,22 @@
-"""Recherche à coups simultanés (§10.2) — 1-ply expectimax sur le simulateur.
+"""Recherche à coups simultanés (§10.2) — expectimax sur le simulateur.
 
-Premier vrai pas vers la Phase 4 : au lieu de l'heuristique à un tour de B1, on
-**simule** chaque combinaison (mon coup × coup adverse) via `sim.simulate_turn`,
-on **évalue l'état résultant**, et on classe mes actions par valeur **attendue**
-sur la distribution des coups adverses — tout en signalant le **pire cas** (l'
-adversaire choisit en même temps que moi, information imparfaite).
+Au lieu de l'heuristique à un tour de B1, on **simule** chaque combinaison (mon
+coup × coup adverse) via le simulateur, on **évalue l'état résultant**, et on
+classe mes actions par valeur **attendue** sur la distribution des coups adverses
+— en signalant le **pire cas** (l'adversaire choisit en même temps que moi,
+information imparfaite).
 
-La distribution adverse vient des coups observés, sinon du set le plus probable
-(usage §10.3) ; à défaut, on suppose l'adversaire inactif. Profondeur 1 pour
-rester rapide et explicable ; l'extension MCTS/ISMCTS multi-tours réutilisera la
-même fonction d'évaluation et le même simulateur.
+Avec `depth≥2`, on cherche en **profondeur** : après mon action et la réponse
+(stochastique, nœud « chance ») de l'adversaire, je continue à jouer au mieux
+(nœud « max ») sur `depth-1` tours de plus, avec un escompte `GAMMA` par tour
+(les gains proches priment). Ce n'est pas encore de l'ISMCTS, mais un expectimax
+déterminisé, borné et explicable — même fonction d'évaluation, même simulateur.
+
+Bornage de l'arbre : dans la descente, seuls les **coups** sont explorés côté
+« moi » (plus un changement FORCÉ si l'actif tombe K.O.) ; les changements
+volontaires ne sont évalués qu'au **niveau racine**. L'adversaire est un nœud
+stochastique **uniforme** sur ses coups probables (observés, sinon usage §10.3) ;
+son banc n'est pas modélisé (un actif adverse K.O. = feuille favorable).
 """
 
 from __future__ import annotations
@@ -23,6 +30,10 @@ from .sim import Mon, Side, simulate_turn_actions
 from .usage import likely_set
 
 _STATUSES = ("brn", "par", "tox", "slp", "frz", "psn")
+
+# Escompte par tour de recherche : une victoire (ou une bonne position) plus
+# proche vaut mieux qu'une lointaine, et départage les valeurs saturées à ±2.
+GAMMA = 0.9
 
 
 # ---------------------------------------------------------------------------
@@ -120,16 +131,65 @@ class SearchResult:
         return out
 
 
+# ---------------------------------------------------------------------------
+# Recherche en profondeur (expectimax à coups simultanés)
+# ---------------------------------------------------------------------------
+
+def _terminal(me: Side, opp: Side) -> bool:
+    """État feuille : l'adversaire est K.O. (on ne modélise pas son banc), ou je
+    n'ai plus rien à envoyer."""
+    if opp.active.fainted:
+        return True
+    if me.active.fainted and not any(not b.fainted for b in me.bench):
+        return True
+    return False
+
+
+def _my_actions(me: Side, allow_switch: bool) -> list[tuple]:
+    """Actions légales pour moi. Les changements « volontaires » ne sont permis
+    qu'au niveau demandé (`allow_switch`) — dans la descente, seuls les coups (ou
+    un changement FORCÉ si l'actif est K.O.) sont explorés, ce qui borne l'arbre.
+    """
+    if me.active.fainted:
+        return [("switch", i) for i, b in enumerate(me.bench) if not b.fainted]
+    acts: list[tuple] = [("move", m) for m in me.active.build.moves if move_known(m)]
+    if allow_switch:
+        acts += [("switch", i) for i, b in enumerate(me.bench) if not b.fainted]
+    return acts or [("move", None)]
+
+
+def _state_value(me: Side, opp: Side, field: FieldState | None,
+                 depth: int, roll: float, opp_cands: list[str | None]) -> float:
+    """Valeur d'un état (mon point de vue) : je maximise, l'adversaire est un
+    nœud stochastique (uniforme) sur `opp_cands`. Feuille à `depth<=0`/terminal."""
+    if depth <= 0 or _terminal(me, opp):
+        return evaluate_side(me, opp.active)
+    best = float("-inf")
+    for action in _my_actions(me, allow_switch=False):
+        acc = 0.0
+        for omv in opp_cands:
+            child = simulate_turn_actions(me, opp, action, ("move", omv),
+                                          field, roll=roll, copy=True)
+            acc += _state_value(child.me, child.opp, field, depth - 1, roll,
+                                opp_cands)
+        best = max(best, acc / len(opp_cands))
+    return GAMMA * best
+
+
 def rank_actions(me: Mon, opp: Mon, field: FieldState | None = None, *,
                  my_moves: list[str] | None = None,
                  my_bench: list[Mon] | None = None,
-                 use_usage: bool = True, roll: float = 0.5) -> SearchResult:
-    """Classe mes actions (coups **et** changements) par valeur attendue à 1 tour.
+                 use_usage: bool = True, roll: float = 0.5,
+                 depth: int = 1) -> SearchResult:
+    """Classe mes actions (coups **et** changements) par valeur attendue.
 
-    Si `my_bench` est fourni, chaque changement vers un Pokémon vivant est
-    évalué au même titre qu'un coup : l'adversaire (qui joue en même temps)
-    frappe l'entrant, et l'état résultant est noté avec `evaluate_side`.
+    `depth=1` : évaluation immédiate après le tour (rapide). `depth≥2` : recherche
+    expectimax multi-tours — après mon action et la réponse (stochastique) de
+    l'adversaire, je continue à jouer au mieux sur `depth-1` tours de plus. Si
+    `my_bench` est fourni, chaque changement vers un Pokémon vivant est évalué au
+    même titre qu'un coup (l'adversaire frappe l'entrant).
     """
+    depth = max(1, min(5, depth))            # borne de sécurité (coût ~ ×10/ply)
     bench = my_bench or []
     my_cands = my_moves if my_moves is not None else list(me.build.moves)
     opp_cands = opponent_moves(opp, use_usage)
@@ -152,7 +212,11 @@ def rank_actions(me: Mon, opp: Mon, field: FieldState | None = None, *,
             res = simulate_turn_actions(
                 Side(active=me, bench=bench), Side(active=opp),
                 action, ("move", omv), field, roll=roll, copy=True)
-            outcomes.append(evaluate_side(res.me, res.opp.active))
+            if depth <= 1:
+                outcomes.append(evaluate_side(res.me, res.opp.active))
+            else:
+                outcomes.append(_state_value(res.me, res.opp, field, depth - 1,
+                                             roll, opp_cands))
             if res.opp_fainted:
                 ko_chance = True
             if res.me_fainted:

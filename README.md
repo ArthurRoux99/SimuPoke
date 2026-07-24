@@ -25,7 +25,7 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 | — | Seuils & optimiseur de SP (§11.1, §8.3) | ✅ speed tiers + outspeed/survive/ko + spread |
 | — | UI — page HTML autonome (§12) | 🟡 v1 (calc de dégâts) |
 | — | UI — serveur local (tous les modules) | 🟡 v1 (Dégâts/B1/B2/B3) |
-| 4 | B1 — Mode simultané (MCTS/ISMCTS) | 🟡 simulateur de tour livré (recherche à venir) |
+| 4 | B1 — Mode simultané (recherche) | 🟡 simulateur + expectimax multi-tours (ISMCTS à venir) |
 | 5 | Doubles | ⏳ |
 | 6 | (optionnel) Apprentissage | ⏳ |
 
@@ -450,9 +450,24 @@ python -m simupoke.cli decide gengar timid shadowball,sludgebomb garchomp jolly 
 #   -> 1. → skarmory (attendu -0.16)  ➤ Changer pour skarmory
 ```
 
-> Profondeur 1 pour rester rapide et explicable ; l'extension MCTS/ISMCTS
-> multi-tours réutilisera la **même** fonction d'évaluation et le **même**
-> simulateur. Exposé aussi par `POST /api/decide` (champ `bench`).
+Avec **`--depth ≥2`**, la recherche va **plus loin** : après mon action et la
+réponse (stochastique) de l'adversaire, je continue à jouer au mieux sur les
+tours suivants (expectimax déterminisé, escompte `GAMMA` par tour pour préférer
+les gains proches). Le setup qui ne paie qu'au tour d'après, ou le switch qui
+mène à une position gagnante, remontent alors dans le classement.
+
+```bash
+python -m simupoke.cli decide garchomp jolly earthquake,swordsdance \
+    tyranitar adamant --me-sp atk=32,spe=32 --opp-moves crunch,rockslide --depth 2
+```
+
+> Bornage : dans la descente, seuls les **coups** sont explorés côté « moi »
+> (plus un changement forcé si l'actif tombe K.O.) ; les changements volontaires
+> ne sont notés qu'au niveau racine. L'adversaire est un nœud stochastique
+> uniforme sur ses coups probables (son banc n'est pas modélisé). Coût ~ ×10 par
+> tour de profondeur (depth 3 ≈ 300 ms) ; `depth` est borné à [1, 5]. Exposé
+> aussi par `POST /api/decide` (champs `bench`, `depth`). Ce n'est pas encore de
+> l'ISMCTS complet, mais une recherche multi-tours réelle, bornée et explicable.
 
 ## Démarrage rapide
 
@@ -539,6 +554,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Simulateur de tour (ordre, dégâts, statut/setup/protection, fin de tour) + `rollout`/CLI `sim` — fondation Phase 4.
 - [x] Recherche 1-ply à coups simultanés (`rank_actions`/CLI `decide`/API) : valeur attendue + pire cas.
 - [x] Changements (switch) dans le simulateur (`simulate_turn_actions`/`Side`) et la recherche (reco de pivot chiffrée).
-- [ ] B1 — recherche multi-tours (MCTS/ISMCTS, §10.2) par-dessus le simulateur.
+- [x] B1 — recherche multi-tours (expectimax déterminisé `depth≥2` + escompte) par-dessus le simulateur.
+- [ ] Passage à ISMCTS/déterminisations (builds adverses échantillonnés) — raffinement de la recherche.
 - [ ] Effets secondaires probabilistes (para 25 %, flinch, gel/dégel) dans le simulateur.
 - [ ] Doubles (Phase 5) ; apprentissage optionnel (Phase 6).
