@@ -27,7 +27,7 @@ from .analysis import (
 from .draft import rank_lineup, evaluate_candidate, DraftEvaluation, team_threats
 from .team import (
     analyze_team, select_team_preview, TeamReport, PreviewResult,
-    matchup_score, check_clauses,
+    matchup_score, damage_matchup_score, check_clauses,
 )
 from .combat import (
     analyze_turn, TurnAnalysis, MoveEval, SwitchEval, evaluate_switches,
@@ -56,7 +56,7 @@ __all__ = [
     "base_stat_total", "DefensiveProfile", "RoleAssessment",
     "rank_lineup", "evaluate_candidate", "DraftEvaluation", "team_threats",
     "analyze_team", "select_team_preview", "TeamReport", "PreviewResult",
-    "matchup_score", "check_clauses",
+    "matchup_score", "damage_matchup_score", "check_clauses",
     "analyze_turn", "TurnAnalysis", "MoveEval", "SwitchEval", "evaluate_switches",
     "effective_speed", "moves_first",
     "speed_tiers", "compute_speed", "min_sp_to_outspeed", "min_sp_to_survive",

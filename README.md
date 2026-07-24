@@ -20,7 +20,7 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 |---|---|---|
 | 0 | Socle données + conversion SP→stats + damage calc | ✅ |
 | 1 | B2 — Aide au tirage (Roster Ranch) | 🟡 v1 (sans priors d'usage) |
-| 2 | B3 — Team builder + team preview | 🟡 v1 (matchups par types) |
+| 2 | B3 — Team builder + team preview | 🟡 v1 (matchups par dégâts + repli types) |
 | 3 | B1 — Mode analyse (Singles) | 🟡 v1 (analyse 1 tour + switchs) |
 | — | Seuils & optimiseur de SP (§11.1, §8.3) | ✅ speed tiers + outspeed/survive/ko + spread |
 | — | UI — page HTML autonome (§12) | 🟡 v1 (calc de dégâts) |
@@ -219,12 +219,17 @@ local. Format détaillé en tête de `src/simupoke/usage_import.py`.
   **couverture offensive manquante**, distribution des **rôles**.
 - **Assistant team preview** (`select_team_preview`) : à partir de mes 6 et des
   6 adverses, choisit les **3 (singles) / 4 (doubles)** à amener et l'**ordre
-  d'envoi**, selon un score de matchup de types + vitesse, avec justification.
+  d'envoi**, avec justification. Le matchup est **affiné par le calculateur de
+  dégâts** (`use_damage=True`, défaut) : il compare les **coups pour KO** de
+  chaque camp (moves connus, sinon set le plus probable §10.3) plutôt qu'une
+  simple efficacité de types — avec **repli automatique sur les types** quand
+  aucune capacité n'est estimable. `--no-damage` force l'ancien mode.
 
 > Le profil défensif tient compte des **immunités de talent** (Lévitation,
 > Torche, Absorbe-Volt/Eau…) : un Motisma-Lavage à Lévitation n'est plus compté
-> faible au Sol. Limitation restante : le matchup *preview* est une **heuristique
-> de types** (le calculateur de dégâts pourra l'affiner ensuite).
+> faible au Sol. Le mode dégâts prend en compte objets/talents/SP réels (Choice
+> Band, Life Orb…), donc l'ordre d'amenée reflète la vraie pression, pas juste
+> les types.
 
 ## UI — page HTML autonome (thème sombre)
 
@@ -455,6 +460,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] Couverture calc étendue : items type-boost, Paradox (Protosynthèse/Charge Quantique), Fluffy/Ice Scales/Water Bubble & co.
 - [x] Focus Sash / Fermeté dans les seuils de survie/KO et l'optimiseur de spread.
 - [x] B1 — évaluation des changements (switch) : sûreté à l'entrée + menace, reco de pivot.
+- [x] B3 — team preview affiné par le vrai calc de dégâts (coups pour KO) + repli types.
 - [x] Delta Champions au calc : talents -ate (dont Dragonize, piloté par données) + Mega Sol.
 - [x] UI — page HTML autonome v1 (calculateur de dégâts, moteur JS à parité).
 - [x] UI — serveur local v1 : tous les modules (Dégâts/B1/B2/B3) via API Python.

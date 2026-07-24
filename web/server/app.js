@@ -190,7 +190,8 @@
   async function runPreview() {
     try {
       const r = await api('/api/preview', { my_team: builders.prevMine.getEntries(),
-        opp_team: builders.prevOpp.getEntries(), format: $('prev-format').value });
+        opp_team: builders.prevOpp.getEntries(), format: $('prev-format').value,
+        use_damage: $('prev-damage').checked });
       $('preview-result').textContent = r.lines.join('\n');
     } catch (e) { $('preview-result').textContent = '⚠ ' + e.message; }
   }

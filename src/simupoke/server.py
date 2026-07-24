@@ -294,10 +294,11 @@ def api_team(body: dict) -> dict:
 def api_preview(body: dict) -> dict:
     res = select_team_preview(_owned_list(body["my_team"]),
                               _owned_list(body["opp_team"]),
-                              body.get("format", "singles"))
+                              body.get("format", "singles"),
+                              use_damage=body.get("use_damage", True))
     pick = lambda p: {"species": p.species, "value": p.value,
                       "beats": p.beats, "threatenedBy": p.threatened_by}
-    return {"fmt": res.fmt, "bring": res.bring,
+    return {"fmt": res.fmt, "bring": res.bring, "byDamage": res.by_damage,
             "picks": [pick(p) for p in res.picks],
             "bench": [pick(p) for p in res.bench],
             "lines": res.lines()}

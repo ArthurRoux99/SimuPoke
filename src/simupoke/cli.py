@@ -8,7 +8,7 @@ Usage :
         [--atk-sp k=v,...] [--def-sp k=v,...] [--boost-atk N]
     python -m simupoke.cli draft <lineup.json> [--no-roster]   # B2 aide au tirage
     python -m simupoke.cli team <team.json>                     # B3 analyse d'équipe
-    python -m simupoke.cli preview <my_team.json> <opp.json> [--format singles|doubles]
+    python -m simupoke.cli preview <my_team.json> <opp.json> [--format singles|doubles] [--no-damage]
     python -m simupoke.cli analyze <me_species> <me_nature> <me_moves> <opp_species> <opp_nature>
         [--opp-move X] [--opp-moves a,b,c] [--me-sp k=v,...] [--opp-sp k=v,...]
         [--me-item X] [--opp-item X] [--me-hp 0..1] [--opp-hp 0..1] [--weather X]
@@ -219,18 +219,21 @@ def cmd_team(args: list[str]) -> int:
 def cmd_preview(args: list[str]) -> int:
     pos: list[str] = []
     fmt = "singles"
+    use_damage = True
     i = 0
     while i < len(args):
         a = args[i]
         if a == "--format":
             fmt = args[i + 1] if i + 1 < len(args) else fmt
             i += 1
+        elif a == "--no-damage":
+            use_damage = False
         elif not a.startswith("--"):
             pos.append(a)
         i += 1
     if len(pos) != 2:
-        print("Usage : preview <my_team.json> <opp.json> [--format singles|doubles]",
-              file=sys.stderr)
+        print("Usage : preview <my_team.json> <opp.json> "
+              "[--format singles|doubles] [--no-damage]", file=sys.stderr)
         return 2
     try:
         my_team = load_team(pos[0])
@@ -238,7 +241,7 @@ def cmd_preview(args: list[str]) -> int:
     except FileNotFoundError as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 1
-    for line in select_team_preview(my_team, opp, fmt).lines():
+    for line in select_team_preview(my_team, opp, fmt, use_damage=use_damage).lines():
         print(line)
     return 0
 
