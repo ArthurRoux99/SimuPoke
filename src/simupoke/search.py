@@ -64,16 +64,28 @@ def evaluate_state(me: Mon, opp: Mon) -> float:
 
 
 def evaluate_side(me: Side, opp_active: Mon) -> float:
-    """Évaluation consciente du banc : l'actif domine, le banc compte un peu.
+    """Évaluation **d'équipe** (mon point de vue).
 
-    Un actif K.O. mais avec un banc vivant n'est pas une défaite totale.
+    On compare la santé MOYENNE de mon camp (actif + banc, un Pokémon K.O. compte
+    0) à celle de l'actif adverse — perdre un membre coûte donc réellement, ce
+    qui valorise un changement qui **préserve** l'actif menacé. Un actif adverse
+    K.O. rapporte un bonus (on ne modélise pas son banc). Termes légers pour les
+    boosts/statuts de mon actif.
     """
-    base = evaluate_state(me.active, opp_active)
-    if me.active.fainted and any(not b.fainted for b in me.bench):
-        base = max(base, -0.8)                # on peut renvoyer un autre Pokémon
-    if me.bench:
-        base += 0.1 * sum(b.hp_pct for b in me.bench) / len(me.bench)
-    return base
+    slots = [me.active, *me.bench]
+    my_avg = sum(x.hp_pct for x in slots) / len(slots)
+    opp_hp = 0.0 if opp_active.fainted else opp_active.hp_pct
+    v = my_avg - opp_hp
+    if opp_active.fainted:
+        v += 1.0                              # j'ai battu l'actif adverse
+    a = me.active
+    off = ("atk", "spa", "spe")
+    v += 0.03 * sum(a.boosts.get(k, 0) for k in off)
+    if not a.fainted and a.status in _STATUSES:
+        v -= 0.08
+    if opp_active.status in _STATUSES:
+        v += 0.08
+    return v
 
 
 # ---------------------------------------------------------------------------

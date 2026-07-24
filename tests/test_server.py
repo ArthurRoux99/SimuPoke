@@ -202,8 +202,7 @@ def test_decide_endpoint():
 def test_decide_endpoint_with_switch():
     out = server.api_decide({
         "me": {"species": "gengar", "nature": "timid",
-               "sp": {"spa": 32, "spe": 32}, "moves": ["shadowball"],
-               "current_hp_pct": 0.35},
+               "sp": {"spa": 32, "spe": 32}, "moves": ["shadowball"]},
         "opp": {"species": "garchomp", "nature": "jolly",
                 "sp": {"atk": 32, "spe": 32}, "item": "choiceband",
                 "moves": ["earthquake"]},

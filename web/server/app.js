@@ -161,6 +161,21 @@
     } catch (e) { $('combat-result').textContent = '⚠ ' + e.message; }
   }
 
+  async function runDecide() {
+    try {
+      const me = { species: $('c-me-species').value, nature: $('c-me-nature').value,
+        sp: readSP('c-me'), moves: splitMoves($('c-me-moves').value),
+        hpPct: parseFloat($('c-me-hp').value || '100') / 100 };
+      const opp = { species: $('c-opp-species').value, nature: $('c-opp-nature').value,
+        moves: splitMoves($('c-opp-moves').value), hpPct: parseFloat($('c-opp-hp').value || '100') / 100 };
+      const r = await api('/api/decide', { me, opp, bench: parseBench($('c-bench').value),
+        depth: parseInt($('c-depth').value || '1', 10),
+        opp_model: $('c-cautious').checked ? 'worst' : 'expected',
+        field: { weather: $('c-weather').value, terrain: $('c-terrain').value } });
+      $('combat-result').textContent = r.lines.join('\n');
+    } catch (e) { $('combat-result').textContent = '⚠ ' + e.message; }
+  }
+
   // ---------- Tirage ----------
   async function runDraft() {
     const out = $('draft-result');
@@ -336,6 +351,7 @@
       el.addEventListener('input', computeDamage); el.addEventListener('change', computeDamage);
     });
     $('c-run').addEventListener('click', runCombat);
+    $('c-decide').addEventListener('click', runDecide);
     $('c-opp-likely').addEventListener('click', fillLikelyOpponent);
     $('draft-run').addEventListener('click', runDraft);
     $('draft-sample').addEventListener('click', () => builders.draft.setEntries(entriesFrom(SAMPLES.lineup, 'lineup')));

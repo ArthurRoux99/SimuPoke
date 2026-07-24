@@ -94,9 +94,9 @@ def test_expected_and_worst_consistent():
 
 
 def test_switch_ranked_and_recommended_when_active_is_lost():
-    # Gengar entamé se fait OHKO par Séisme ; Skarmory (banc) y est immunisé.
-    me = mon("gengar", "timid", {"spa": 32, "spe": 32},
-             moves=["shadowball"], hp=0.35)
+    # Gengar SAIN mais condamné (OHKO Séisme Choice Band) : le préserver via un
+    # switch vers Skarmory (immunisé Sol) vaut mieux que le sacrifier.
+    me = mon("gengar", "timid", {"spa": 32, "spe": 32}, moves=["shadowball"])
     opp = mon("garchomp", "jolly", {"atk": 32, "spe": 32}, item="choiceband",
               moves=["earthquake"])
     bench = [mon("skarmory", "impish", {"hp": 32, "def": 32}, moves=["bravebird"])]
