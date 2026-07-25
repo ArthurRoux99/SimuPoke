@@ -474,9 +474,34 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+def _lan_ip() -> str | None:
+    """Adresse IP de l'interface réseau locale (LAN), sans émettre de paquet.
+
+    Le `connect` UDP ne transmet rien : il ne fait que sélectionner l'interface
+    de sortie, ce qui permet de lire l'IP locale (proximité mobile/2e écran, §3
+    respecté — rien ne quitte le PC)."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("192.0.2.1", 1))          # réseau de test (RFC 5737), non routé
+        return s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+
+
 def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
     httpd = ThreadingHTTPServer((host, port), Handler)
     print(f"SimuPoke en écoute sur http://{host}:{port}  (Ctrl-C pour arrêter)")
+    loopback = host in ("127.0.0.1", "localhost", "::1")
+    if loopback:
+        print("  Astuce : --host 0.0.0.0 pour ouvrir sur ton mobile / 2e écran "
+              "(même wifi). Rien ne quitte ton PC.")
+    else:
+        lan = _lan_ip()
+        if lan:
+            print(f"  Accès mobile / 2e écran (même wifi) : http://{lan}:{port}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
@@ -486,7 +511,8 @@ def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Serveur local SimuPoke")
-    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--host", default="127.0.0.1",
+                   help="127.0.0.1 (défaut, local) ou 0.0.0.0 (accès LAN mobile)")
     p.add_argument("--port", type=int, default=8000)
     args = p.parse_args()
     serve(args.host, args.port)

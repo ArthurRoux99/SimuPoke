@@ -298,7 +298,22 @@ les exemples de `data/`. L'onglet **Mon Box** charge, édite et **enregistre**
 `data/my_roster.json` directement. Rien ne sort de ta machine (§3).
 
 > API : `GET /api/meta|samples|roster`,
-> `POST /api/damage|analyze|decide|draft|team|preview|stats|roster|speed|outspeed|survive|ko|spread`.
+> `POST /api/damage|analyze|decide|draft|team|preview|stats|roster|speed|outspeed|survive|ko|spread|paste|export`.
+
+### Accès mobile / 2ᵉ écran (proximité, sans rien exposer, §15 Q4)
+
+Pas besoin d'hébergement cloud : le serveur tourne sur ton PC et peut être ouvert
+depuis ton **mobile ou un 2ᵉ écran** sur le **même wifi**. Tout reste local (le
+cadre §3 est préservé — ni le jeu ni un serveur tiers ne voient tes données).
+
+```bash
+python -m simupoke.server --host 0.0.0.0
+#   Accès mobile / 2e écran (même wifi) : http://192.168.x.x:8000
+```
+
+Le démarrage affiche directement l'URL LAN à ouvrir sur le téléphone. Pour un
+accès **partout** (hors wifi) sans serveur, la **page autonome** (calc) est déjà
+publiée sur GitHub Pages ; les autres modules pourront y être ajoutés en JS.
 
 ## B1 — Assistant de combat (mode analyse)
 
