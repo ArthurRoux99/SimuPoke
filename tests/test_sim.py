@@ -160,6 +160,40 @@ def test_switch_resets_boosts_of_outgoing():
     assert benched.boosts == {}
 
 
+def test_recoil_damages_attacker():
+    me = mon("incineroar", "adamant", {"atk": 32})
+    opp = mon("tyranitar", "careful", {"hp": 32, "def": 32})
+    r = simulate_turn(me, opp, "flareblitz", None, roll=0.5)
+    assert r.me.hp < r.me.max_hp
+    assert any("recul" in ln for ln in r.log)
+
+
+def test_rock_head_negates_recoil():
+    me = PokemonState(species="aggron", nature="adamant",
+                      stat_points={"atk": 32}, ability="rockhead")
+    r = simulate_turn(Mon.from_state(me),
+                      mon("tyranitar", "careful", {"hp": 32}), "doubleedge", None)
+    assert r.me.hp == r.me.max_hp
+    assert not any("recul" in ln for ln in r.log)
+
+
+def test_drain_heals_attacker():
+    me = mon("ironhands", "adamant", {"atk": 32}, hp=0.5)
+    before = me.hp
+    r = simulate_turn(me, mon("blissey", "calm"), "drainpunch", None, roll=0.5)
+    assert r.me.hp > before
+    assert any("draine" in ln for ln in r.log)
+
+
+def test_drain_capped_by_damage_dealt():
+    # Cible presque morte : le drain ne dépasse pas les dégâts réellement infligés.
+    me = mon("ironhands", "adamant", {"atk": 32}, hp=0.5)
+    opp = mon("flutter mane", "timid", hp=0.02)      # ~ presque KO
+    r = simulate_turn(me, opp, "drainpunch", None, roll=1.0)
+    # dégâts réels faibles -> soin faible (pas un demi-Drain Punch plein).
+    assert r.me.hp - me.max_hp // 2 <= me.max_hp // 4
+
+
 def test_switch_into_weakness_takes_damage():
     me = Side(active=mon("gengar", "timid", {"spa": 32}, moves=["shadowball"]),
               bench=[mon("charizard", "timid", {"hp": 0})])

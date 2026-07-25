@@ -105,6 +105,21 @@ def _roll_index(roll: float) -> int:
 
 _STATUS_IMMUNE_TYPE = {"brn": "Fire", "par": "Electric"}
 
+# Recul : fraction des DÉGÂTS infligés reprise par l'attaquant.
+_RECOIL: dict[str, float] = {
+    "flareblitz": 1 / 3, "bravebird": 1 / 3, "doubleedge": 1 / 3,
+    "woodhammer": 1 / 3, "volttackle": 1 / 3, "headcharge": 1 / 4,
+    "wildcharge": 1 / 4, "takedown": 1 / 4, "submission": 1 / 4,
+    "headsmash": 1 / 2, "lightofruin": 1 / 2,
+}
+# Drain : fraction des dégâts infligés récupérée en PV.
+_DRAIN: dict[str, float] = {
+    "drainpunch": 0.5, "gigadrain": 0.5, "leechlife": 0.5, "hornleech": 0.5,
+    "paraboliccharge": 0.5, "dreameater": 0.5, "absorb": 0.5, "megadrain": 0.5,
+    "bitterblade": 0.5, "drainingkiss": 0.75, "oblivionwing": 0.75,
+    "bouncybubble": 0.75,
+}
+
 
 def _apply_status(target: Mon, status: str, move_id: str, log: list[str]) -> None:
     if target.status:
@@ -184,16 +199,35 @@ def _apply_move(attacker: Mon, defender: Mon, move: str,
     if r.type_effectiveness == 0:
         log.append("  sans effet (immunité)")
         return
+    hp_before = defender.hp
     defender.hp = max(0, defender.hp - dmg)
+    dealt = hp_before - defender.hp        # dégâts réellement infligés (plafonnés)
     log.append(f"  {dmg} dégâts -> {defender.build.species} "
                f"{defender.hp}/{defender.max_hp} ({100*defender.hp//defender.max_hp}%)")
     if defender.fainted:
         log.append(f"  {defender.build.species} est K.O. !")
-    # Orbe Vie : recul de 1/10 des PV max après un coup qui touche.
-    if to_id(attacker.item or "") == "lifeorb" and dmg > 0:
-        recoil = max(1, attacker.max_hp // 10)
+    if dealt <= 0:
+        return
+    atk_ability = to_id(attacker.build.ability or "")
+    # Drain : soin d'une fraction des dégâts infligés.
+    if mid in _DRAIN and attacker.hp > 0:
+        healed = min(attacker.max_hp - attacker.hp,
+                     max(1, int(dealt * _DRAIN[mid])))
+        if healed > 0:
+            attacker.hp += healed
+            log.append(f"  {attacker.build.species} draine {healed} PV")
+    # Recul (sauf Tête de Roche / Garde Magik).
+    if mid in _RECOIL and atk_ability not in ("rockhead", "magicguard"):
+        recoil = max(1, int(dealt * _RECOIL[mid]))
         attacker.hp = max(0, attacker.hp - recoil)
-        log.append(f"  {attacker.build.species} subit {recoil} (Orbe Vie)")
+        log.append(f"  {attacker.build.species} subit {recoil} (recul)")
+        if attacker.fainted:
+            log.append(f"  {attacker.build.species} est K.O. (recul) !")
+    # Orbe Vie : recul de 1/10 des PV max après un coup qui touche.
+    if to_id(attacker.item or "") == "lifeorb":
+        lo = max(1, attacker.max_hp // 10)
+        attacker.hp = max(0, attacker.hp - lo)
+        log.append(f"  {attacker.build.species} subit {lo} (Orbe Vie)")
 
 
 # ---------------------------------------------------------------------------
