@@ -250,18 +250,24 @@ vérifié par **parité** (`node web/verify_engine.mjs` → **33/33**) : 18 vect
 
 ```bash
 # Construire le fichier autonome (stdlib Python, aucune dépendance)
-python scripts/build_web.py        # -> web/dist/simupoke.html (~285 Ko)
+python scripts/build_web.py        # -> web/dist/simupoke.html (~316 Ko)
 ```
 
 Ouvrir ensuite `web/dist/simupoke.html` dans un navigateur : tout est embarqué
-(données + moteur), aucun serveur requis. La page propose attaquant/défenseur
-(espèce, nature, SP, objet, talent, boosts, statut, PV %), météo/terrain,
-critique et attaque de zone, avec dégâts min–max, %, KO en N coups et le delta
-Champions (ex. talent `dragonize`).
+(données + moteur), aucun serveur requis. Deux onglets :
 
-> Source dans `web/` (`index.html` + `style.css` + `engine.js` + `app.js`),
-> assemblée par `scripts/build_web.py`. Cette version autonome ne couvre que le
-> calcul de dégâts.
+- **Dégâts** — attaquant/défenseur (espèce, nature, SP, objet, talent, boosts,
+  statut, PV %), météo/terrain, critique et attaque de zone → dégâts min–max, %,
+  KO en N coups, delta Champions (ex. `dragonize`).
+- **Seuils** — combien de SP pour **dépasser** en vitesse, **survivre** à une
+  attaque, ou **tuer** en N coups (Focus Sash / Fermeté inclus), port JS de
+  `bench.py` vérifié par parité (`node web/verify_bench.mjs` → 5/5).
+
+> Source dans `web/` (`index.html` + `style.css` + `engine.js` + `bench.js` +
+> `app.js`), assemblée par `scripts/build_web.py`. **Version en ligne** (§15 Q4) :
+> les modules sont portés progressivement en JS pour tourner **entièrement dans
+> le navigateur** (hors-ligne, publiable sur GitHub Pages) — Dégâts et Seuils
+> sont faits ; B1/B2/B3 et la recherche suivront, à parité avec le cœur Python.
 
 ### Publication sur GitHub Pages
 

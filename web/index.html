@@ -9,11 +9,17 @@
 <body>
 <header>
   <h1>SimuPoke <span class="tag">Champions</span></h1>
-  <p>Calculateur de dégâts hors-ligne — modèle de stats Champions (niveau 50, SP, IV 31)
-     et delta Méga. Moteur identique au cœur Python (parité @smogon/calc).</p>
+  <p>Outil hors-ligne — calculateur de dégâts et seuils SP (modèle Champions :
+     niveau 50, SP, IV 31, delta Méga). Moteur identique au cœur Python.</p>
 </header>
 
+<div class="tabs" id="tabs">
+  <button data-tab="damage" class="active">Dégâts</button>
+  <button data-tab="bench">Seuils</button>
+</div>
+
 <main>
+  <section class="tab-panel active" id="tab-damage">
   <div class="grid-2">
     <!-- ATTAQUANT -->
     <section class="panel attacker">
@@ -92,6 +98,73 @@
     <button data-preset="dragonize">Feraligatr (Dragonize) vs Garchomp</button>
     <button data-preset="pixilate">Sylveon (Pixilate) vs Garchomp</button>
   </div>
+  </section>
+
+  <!-- ===== SEUILS ===== -->
+  <section class="tab-panel" id="tab-bench">
+    <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Questions inverses
+      du calc : combien de SP pour dépasser, survivre ou tuer. Raisonnement stat par
+      stat (le budget global de 66 SP reste à ta charge).</p>
+
+    <div class="bench-block">
+      <h2>Vitesse — combien de SP pour dépasser ?</h2>
+      <div class="controls" style="grid-template-columns:1.4fr 1fr auto;">
+        <div><label>Mon Pokémon</label><input id="os-me-species" list="species-list" value="Garchomp" autocomplete="off"></div>
+        <div><label>Nature</label><select id="os-me-nature"></select></div>
+        <div class="check"><input type="checkbox" id="os-me-tw"><label for="os-me-tw">mon Tailwind</label></div>
+      </div>
+      <div class="controls" style="grid-template-columns:1.4fr 1fr auto;">
+        <div><label>Cible</label><input id="os-tg-species" list="species-list" value="Flutter Mane" autocomplete="off"></div>
+        <div><label>Nature</label><select id="os-tg-nature"></select></div>
+        <div class="check"><input type="checkbox" id="os-tg-tw"><label for="os-tg-tw">Tailwind cible</label></div>
+      </div>
+      <div class="controls" style="grid-template-columns:1fr auto auto;">
+        <div><label>SP Vitesse cible</label><input id="os-tg-spe" type="number" min="0" max="32" value="32"></div>
+        <div class="check"><input type="checkbox" id="os-tie"><label for="os-tie">égaliser suffit</label></div>
+        <button class="primary" id="os-run">Calculer</button>
+      </div>
+      <div class="bench-out" id="os-out"></div>
+    </div>
+
+    <div class="bench-block">
+      <h2>Survie — SP défensifs pour encaisser</h2>
+      <div class="controls" style="grid-template-columns:1.4fr 1fr;">
+        <div><label>Défenseur (moi)</label><input id="sv-def-species" list="species-list" value="Tyranitar" autocomplete="off"></div>
+        <div><label>Nature</label><select id="sv-def-nature"></select></div>
+      </div>
+      <div class="controls" style="grid-template-columns:1.4fr 1fr 1fr;">
+        <div><label>Attaquant</label><input id="sv-atk-species" list="species-list" value="Garchomp" autocomplete="off"></div>
+        <div><label>Nature</label><select id="sv-atk-nature"></select></div>
+        <div><label>Objet attaquant</label><input id="sv-atk-item" value="choiceband" autocomplete="off"></div>
+      </div>
+      <div class="controls" style="grid-template-columns:1.4fr 1fr auto;">
+        <div><label>Capacité</label><input id="sv-move" list="move-list" value="Earthquake" autocomplete="off"></div>
+        <div><label>SP off. attaquant</label><input id="sv-atk-off" type="number" min="0" max="32" value="32"></div>
+        <button class="primary" id="sv-run">Calculer</button>
+      </div>
+      <div class="bench-out" id="sv-out"></div>
+    </div>
+
+    <div class="bench-block">
+      <h2>KO — SP offensifs pour tuer</h2>
+      <div class="controls" style="grid-template-columns:1.4fr 1fr 1fr;">
+        <div><label>Attaquant (moi)</label><input id="ko-atk-species" list="species-list" value="Garchomp" autocomplete="off"></div>
+        <div><label>Nature</label><select id="ko-atk-nature"></select></div>
+        <div><label>Objet</label><input id="ko-atk-item" value="choiceband" autocomplete="off"></div>
+      </div>
+      <div class="controls" style="grid-template-columns:1.4fr 1fr 1fr;">
+        <div><label>Défenseur</label><input id="ko-def-species" list="species-list" value="Tyranitar" autocomplete="off"></div>
+        <div><label>Nature</label><select id="ko-def-nature"></select></div>
+        <div><label>PV cible (%)</label><input id="ko-def-hp" type="number" min="1" max="100" value="100"></div>
+      </div>
+      <div class="controls" style="grid-template-columns:1.4fr auto auto;">
+        <div><label>Capacité</label><input id="ko-move" list="move-list" value="Earthquake" autocomplete="off"></div>
+        <div><label>KO en (coups)</label><input id="ko-hits" type="number" min="1" max="6" value="1"></div>
+        <button class="primary" id="ko-run">Calculer</button>
+      </div>
+      <div class="bench-out" id="ko-out"></div>
+    </div>
+  </section>
 </main>
 
 <footer>
@@ -105,6 +178,7 @@
 
 <script>/* @DATA */</script>
 <script>/* @ENGINE */</script>
+<script>/* @BENCH */</script>
 <script>/* @APP */</script>
 </body>
 </html>

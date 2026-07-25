@@ -49,6 +49,7 @@ def build() -> Path:
     template = (WEB / "index.html").read_text(encoding="utf-8")
     style = (WEB / "style.css").read_text(encoding="utf-8")
     engine = (WEB / "engine.js").read_text(encoding="utf-8")
+    bench = (WEB / "bench.js").read_text(encoding="utf-8")
     app = (WEB / "app.js").read_text(encoding="utf-8")
 
     data = {
@@ -63,6 +64,7 @@ def build() -> Path:
             .replace("/* @STYLE */", style)
             .replace("/* @DATA */", data_js)
             .replace("/* @ENGINE */", engine)
+            .replace("/* @BENCH */", bench)
             .replace("/* @APP */", app))
 
     DIST.mkdir(parents=True, exist_ok=True)

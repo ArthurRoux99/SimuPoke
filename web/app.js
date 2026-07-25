@@ -4,6 +4,7 @@
   'use strict';
   const DATA = window.SIMUPOKE_DATA;
   const E = window.SimuEngine.makeEngine(DATA);
+  const B = window.SimuBench.makeBench(E);
   const $ = (id) => document.getElementById(id);
   const SP = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
   const SP_FR = { hp: 'PV', atk: 'Atq', def: 'Déf', spa: 'A.Sp', spd: 'D.Sp', spe: 'Vit' };
@@ -44,13 +45,78 @@
       .map((m) => m.name).sort();
     $('move-list').innerHTML = moveNames.map((n) => `<option value="${n}">`).join('');
 
-    document.querySelectorAll('input, select').forEach((el) => {
+    document.querySelectorAll('#tab-damage input, #tab-damage select').forEach((el) => {
       el.addEventListener('input', compute);
       el.addEventListener('change', compute);
     });
     document.querySelectorAll('[data-preset]').forEach((b) =>
       b.addEventListener('click', () => applyPreset(b.dataset.preset)));
+    initTabs();
+    initBench();
     compute();
+  }
+
+  // --- Onglets ---
+  function initTabs() {
+    document.querySelectorAll('#tabs button').forEach((b) => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('#tabs button').forEach((x) => x.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach((x) => x.classList.remove('active'));
+        b.classList.add('active'); $('tab-' + b.dataset.tab).classList.add('active');
+      });
+    });
+  }
+
+  // --- Seuils (bench) ---
+  function initBench() {
+    document.querySelectorAll('#tab-bench select[id$="-nature"]').forEach(fillNatures);
+    $('os-me-nature').value = 'jolly'; $('os-tg-nature').value = 'timid';
+    $('sv-def-nature').value = 'careful'; $('sv-atk-nature').value = 'adamant';
+    $('ko-atk-nature').value = 'adamant'; $('ko-def-nature').value = 'jolly';
+    $('os-run').addEventListener('click', runOutspeed);
+    $('sv-run').addEventListener('click', runSurvive);
+    $('ko-run').addEventListener('click', runKo);
+  }
+  const outClass = (ok) => 'bench-out ' + (ok ? 'ok' : 'no');
+  function runOutspeed() {
+    const out = $('os-out');
+    try {
+      const me = { species: $('os-me-species').value, nature: $('os-me-nature').value, sp: {} };
+      const tg = { species: $('os-tg-species').value, nature: $('os-tg-nature').value, sp: { spe: parseInt($('os-tg-spe').value || '0', 10) } };
+      const r = B.minSpToOutspeed(me, tg, { meTailwind: $('os-me-tw').checked, targetTailwind: $('os-tg-tw').checked, strict: !$('os-tie').checked });
+      out.className = outClass(r.feasible);
+      out.textContent = r.feasible
+        ? `${r.sp} SP en Vitesse suffisent (${r.mySpeed} vs ${r.targetSpeed}).`
+        : `Hors de portée : même à 32 SP, ${r.mySpeed} ≤ ${r.targetSpeed}` + (r.tiesOnly ? ' (égalité possible).' : '.');
+    } catch (e) { out.className = 'bench-out no'; out.textContent = '⚠ ' + e.message; }
+  }
+  function runSurvive() {
+    const out = $('sv-out');
+    try {
+      const off = parseInt($('sv-atk-off').value || '0', 10);
+      const def = { species: $('sv-def-species').value, nature: $('sv-def-nature').value, sp: {} };
+      const atk = { species: $('sv-atk-species').value, nature: $('sv-atk-nature').value, item: $('sv-atk-item').value, sp: { atk: off, spa: off } };
+      const r = B.minSpToSurvive(def, atk, $('sv-move').value, {});
+      out.className = outClass(r.feasible);
+      out.textContent = r.byEndure
+        ? `Survie garantie par Focus Sash / Fermeté — 0 SP.`
+        : r.feasible
+          ? `${r.totalSp} SP (PV ${r.hpSp} / ${r.stat} ${r.defSp}) — roll haut ${r.maxPct.toFixed(0)}%.`
+          : `Impossible même à fond (PV + ${r.stat}).`;
+    } catch (e) { out.className = 'bench-out no'; out.textContent = '⚠ ' + e.message; }
+  }
+  function runKo() {
+    const out = $('ko-out');
+    try {
+      const atk = { species: $('ko-atk-species').value, nature: $('ko-atk-nature').value, item: $('ko-atk-item').value, sp: {} };
+      const def = { species: $('ko-def-species').value, nature: $('ko-def-nature').value, hpPct: parseFloat($('ko-def-hp').value || '100') / 100, sp: {} };
+      const r = B.minSpToKo(atk, def, $('ko-move').value, {}, { hits: parseInt($('ko-hits').value || '1', 10) });
+      const what = r.hits === 1 ? 'OHKO' : `KO en ${r.hits}`;
+      out.className = outClass(r.feasible);
+      out.textContent = r.feasible
+        ? `${what} : ${r.sp} SP ${r.stat} (roll bas ${r.minPct.toFixed(0)}%).`
+        : r.blockedByEndure ? `${what} bloqué par Focus Sash / Fermeté.` : `${what} hors de portée même à 32 SP ${r.stat}.`;
+    } catch (e) { out.className = 'bench-out no'; out.textContent = '⚠ ' + e.message; }
   }
 
   function readMon(prefix) {
