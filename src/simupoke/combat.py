@@ -369,7 +369,13 @@ def analyze_turn(me: PokemonState, opp: PokemonState,
             other.append(MoveEval(move=m.name, kind="status", value=val,
                                   notes=notes))
             continue
-        res = calculate(me, opp, mv, field)
+        try:
+            res = calculate(me, opp, mv, field)
+        except (ValueError, KeyError):
+            # Coup à puissance variable / non géré par le calc : listé, non noté.
+            other.append(MoveEval(move=m.name, kind="status", value=0.0,
+                                  notes=["puissance variable — non évalué"]))
+            continue
         cur = res.defender_current_hp
         guaranteed = res.min_damage >= cur
         possible = res.max_damage >= cur

@@ -352,6 +352,16 @@ def test_air_balloon_immune_to_ground_then_pops():
     assert popped.opp.item is None                    # percé par un coup non-Sol
 
 
+def test_variable_power_move_does_not_crash():
+    # Balayage (Low Kick) a une puissance variable (basePower 0 en données) :
+    # le simulateur l'ignore proprement au lieu de lever.
+    me = mon("hariyama", "adamant", {"atk": 32})
+    opp = mon("tyranitar", "careful", {"hp": 32, "def": 32})
+    r = simulate_turn(me, opp, "lowkick", None)
+    assert any("non simulé" in ln for ln in r.log)
+    assert r.opp.hp == r.opp.max_hp                  # aucun dégât appliqué
+
+
 def test_grassy_terrain_heals_grounded():
     atk = mon("pikachu", "timid")
     opp = mon("snorlax", "careful", {"hp": 32}, hp=0.5)

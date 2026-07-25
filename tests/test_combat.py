@@ -138,6 +138,15 @@ def test_usage_disabled_falls_back_to_unknown():
 
 # --- Changements (switch) ---------------------------------------------------
 
+def test_variable_power_move_listed_not_crashing():
+    # Un coup à puissance variable dans mon moveset ne fait pas planter l'analyse.
+    me = mk("hariyama", "adamant", {"atk": 32}, ["lowkick", "closecombat"])
+    opp = mk("tyranitar", "adamant", {"atk": 32}, ["crunch"])
+    a = analyze_turn(me, opp, opp_move="crunch")
+    assert any(e.move == "Close Combat" for e in a.options)
+    assert any("Low Kick" in e.move for e in a.other)
+
+
 def test_no_bench_means_no_switches():
     me = mk("garchomp", "jolly", {"atk": 32, "spe": 32}, ["earthquake"])
     opp = mk("tyranitar", "adamant", {"atk": 32}, ["crunch"])

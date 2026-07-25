@@ -267,7 +267,13 @@ def _apply_move(attacker: Mon, defender: Mon, move: str,
             scr = "auroraveil" if "auroraveil" in s else "reflect"
         elif not m.is_physical and ("lightscreen" in s or "auroraveil" in s):
             scr = "auroraveil" if "auroraveil" in s else "lightscreen"
-    r = calculate(attacker.snapshot(), defender.snapshot(), m, field, screen=scr)
+    try:
+        r = calculate(attacker.snapshot(), defender.snapshot(), m, field, screen=scr)
+    except (ValueError, KeyError):
+        # Coup à puissance variable / non modélisé par le calc (ex. Balayage) :
+        # on l'ignore plutôt que de planter la simulation.
+        log.append(f"  {m.name} : effet non simulé")
+        return
     dmg = r.rolls[_roll_index(roll)]
     if r.type_effectiveness == 0:
         log.append("  sans effet (immunité)")
