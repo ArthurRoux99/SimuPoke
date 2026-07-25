@@ -13,9 +13,10 @@ Tailwind, Trick Room), dégâts, recul (recoil) et drain, coups de statut/setup/
 protection/soin, sommeil/gel, **écrans** (Protection/Mur Lumière/Voile Aurore),
 **Tailwind**, **pièges d'entrée** (Piège de Roc, Picots), coups posant
 **météo/terrain/Trick Room**, objets/talents à déclenchement (**Focus Sash /
-Fermeté**, **Baie Sitrus**, **Ceinture Force**, **Casque Brut / Peau Dure /
-Épines de Fer** au contact, **Orbe Vie**), et les effets de fin de tour (brûlure,
-poison, toxik à compteur, Vestiges, sable).
+Fermeté**, **Baie Sitrus**, **baies de résistance de type**, **Ceinture Force**,
+**Ballon**, **Casque Brut / Peau Dure / Épines de Fer** au contact, **Orbe Vie**),
+et les effets de fin de tour (brûlure, poison, toxik à compteur, Vestiges, sable,
+**Champ Herbu**).
 
 Périmètre v1 (assumé, extensible) :
   - Dégâts pris à un **roll** paramétrable (défaut : médian) pour rester
@@ -141,6 +142,17 @@ _TERRAIN_MOVES = {"electricterrain": "electric", "grassyterrain": "grassy",
 _HAZARD_MOVES = {"stealthrock", "spikes"}
 _SPIKE_FRACTION = {1: 8, 2: 6, 3: 4}   # couches -> dénominateur (1/8, 1/6, 1/4)
 
+# Baies de résistance : divisent par deux UN coup super efficace de ce type
+# (Baie Rass", etc. — Chilan couvre le Normal même non super efficace).
+_RESIST_BERRY: dict[str, str] = {
+    "occaberry": "Fire", "passhoberry": "Water", "wacanberry": "Electric",
+    "rindoberry": "Grass", "yacheberry": "Ice", "chopleberry": "Fighting",
+    "kebiaberry": "Poison", "shucaberry": "Ground", "cobaberry": "Flying",
+    "payapaberry": "Psychic", "tangaberry": "Bug", "chartiberry": "Rock",
+    "kasibberry": "Ghost", "habanberry": "Dragon", "colburberry": "Dark",
+    "babiriberry": "Steel", "roseliberry": "Fairy", "chilanberry": "Normal",
+}
+
 
 def _apply_status(target: Mon, status: str, move_id: str, log: list[str]) -> None:
     if target.status:
@@ -262,6 +274,21 @@ def _apply_move(attacker: Mon, defender: Mon, move: str,
         return
     def_item = to_id(defender.item or "")
     def_ability = to_id(defender.build.ability or "")
+    # Ballon : immunité au Sol tant qu'il n'a pas été percé (par un coup non-Sol).
+    if def_item == "airballoon":
+        if r.move_type == "Ground":
+            log.append(f"  {defender.build.species} flotte (Ballon) — sans effet")
+            return
+        defender.item = None
+        def_item = ""
+        log.append(f"  le Ballon de {defender.build.species} éclate")
+    # Baie de résistance : divise par deux un coup super efficace du bon type.
+    berry_type = _RESIST_BERRY.get(def_item)
+    if berry_type and r.move_type == berry_type \
+            and (r.type_effectiveness > 1 or def_item == "chilanberry"):
+        dmg = dmg // 2
+        defender.item = None
+        log.append(f"  {defender.build.species} mange sa baie (dégâts ÷2)")
     # Focus Sash / Fermeté : survit à 1 PV depuis des PV pleins.
     if dmg >= defender.hp and defender.hp >= defender.max_hp \
             and (def_item == "focussash" or def_ability == "sturdy"):
@@ -337,6 +364,13 @@ def _end_of_turn(mon: Mon, field: FieldState | None, log: list[str]) -> None:
         heal = max(1, mon.max_hp // 16)
         mon.hp = min(mon.max_hp, mon.hp + heal)
         log.append(f"  {mon.build.species} récupère {heal} (Vestiges)")
+    # Champ Herbu : soin des Pokémon au sol.
+    terr = to_id(field.terrain or "") if field and field.terrain else ""
+    if terr in ("grassy", "grassyterrain") and _grounded(mon) \
+            and mon.hp < mon.max_hp:
+        heal = max(1, mon.max_hp // 16)
+        mon.hp = min(mon.max_hp, mon.hp + heal)
+        log.append(f"  {mon.build.species} récupère {heal} (Champ Herbu)")
     # Statut persistant.
     if mon.status == "brn":
         dmg = max(1, mon.max_hp // 16)

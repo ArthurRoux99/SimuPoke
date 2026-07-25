@@ -320,3 +320,40 @@ def test_sitrus_berry_heals_below_half():
     r = simulate_turn(me, opp, "earthquake", None)
     assert r.opp.item is None
     assert any("Sitrus" in ln for ln in r.log)
+
+
+def test_resist_berry_halves_super_effective_hit():
+    me = mon("kyurem", "modest", {"spa": 32})
+    plain = simulate_turn(me, mon("garchomp", "jolly", {"hp": 32}), "icebeam", None)
+    berry = simulate_turn(me, mon("garchomp", "jolly", {"hp": 32},
+                                  item="yacheberry"), "icebeam", None)
+    lost_plain = plain.opp.max_hp - plain.opp.hp
+    lost_berry = berry.opp.max_hp - berry.opp.hp
+    assert lost_berry < lost_plain
+    assert berry.opp.item is None
+
+
+def test_resist_berry_ignores_non_matching_type():
+    me = mon("garchomp", "adamant", {"atk": 32})
+    # Baie Yache (Glace) n'aide pas contre un Séisme (Sol).
+    r = simulate_turn(me, mon("heatran", "careful", {"hp": 32, "def": 32},
+                              item="yacheberry"), "earthquake", None)
+    assert r.opp.item == "yacheberry"                 # non consommée
+
+
+def test_air_balloon_immune_to_ground_then_pops():
+    atk = mon("garchomp", "adamant", {"atk": 32})
+    balloon = mon("heatran", "calm", {"hp": 32}, item="airballoon")
+    ground = simulate_turn(atk, balloon, "earthquake", None)
+    assert ground.opp.hp == ground.opp.max_hp         # immunisé, aucun dégât
+    assert ground.opp.item == "airballoon"            # le Ballon tient (coup Sol)
+    popped = simulate_turn(atk, mon("heatran", "calm", {"hp": 32},
+                                    item="airballoon"), "dragonclaw", None)
+    assert popped.opp.item is None                    # percé par un coup non-Sol
+
+
+def test_grassy_terrain_heals_grounded():
+    atk = mon("pikachu", "timid")
+    opp = mon("snorlax", "careful", {"hp": 32}, hp=0.5)
+    r = simulate_turn(atk, opp, "thunderbolt", None, FieldState(terrain="grassy"))
+    assert any("Champ Herbu" in ln for ln in r.log)

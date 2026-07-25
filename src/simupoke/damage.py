@@ -187,6 +187,7 @@ class DamageResult:
     type_effectiveness: float
     is_stab: bool
     crit: bool
+    move_type: str = ""           # type EFFECTIF du coup (après -ate)
 
     @property
     def min_damage(self) -> int:
@@ -470,4 +471,5 @@ def calculate(attacker: PokemonState, defender: PokemonState,
         type_effectiveness=eff,
         is_stab=is_stab,
         crit=crit,
+        move_type=move_type,
     )
