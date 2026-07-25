@@ -11,21 +11,20 @@ Document de conception complet : [`docs/conception_socle.md`](docs/conception_so
 
 ## État du projet
 
-**Phase 0 — Socle données & stats** (en cours).
-
 Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovial,
 4/4 stats exactes le 23/06/2026). Voir §8.3 du document socle.
 
 | Phase | Objet | Statut |
 |---|---|---|
-| 0 | Socle données + conversion SP→stats + damage calc | ✅ |
-| 1 | B2 — Aide au tirage (Roster Ranch) | 🟡 v1 (sans priors d'usage) |
-| 2 | B3 — Team builder + team preview | 🟡 v1 (matchups par dégâts + repli types) |
-| 3 | B1 — Mode analyse (Singles) | 🟡 v1 (analyse 1 tour + switchs) |
-| — | Seuils & optimiseur de SP (§11.1, §8.3) | ✅ speed tiers + outspeed/survive/ko + spread |
-| — | UI — page HTML autonome (§12) | 🟡 v1 (calc de dégâts) |
-| — | UI — serveur local (tous les modules) | 🟡 v1 (Dégâts/B1/B2/B3) |
-| 4 | B1 — Mode simultané (recherche) | 🟡 simulateur + expectimax multi-tours (ISMCTS à venir) |
+| 0 | Socle données + conversion SP→stats + damage calc (talents/items/Paradox/écrans) | ✅ |
+| 1 | B2 — Aide au tirage (Roster Ranch) + priors d'usage | ✅ |
+| 2 | B3 — Team builder + team preview (matchups par dégâts) | ✅ |
+| 3 | B1 — Mode analyse (coups + switchs + soutien) | ✅ |
+| — | Seuils & optimiseur de SP (speed tiers, outspeed/survive/ko, spread) | ✅ |
+| — | UI — page HTML autonome (calc, parité JS 33/33) | ✅ |
+| — | UI — serveur local (tous les modules + recherche) | ✅ |
+| — | Modèle d'usage + import Showdown paste + i18n FR/EN | ✅ |
+| 4 | B1 — Mode simultané : simulateur + recherche multi-tours/switchs/minimax/déterminisation | 🟡 (ISMCTS complet à venir) |
 | 5 | Doubles | ⏳ |
 | 6 | (optionnel) Apprentissage | ⏳ |
 
@@ -82,7 +81,7 @@ SimuPoke/
 │   ├── team.py                  # B3 — analyse d'équipe + assistant team preview
 │   ├── combat.py                # B1 — assistant de combat (mode analyse, 1 tour)
 │   ├── sim.py                   # simulateur de tour (ordre, dégâts, statut, fin de tour) — fondation Phase 4
-│   ├── search.py                # recherche 1-ply à coups simultanés (§10.2) sur le simulateur
+│   ├── search.py                # recherche à coups simultanés (§10.2) : multi-tours, switchs, minimax, déterminisation
 │   ├── bench.py                 # seuils & optimiseur de SP (speed tiers, outspeed/survive/ko)
 │   ├── optimize.py              # optimiseur de spread complet (objectifs combinés → SP)
 │   ├── model.py                  # OwnedPokemon + état de combat (Doubles-ready)
