@@ -12,8 +12,10 @@ Mécaniques couvertes (Singles) : ordre d'action (priorité + vitesse effective,
 Tailwind, Trick Room), dégâts, recul (recoil) et drain, coups de statut/setup/
 protection/soin, sommeil/gel, **écrans** (Protection/Mur Lumière/Voile Aurore),
 **Tailwind**, **pièges d'entrée** (Piège de Roc, Picots), coups posant
-**météo/terrain/Trick Room**, et les effets de fin de tour (brûlure, poison,
-toxik à compteur, Vestiges, sable, Orbe Vie).
+**météo/terrain/Trick Room**, objets/talents à déclenchement (**Focus Sash /
+Fermeté**, **Baie Sitrus**, **Ceinture Force**, **Casque Brut / Peau Dure /
+Épines de Fer** au contact, **Orbe Vie**), et les effets de fin de tour (brûlure,
+poison, toxik à compteur, Vestiges, sable).
 
 Périmètre v1 (assumé, extensible) :
   - Dégâts pris à un **roll** paramétrable (défaut : médian) pour rester
@@ -258,6 +260,16 @@ def _apply_move(attacker: Mon, defender: Mon, move: str,
     if r.type_effectiveness == 0:
         log.append("  sans effet (immunité)")
         return
+    def_item = to_id(defender.item or "")
+    def_ability = to_id(defender.build.ability or "")
+    # Focus Sash / Fermeté : survit à 1 PV depuis des PV pleins.
+    if dmg >= defender.hp and defender.hp >= defender.max_hp \
+            and (def_item == "focussash" or def_ability == "sturdy"):
+        dmg = defender.hp - 1
+        if def_item == "focussash":
+            defender.item = None
+        log.append(f"  {defender.build.species} tient bon ("
+                   + ("Focus Sash" if def_item == "focussash" else "Fermeté") + ")")
     hp_before = defender.hp
     defender.hp = max(0, defender.hp - dmg)
     dealt = hp_before - defender.hp        # dégâts réellement infligés (plafonnés)
@@ -268,6 +280,29 @@ def _apply_move(attacker: Mon, defender: Mon, move: str,
     if dealt <= 0:
         return
     atk_ability = to_id(attacker.build.ability or "")
+    # --- Réactions du défenseur survivant ---
+    if not defender.fainted:
+        # Casque Brut / Peau Dure / Épines de Fer : chip au contact.
+        if m.makes_contact:
+            if def_item == "rockyhelmet":
+                chip = max(1, attacker.max_hp // 6)
+                attacker.hp = max(0, attacker.hp - chip)
+                log.append(f"  {attacker.build.species} subit {chip} (Casque Brut)")
+            elif def_ability in ("roughskin", "ironbarbs"):
+                chip = max(1, attacker.max_hp // 8)
+                attacker.hp = max(0, attacker.hp - chip)
+                log.append(f"  {attacker.build.species} subit {chip} (Peau Dure)")
+        # Ceinture Force (Weakness Policy) : +2 Atq/Atq.Spé sur coup super efficace.
+        if def_item == "weaknesspolicy" and r.type_effectiveness > 1:
+            defender.boosts = _add_boosts(defender.boosts, {"atk": 2, "spa": 2})
+            defender.item = None
+            log.append(f"  {defender.build.species} : Ceinture Force (+2 Atq/A.Sp)")
+        # Baie Sitrus : soin de 25 % dès que les PV tombent à ≤ 50 %.
+        if def_item == "sitrusberry" and defender.hp <= defender.max_hp // 2:
+            heal = max(1, defender.max_hp // 4)
+            defender.hp = min(defender.max_hp, defender.hp + heal)
+            defender.item = None
+            log.append(f"  {defender.build.species} mange sa Baie Sitrus (+{heal})")
     # Drain : soin d'une fraction des dégâts infligés.
     if mid in _DRAIN and attacker.hp > 0:
         healed = min(attacker.max_hp - attacker.hp,

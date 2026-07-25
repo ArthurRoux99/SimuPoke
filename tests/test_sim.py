@@ -263,3 +263,60 @@ def test_weather_move_sets_field():
     opp = Side(active=mon("garchomp", "jolly", {"spe": 32}))
     r = simulate_turn_actions(me, opp, ("move", "sunnyday"), ("move", None))
     assert any("météo -> sun" in ln for ln in r.log)
+
+
+# --- Objets / talents à déclenchement --------------------------------------
+
+def test_focus_sash_survives_at_one_hp():
+    me = mon("garchomp", "adamant", {"atk": 32}, item="choiceband")
+    opp = mon("fluttermane", "timid", {"hp": 0}, item="focussash")
+    r = simulate_turn(me, opp, "earthquake", None, roll=1.0)
+    assert r.opp.hp == 1
+    assert r.opp.item is None                      # Sash consommée
+    assert any("tient bon" in ln for ln in r.log)
+
+
+def test_sturdy_survives_without_consuming_item():
+    me = mon("garchomp", "adamant", {"atk": 32}, item="choiceband")
+    opp = PokemonState(species="fluttermane", nature="timid",
+                       stat_points={"hp": 0}, ability="sturdy")
+    r = simulate_turn(me, Mon.from_state(opp), "earthquake", None, roll=1.0)
+    assert r.opp.hp == 1
+
+
+def test_rocky_helmet_chips_on_contact():
+    me = mon("garchomp", "jolly", {"atk": 16})
+    opp = mon("snorlax", "careful", {"hp": 32, "def": 32}, item="rockyhelmet")
+    r = simulate_turn(me, opp, "dragonclaw", None)
+    assert r.me.hp == r.me.max_hp - r.me.max_hp // 6
+
+
+def test_rough_skin_chips_on_contact():
+    me = mon("garchomp", "jolly", {"atk": 16})
+    opp = mon("garchomp", "jolly", {"hp": 32, "def": 32}, ability="roughskin")
+    r = simulate_turn(me, opp, "dragonclaw", None)
+    assert r.me.hp == r.me.max_hp - r.me.max_hp // 8
+
+
+def test_contact_punish_skipped_without_contact():
+    me = mon("garchomp", "jolly", {"atk": 32})
+    opp = mon("snorlax", "careful", {"hp": 32, "def": 32}, item="rockyhelmet")
+    r = simulate_turn(me, opp, "earthquake", None)     # Séisme : pas de contact
+    assert r.me.hp == r.me.max_hp
+
+
+def test_weakness_policy_boosts_on_super_effective():
+    me = mon("garchomp", "adamant", {"atk": 16})
+    opp = mon("tyranitar", "careful", {"hp": 32, "def": 32}, item="weaknesspolicy")
+    r = simulate_turn(me, opp, "earthquake", None)     # ×2 sur Tyranitar
+    assert r.opp.boosts.get("atk") == 2 and r.opp.boosts.get("spa") == 2
+    assert r.opp.item is None
+
+
+def test_sitrus_berry_heals_below_half():
+    me = mon("garchomp", "adamant", {"atk": 16})
+    opp = mon("snorlax", "careful", {"hp": 32, "spd": 32}, item="sitrusberry",
+              hp=0.55)
+    r = simulate_turn(me, opp, "earthquake", None)
+    assert r.opp.item is None
+    assert any("Sitrus" in ln for ln in r.log)

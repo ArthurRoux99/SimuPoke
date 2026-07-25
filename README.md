@@ -429,7 +429,9 @@ résolvent avant les coups (le coup adverse touche l'entrant), boosts du sortant
 remis à zéro. Ce chemin gère aussi les **conditions de camp/champ** : écrans
 (Protection/Mur Lumière/Voile Aurore), **Tailwind** (vitesse ×2), **pièges
 d'entrée** (Piège de Roc selon l'efficacité Roche, Picots pour les non-Vol/
-Lévitation), et les coups posant **météo/terrain/Trick Room**. Recul et drain
+Lévitation), et les coups posant **météo/terrain/Trick Room**. Recul, drain et
+les **objets/talents à déclenchement** (Focus Sash / Fermeté, Baie Sitrus,
+Ceinture Force, Casque Brut / Peau Dure / Épines de Fer au contact, Orbe Vie)
 sont appliqués partout (y compris `rollout`/`sim`).
 
 > Périmètre v1 (assumé, extensible) : Singles ; dégâts déterministes à un roll ;
