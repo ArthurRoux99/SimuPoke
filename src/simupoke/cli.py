@@ -5,7 +5,7 @@ Usage (option globale : [--lang fr|en] ou SIMUPOKE_LANG) :
     python -m simupoke.cli stats <species> <nature> <hp> <atk> <def> <spa> <spd> <spe>
     python -m simupoke.cli damage <atk_species> <atk_nature> <move> <def_species> <def_nature>
         [--crit] [--spread] [--weather X] [--item-atk X] [--ability-atk X]
-        [--atk-sp k=v,...] [--def-sp k=v,...] [--boost-atk N]
+        [--atk-sp k=v,...] [--def-sp k=v,...] [--boost-atk N] [--screen reflect|lightscreen|auroraveil]
     python -m simupoke.cli draft <lineup.json> [--no-roster]   # B2 aide au tirage
     python -m simupoke.cli team <team.json>                     # B3 analyse d'équipe
     python -m simupoke.cli preview <my_team.json> <opp.json> [--format singles|doubles] [--no-damage]
@@ -171,7 +171,8 @@ def cmd_damage(args: list[str]) -> int:
     field = FieldState(weather=opts.get("weather"), terrain=opts.get("terrain"))
     try:
         r = calculate(attacker, defender, move, field,
-                      crit="crit" in flags, apply_spread="spread" in flags)
+                      crit="crit" in flags, apply_spread="spread" in flags,
+                      screen=opts.get("screen"))
     except (ValueError, KeyError) as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 1

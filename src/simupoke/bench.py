@@ -191,12 +191,13 @@ class SurviveResult:
 
 def min_sp_to_survive(defender: PokemonState, attacker: PokemonState,
                       move: str, field: FieldState | None = None, *,
-                      crit: bool = False) -> SurviveResult:
+                      crit: bool = False, screen: str | None = None) -> SurviveResult:
     """SP défensif total minimal (PV + Déf/Déf.Spé) pour survivre au roll haut.
 
     On énumère les répartitions par total croissant et on renvoie la première
     (donc de coût minimal) qui garantit la survie même sur le roll max. Le
-    défenseur est évalué à PLEINS PV (un seuil de survie « propre »).
+    défenseur est évalué à PLEINS PV (un seuil de survie « propre »). `screen`
+    permet de raisonner « survivre derrière un écran » (Mur Lumière/Protection).
     """
     m = get_move(move)
     stat = "def" if m.is_physical else "spd"
@@ -212,7 +213,7 @@ def min_sp_to_survive(defender: PokemonState, attacker: PokemonState,
             def_sp = total - hp_sp
             trial = replace(base, stat_points={
                 **base.stat_points, "hp": hp_sp, stat: def_sp})
-            r = calculate(attacker, trial, m, field, crit=crit)
+            r = calculate(attacker, trial, m, field, crit=crit, screen=screen)
             if r.max_damage < r.defender_max_hp:
                 return SurviveResult(True, hp_sp, def_sp, total, m.name, stat,
                                      max_pct=r.max_pct)

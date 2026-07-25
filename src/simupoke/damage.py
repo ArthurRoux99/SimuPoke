@@ -18,6 +18,8 @@ Couverture (documentée, extensible pour le « delta » Champions §7.2) :
   - Talents défensifs : Multiscale/Shadow Shield, Filter/Solid Rock/Prism Armor,
     Thick Fat, Heatproof, Fluffy, Ice Scales, Purifying Salt, Water Bubble,
     Dry Skin, Protosynthèse / Charge Quantique ; immunités de talent.
+  - Écrans : Mur Lumière / Protection / Voile Aurore (×0.5 singles, ×0.667
+    doubles ; ignorés par le crit).
 
 Tout le reste (autres items/talents, Tera — absent de Champions au lancement,
 §4.6) viendra par extension des mêmes points d'accroche (modificateurs base-4096).
@@ -244,12 +246,19 @@ class DamageResult:
 # Calcul principal
 # ---------------------------------------------------------------------------
 
+_SCREENS = {"reflect", "lightscreen", "auroraveil"}
+
+
 def calculate(attacker: PokemonState, defender: PokemonState,
               move: str | Move, field: FieldState | None = None, *,
-              crit: bool = False, apply_spread: bool = False) -> DamageResult:
+              crit: bool = False, apply_spread: bool = False,
+              screen: str | None = None) -> DamageResult:
     """Calcule les dégâts d'un `move` de `attacker` sur `defender`.
 
     `apply_spread` : pénalité ×0.75 des attaques de zone en doubles.
+    `screen` : écran côté défenseur ('reflect' = physique, 'lightscreen' =
+    spécial, 'auroraveil' = les deux). Divise les dégâts (×0.5 en singles,
+    ×0.667 en doubles) ; **ignoré par un coup critique** (le crit passe l'écran).
     """
     mv = move if isinstance(move, Move) else get_move(move)
     if mv.is_status or mv.base_power <= 0:
@@ -422,6 +431,13 @@ def calculate(attacker: PokemonState, defender: PokemonState,
         final_mods.append(2048)             # ×0.5 sur le Feu
     if def_ability == "dryskin" and move_type == "Fire":
         final_mods.append(5120)             # ×1.25 sur le Feu
+    # Écrans (Mur Lumière / Protection / Voile Aurore), ignorés par le crit.
+    scr = to_id(screen) if screen else ""
+    if not crit and scr in _SCREENS:
+        blocks = (physical and scr in ("reflect", "auroraveil")) or \
+                 (not physical and scr in ("lightscreen", "auroraveil"))
+        if blocks:
+            final_mods.append(2732 if apply_spread else 2048)
     final_mod = _chain_mods(final_mods)
 
     # --- 16 rolls ---

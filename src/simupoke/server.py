@@ -151,7 +151,8 @@ def api_damage(body: dict) -> dict:
     r = calculate(_state(body["attacker"]), _state(body["defender"]),
                   body["move"], FieldState(**(body.get("field") or {})),
                   crit=body.get("crit", False),
-                  apply_spread=body.get("spread", False))
+                  apply_spread=body.get("spread", False),
+                  screen=body.get("screen") or None)
     return _damage_json(r)
 
 

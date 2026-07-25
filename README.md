@@ -137,11 +137,15 @@ brûlure, météo, terrains, esquive multi-cibles, boosts.
 - **Talents défensifs** : Multiscale, Filter & co., immunités (Lévitation,
   Torche, Absorbe-Volt/Eau…), réductions (Thick Fat, Heatproof) et **Fluffy,
   Ice Scales, Sel Purifiant, Water Bubble, Peau Sèche**.
+- **Écrans** : Protection (physique), Mur Lumière (spécial), Voile Aurore (les
+  deux) — ×0.5 en singles, ×0.667 en doubles, **ignorés par le critique**.
 
 > Nouveaux modificateurs vérifiés par **ratio** contre les valeurs Showdown
 > (`tests/test_damage_coverage.py`) ; les 12 scénarios de parité `@smogon/calc`
-> historiques restent verts. **Tera** est volontairement absent : il n'est pas
-> dans Champions au lancement (§4.6 du document socle).
+> historiques restent verts. Les écrans se pilotent par `--screen` (CLI),
+> `screen` (API), le sélecteur **Écran** de l'UI et `min_sp_to_survive(screen=…)`.
+> **Tera** est volontairement absent : il n'est pas dans Champions au lancement
+> (§4.6 du document socle).
 
 ### Delta Champions (§7.2)
 
@@ -241,8 +245,9 @@ calculateur de dégâts. Le moteur JS (`web/engine.js`) est un **port fidèle** 
 `src/simupoke/damage.py` — socle **et** modificateurs avancés (items type-boost,
 Muscle Band/Wise Glasses, Water Bubble, Solar Power, Sand Force, Protosynthèse /
 Charge Quantique, type-boost, Fluffy/Ice Scales/Sel Purifiant/Peau Sèche) —
-vérifié par **parité** (`node web/verify_engine.mjs` → **31/31**) : 18 vecteurs
-`@smogon/calc` historiques + 13 vecteurs de référence issus du moteur Python.
+vérifié par **parité** (`node web/verify_engine.mjs` → **33/33**) : 18 vecteurs
+`@smogon/calc` historiques + 15 vecteurs de référence issus du moteur Python
+(modificateurs avancés + écrans).
 
 ```bash
 # Construire le fichier autonome (stdlib Python, aucune dépendance)

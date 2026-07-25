@@ -250,6 +250,13 @@
       if (defAb === 'purifyingsalt' && moveType === 'Ghost') finalMods.push(2048);
       if (defAb === 'waterbubble' && moveType === 'Fire') finalMods.push(2048);
       if (defAb === 'dryskin' && moveType === 'Fire') finalMods.push(5120);
+      // Écrans (Mur Lumière / Protection / Voile Aurore), ignorés par le crit.
+      const scr = toId(opts.screen);
+      if (!crit && (scr === 'reflect' || scr === 'lightscreen' || scr === 'auroraveil')) {
+        const blocks = (physical && (scr === 'reflect' || scr === 'auroraveil'))
+          || (!physical && (scr === 'lightscreen' || scr === 'auroraveil'));
+        if (blocks) finalMods.push(applySpread ? 2732 : 2048);
+      }
       const finalMod = chainMods(finalMods);
 
       const rolls = [];

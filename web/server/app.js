@@ -111,7 +111,7 @@
       const r = await api('/api/damage', {
         attacker: readMon('a'), defender: readMon('d'), move: $('move').value,
         field: { weather: $('weather').value, terrain: $('terrain').value },
-        crit: $('crit').checked, spread: $('spread').checked,
+        crit: $('crit').checked, spread: $('spread').checked, screen: $('screen').value,
       });
       const left = Math.min(100, r.minPct), w = Math.min(100, r.maxPct) - left;
       $('dmg-result').innerHTML = `

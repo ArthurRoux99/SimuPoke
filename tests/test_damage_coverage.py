@@ -133,3 +133,46 @@ def test_purifying_salt_halves_ghost():
     r = _def_ratio("purifyingsalt", "shadowball",
                    st("gengar", "modest", {"spa": 32}), "garchomp", "careful")
     assert abs(r - 0.5) < 0.05
+
+
+# --- Écrans -----------------------------------------------------------------
+
+def _base(att, mv, dfn):
+    return calculate(att, dfn, mv)
+
+
+def test_reflect_halves_physical():
+    att = st("garchomp", "adamant", {"atk": 32}, item="choiceband")
+    dfn = st("tyranitar", "careful", {"hp": 32, "def": 32})
+    r = calculate(att, dfn, "earthquake", screen="reflect")
+    assert abs(r.max_damage / _base(att, "earthquake", dfn).max_damage - 0.5) < 0.02
+
+
+def test_lightscreen_no_effect_on_physical():
+    att = st("garchomp", "adamant", {"atk": 32})
+    dfn = st("tyranitar", "careful")
+    assert calculate(att, dfn, "earthquake", screen="lightscreen").max_damage \
+        == _base(att, "earthquake", dfn).max_damage
+
+
+def test_auroraveil_halves_special():
+    att = st("charizard", "modest", {"spa": 32})
+    dfn = st("blissey", "calm")
+    r = calculate(att, dfn, "flamethrower", screen="auroraveil")
+    assert abs(r.max_damage / _base(att, "flamethrower", dfn).max_damage - 0.5) < 0.03
+
+
+def test_crit_bypasses_screen():
+    att = st("garchomp", "adamant", {"atk": 32}, item="choiceband")
+    dfn = st("tyranitar", "careful", {"hp": 32, "def": 32})
+    behind = calculate(att, dfn, "earthquake", screen="reflect", crit=True)
+    plain_crit = calculate(att, dfn, "earthquake", crit=True)
+    assert behind.max_damage == plain_crit.max_damage
+
+
+def test_screen_doubles_is_two_thirds():
+    att = st("garchomp", "adamant", {"atk": 32}, item="choiceband")
+    dfn = st("tyranitar", "careful", {"hp": 32, "def": 32})
+    with_screen = calculate(att, dfn, "earthquake", screen="reflect", apply_spread=True)
+    no_screen = calculate(att, dfn, "earthquake", apply_spread=True)
+    assert abs(with_screen.max_damage / no_screen.max_damage - 0.667) < 0.02
