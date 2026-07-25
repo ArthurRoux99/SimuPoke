@@ -549,6 +549,19 @@ python -m simupoke.cli analyze garchomp jolly earthquake,dragonclaw,stoneedge \
 > Sans installation, on peut aussi lancer depuis la racine du dépôt avec
 > `PYTHONPATH=src python -m simupoke.cli ...` et `PYTHONPATH=src pytest`.
 
+### Langue d'affichage (FR/EN, §0.5)
+
+Le français est la langue par défaut ; `--lang en` (n'importe où sur la ligne)
+ou `SIMUPOKE_LANG=en` bascule l'affichage en anglais. La bascule est **effective**
+(le mode EN affiche « Garchomp », pas « Carchacrok ») : à défaut de traduction,
+le libellé est dérivé des données (nom anglais du Pokédex) plutôt que de fuir
+vers l'autre langue. Les IDs internes et le moteur ne changent jamais.
+
+```bash
+python -m simupoke.cli --lang en stats garchomp jolly 0 32 0 0 0 32
+#   -> Garchomp (Jolly) ; HP/Attack/Sp. Atk/…
+```
+
 ## Import / export « Showdown paste »
 
 `simupoke.showdown` importe une équipe au **format Showdown** (le standard de
@@ -610,6 +623,7 @@ Autres  = ⌊ (⌊I / 2⌋ + 5) · Nature ⌋     (Nature ∈ {0.9, 1.0, 1.1})
 - [x] B1 — recherche multi-tours (expectimax déterminisé `depth≥2` + escompte) par-dessus le simulateur.
 - [x] Déterminisation du build adverse (ISMCTS-lite) : `sample_set` + `rank_actions_sampled` (CLI `--samples`, API).
 - [x] Import/export « Showdown paste » (EV ⇄ SP) : `showdown.py`, CLI `paste`, API, import UI.
+- [x] Bascule d'affichage FR/EN effective (§0.5) : `i18n.set_language`, CLI `--lang`/`SIMUPOKE_LANG`.
 - [ ] Effets secondaires probabilistes (para 25 %, flinch, gel/dégel) dans le simulateur.
 - [ ] Déterminisations profondes (ré-échantillonnage par nœud) + budget temps — vers l'ISMCTS complet.
 - [ ] Doubles (Phase 5) ; apprentissage optionnel (Phase 6).

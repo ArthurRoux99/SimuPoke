@@ -1,6 +1,6 @@
 """CLI minimale — valide le pipeline Phase 0 (§12, « UI v1 = CLI »).
 
-Usage :
+Usage (option globale : [--lang fr|en] ou SIMUPOKE_LANG) :
     python -m simupoke.cli roster      # affiche mon Box avec stats finales
     python -m simupoke.cli stats <species> <nature> <hp> <atk> <def> <spa> <spd> <spe>
     python -m simupoke.cli damage <atk_species> <atk_nature> <move> <def_species> <def_nature>
@@ -36,11 +36,12 @@ Usage :
 
 from __future__ import annotations
 
+import os
 import sys
 
 from .stats import STAT_KEYS, Build, validate_sp
 from .basestats import is_known
-from .i18n import stat_label, label
+from .i18n import stat_label, label, set_language
 from .loaders import load_my_roster
 from .model import PokemonState, FieldState
 from .damage import calculate
@@ -703,6 +704,13 @@ def _force_utf8_stdout() -> None:
 def main(argv: list[str] | None = None) -> int:
     _force_utf8_stdout()
     argv = argv if argv is not None else sys.argv[1:]
+    # Langue d'affichage : --lang <fr|en> (n'importe où) ou SIMUPOKE_LANG.
+    set_language(os.environ.get("SIMUPOKE_LANG", "fr"))
+    if "--lang" in argv:
+        i = argv.index("--lang")
+        if i + 1 < len(argv):
+            set_language(argv[i + 1])
+            del argv[i:i + 2]
     if not argv:
         print(__doc__)
         return 0
