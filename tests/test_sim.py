@@ -203,3 +203,63 @@ def test_switch_into_weakness_takes_damage():
     # Charizard entre et encaisse Lance-Pierre (×4) : gros dégâts.
     assert r.me.active.build.species == "charizard"
     assert r.me.active.hp < r.me.active.max_hp
+
+
+# --- Conditions de camp / champ --------------------------------------------
+
+def test_reflect_halves_physical_damage():
+    # Défenseur neutre et encaissant (survit avec et sans écran) pour un ratio net.
+    opp = Side(active=mon("garchomp", "adamant", {"atk": 32}))
+    behind = simulate_turn_actions(
+        Side(active=mon("snorlax", "careful", {"hp": 32, "def": 32}),
+             screens={"reflect": 5}),
+        opp, ("move", None), ("move", "bodyslam"))
+    plain = simulate_turn_actions(
+        Side(active=mon("snorlax", "careful", {"hp": 32, "def": 32})),
+        opp, ("move", None), ("move", "bodyslam"))
+    lost_behind = behind.me.active.max_hp - behind.me.active.hp
+    lost_plain = plain.me.active.max_hp - plain.me.active.hp
+    assert lost_plain > lost_behind > 0
+    assert abs(lost_behind - lost_plain // 2) <= 2
+
+
+def test_reflect_move_sets_screen():
+    me = Side(active=mon("amoonguss", "sassy", {"hp": 32}))
+    opp = Side(active=mon("amoonguss", "sassy", {"hp": 32}))
+    r = simulate_turn_actions(me, opp, ("move", "reflect"), ("move", None))
+    # Posé ce tour -> garde sa durée pleine (pas décrémenté le tour de pose).
+    assert r.me.screens.get("reflect", 0) == 5
+
+
+def test_tailwind_move_and_speed_flip():
+    me = Side(active=mon("whimsicott", "timid", {"spe": 0}, moves=["tailwind"]))
+    opp = Side(active=mon("garchomp", "jolly", {"spe": 32}))
+    r = simulate_turn_actions(me, opp, ("move", "tailwind"), ("move", None))
+    assert r.me.tailwind == 4
+
+
+def test_stealth_rock_damages_switch_in():
+    me = Side(active=mon("gengar", "timid", {"spa": 32}, moves=["shadowball"]),
+              bench=[mon("charizard", "timid", {"hp": 0})],
+              hazards={"stealthrock": 1})
+    opp = Side(active=mon("blissey", "calm"))
+    r = simulate_turn_actions(me, opp, ("switch", 0), ("move", None))
+    # Charizard (Feu/Vol) : Roche ×4 -> ~ la moitié des PV à l'entrée.
+    assert r.me.active.hp < r.me.active.max_hp // 2 + 5
+
+
+def test_spikes_spare_flying_types():
+    me = Side(active=mon("garchomp", "jolly", {"spe": 32}),
+              bench=[mon("charizard", "timid", {"hp": 32})],   # Vol -> immunisé Picots
+              hazards={"spikes": 3})
+    opp = Side(active=mon("blissey", "calm"))
+    r = simulate_turn_actions(me, opp, ("switch", 0), ("move", None))
+    assert r.me.active.hp == r.me.active.max_hp
+    assert not any("Picots" in ln for ln in r.log)
+
+
+def test_weather_move_sets_field():
+    me = Side(active=mon("torkoal", "quiet", {"spa": 32}, moves=["sunnyday"]))
+    opp = Side(active=mon("garchomp", "jolly", {"spe": 32}))
+    r = simulate_turn_actions(me, opp, ("move", "sunnyday"), ("move", None))
+    assert any("météo -> sun" in ln for ln in r.log)

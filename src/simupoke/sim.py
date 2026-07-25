@@ -8,13 +8,21 @@ poison, Vestiges, tempête de sable, Orbe Vie). Il permet d'enchaîner les tours
 (`rollout`) pour **rejouer une ligne** (§10.1) et servira de substrat à la
 recherche simultanée (MCTS/ISMCTS, §10.2).
 
+Mécaniques couvertes (Singles) : ordre d'action (priorité + vitesse effective,
+Tailwind, Trick Room), dégâts, recul (recoil) et drain, coups de statut/setup/
+protection/soin, sommeil/gel, **écrans** (Protection/Mur Lumière/Voile Aurore),
+**Tailwind**, **pièges d'entrée** (Piège de Roc, Picots), coups posant
+**météo/terrain/Trick Room**, et les effets de fin de tour (brûlure, poison,
+toxik à compteur, Vestiges, sable, Orbe Vie).
+
 Périmètre v1 (assumé, extensible) :
-  - **Singles**, un actif par camp ; les **changements** ne sont pas encore
-    simulés (ce sera l'étape suivante) — on résout deux coups.
   - Dégâts pris à un **roll** paramétrable (défaut : médian) pour rester
     déterministe ; la pleine stochasticité (16 rolls) viendra avec le MCTS.
   - Coups de statut modélisés par leur **effet primaire** (tables B1), sans
-    probabilités d'effet secondaire. Toxic à compteur croissant.
+    probabilités d'effet secondaire. Toxic à compteur croissant. Météo/terrain
+    posés persistent le temps de la résolution (durée non répercutée entre
+    déterminisations de la recherche) ; les conditions de camp (écrans/Tailwind/
+    pièges) persistent, elles, via les `Side`.
 
 Tout réutilise le moteur figé (`damage.calculate`) et les tables de `combat` :
 une seule source de vérité.
@@ -81,13 +89,15 @@ def _priority(move: str | None) -> int:
 
 
 def action_order(me: Mon, opp: Mon, my_move: str | None, opp_move: str | None,
-                 field: FieldState | None) -> list[str]:
-    """Ordre d'action : 'me'/'opp' résolus par priorité puis vitesse effective."""
+                 field: FieldState | None, *, me_tailwind: bool = False,
+                 opp_tailwind: bool = False) -> list[str]:
+    """Ordre d'action : 'me'/'opp' résolus par priorité puis vitesse effective
+    (Tailwind double la vitesse du camp concerné)."""
     pr_me, pr_opp = _priority(my_move), _priority(opp_move)
     if pr_me != pr_opp:
         return ["me", "opp"] if pr_me > pr_opp else ["opp", "me"]
-    sm = effective_speed(me.snapshot())
-    so = effective_speed(opp.snapshot())
+    sm = effective_speed(me.snapshot()) * (2 if me_tailwind else 1)
+    so = effective_speed(opp.snapshot()) * (2 if opp_tailwind else 1)
     trick_room = bool(field and field.trick_room)
     if sm == so:
         return ["me", "opp"]                     # départage arbitraire stable
@@ -119,6 +129,15 @@ _DRAIN: dict[str, float] = {
     "bitterblade": 0.5, "drainingkiss": 0.75, "oblivionwing": 0.75,
     "bouncybubble": 0.75,
 }
+
+# Coups posant des conditions de terrain / de camp.
+_SCREEN_MOVES = {"reflect", "lightscreen", "auroraveil"}
+_WEATHER_MOVES = {"sunnyday": "sun", "raindance": "rain", "sandstorm": "sand",
+                  "snowscape": "snow", "hail": "snow", "chillyreception": "snow"}
+_TERRAIN_MOVES = {"electricterrain": "electric", "grassyterrain": "grassy",
+                  "psychicterrain": "psychic", "mistyterrain": "misty"}
+_HAZARD_MOVES = {"stealthrock", "spikes"}
+_SPIKE_FRACTION = {1: 8, 2: 6, 3: 4}   # couches -> dénominateur (1/8, 1/6, 1/4)
 
 
 def _apply_status(target: Mon, status: str, move_id: str, log: list[str]) -> None:
@@ -159,8 +178,15 @@ def _can_act(mon: Mon, log: list[str]) -> bool:
 
 
 def _apply_move(attacker: Mon, defender: Mon, move: str,
-                field: FieldState | None, roll: float, log: list[str]) -> None:
-    """Résout un coup de `attacker` sur `defender` (mutation en place)."""
+                field: FieldState | None, roll: float, log: list[str], *,
+                atk_side: "Side | None" = None, def_side: "Side | None" = None,
+                field_dur: dict | None = None) -> None:
+    """Résout un coup de `attacker` sur `defender` (mutation en place).
+
+    `atk_side`/`def_side`/`field_dur` (facultatifs, chemin « actions ») activent
+    les conditions de camp/champ : écrans, Tailwind, météo/terrain/Trick Room,
+    pièges d'entrée.
+    """
     if attacker.fainted:
         return
     if not _can_act(attacker, log):
@@ -186,6 +212,32 @@ def _apply_move(attacker: Mon, defender: Mon, move: str,
             log.append(f"  récupère {healed} PV ({attacker.hp}/{attacker.max_hp})")
         elif mid in _STATUS_MOVES:
             _apply_status(defender, _STATUS_MOVES[mid], mid, log)
+        elif atk_side is not None and mid in _SCREEN_MOVES:
+            dur = 8 if to_id(attacker.item or "") == "lightclay" else 5
+            atk_side.screens[mid] = dur
+            log.append(f"  écran posé ({mid}, {dur} tours)")
+        elif atk_side is not None and mid == "tailwind":
+            atk_side.tailwind = 4
+            log.append("  Tailwind posé (4 tours)")
+        elif field is not None and field_dur is not None and mid in _WEATHER_MOVES:
+            field.weather = _WEATHER_MOVES[mid]
+            field_dur["weather"] = 5
+            log.append(f"  météo -> {field.weather}")
+        elif field is not None and field_dur is not None and mid in _TERRAIN_MOVES:
+            field.terrain = _TERRAIN_MOVES[mid]
+            field_dur["terrain"] = 5
+            log.append(f"  terrain -> {field.terrain}")
+        elif field is not None and field_dur is not None and mid == "trickroom":
+            field.trick_room = not field.trick_room
+            field_dur["trickroom"] = 0 if not field.trick_room else 5
+            log.append(f"  Trick Room {'activé' if field.trick_room else 'annulé'}")
+        elif def_side is not None and mid in _HAZARD_MOVES:
+            if mid == "spikes":
+                def_side.hazards["spikes"] = min(3, def_side.hazards.get("spikes", 0) + 1)
+                log.append(f"  Picots posés (couche {def_side.hazards['spikes']})")
+            else:
+                def_side.hazards["stealthrock"] = 1
+                log.append("  Piège de Roc posé")
         else:
             log.append("  (effet non modélisé)")
         return
@@ -194,7 +246,14 @@ def _apply_move(attacker: Mon, defender: Mon, move: str,
     if defender.protected:
         log.append(f"  {defender.build.species} est protégé — bloqué")
         return
-    r = calculate(attacker.snapshot(), defender.snapshot(), m, field)
+    scr = None
+    if def_side is not None and def_side.screens:
+        s = def_side.screens
+        if m.is_physical and ("reflect" in s or "auroraveil" in s):
+            scr = "auroraveil" if "auroraveil" in s else "reflect"
+        elif not m.is_physical and ("lightscreen" in s or "auroraveil" in s):
+            scr = "auroraveil" if "auroraveil" in s else "lightscreen"
+    r = calculate(attacker.snapshot(), defender.snapshot(), m, field, screen=scr)
     dmg = r.rolls[_roll_index(roll)]
     if r.type_effectiveness == 0:
         log.append("  sans effet (immunité)")
@@ -324,9 +383,12 @@ def simulate_turn(me: Mon, opp: Mon, my_move: str | None, opp_move: str | None,
 
 @dataclass
 class Side:
-    """Un camp : Pokémon actif + banc (pour les changements)."""
+    """Un camp : Pokémon actif + banc, plus ses conditions de camp."""
     active: Mon
     bench: list[Mon] = field(default_factory=list)
+    screens: dict[str, int] = field(default_factory=dict)   # nom -> tours restants
+    tailwind: int = 0                                        # tours restants
+    hazards: dict[str, int] = field(default_factory=dict)   # pièges SUR ce camp
 
 
 def _copy_mon(m: Mon) -> Mon:
@@ -334,12 +396,37 @@ def _copy_mon(m: Mon) -> Mon:
 
 
 def _copy_side(s: Side) -> Side:
-    return Side(active=_copy_mon(s.active), bench=[_copy_mon(b) for b in s.bench])
+    return Side(active=_copy_mon(s.active), bench=[_copy_mon(b) for b in s.bench],
+                screens=dict(s.screens), tailwind=s.tailwind,
+                hazards=dict(s.hazards))
+
+
+def _grounded(mon: Mon) -> bool:
+    types = get_species(mon.build.species).get("types") or []
+    return "Flying" not in types and to_id(mon.build.ability or "") != "levitate"
+
+
+def _apply_hazards(side: Side, mon: Mon, log: list[str]) -> None:
+    """Dégâts d'entrée des pièges présents sur `side` (Piège de Roc, Picots)."""
+    from .typechart import effectiveness
+    if "stealthrock" in side.hazards and not mon.fainted:
+        types = get_species(mon.build.species).get("types") or []
+        eff = effectiveness("Rock", types)
+        dmg = max(1, int(mon.max_hp * eff / 8))
+        mon.hp = max(0, mon.hp - dmg)
+        log.append(f"  {mon.build.species} souffre du Piège de Roc ({dmg})")
+    layers = side.hazards.get("spikes", 0)
+    if layers and _grounded(mon) and not mon.fainted:
+        dmg = max(1, mon.max_hp // _SPIKE_FRACTION[min(3, layers)])
+        mon.hp = max(0, mon.hp - dmg)
+        log.append(f"  {mon.build.species} souffre des Picots ({dmg})")
+    if mon.fainted:
+        log.append(f"  {mon.build.species} est K.O. à l'entrée !")
 
 
 def _do_switch(side: Side, index: int, log: list[str]) -> None:
-    """Rappelle l'actif et envoie `bench[index]` (les boosts du sortant sont
-    remis à zéro, comme en jeu ; le statut est conservé)."""
+    """Rappelle l'actif et envoie `bench[index]` (boosts du sortant remis à zéro,
+    statut conservé) ; l'entrant subit les pièges présents sur son camp."""
     if not (0 <= index < len(side.bench)):
         log.append("  changement invalide (indice hors banc)")
         return
@@ -350,6 +437,7 @@ def _do_switch(side: Side, index: int, log: list[str]) -> None:
     side.bench[index] = old
     side.active = new
     log.append(f"{old.build.species} est rappelé ; {new.build.species} entre")
+    _apply_hazards(side, new, log)
 
 
 @dataclass
@@ -371,30 +459,60 @@ def simulate_turn_actions(me: Side, opp: Side, my_action: tuple, opp_action: tup
     """
     if copy:
         me, opp = _copy_side(me), _copy_side(opp)
+    # Copie de travail du champ (on ne mute pas celui de l'appelant).
+    src = field or FieldState()
+    field = FieldState(weather=src.weather, terrain=src.terrain,
+                       trick_room=src.trick_room, turn=src.turn)
+    field_dur: dict = {}
     me.active.protected = opp.active.protected = False
     log: list[str] = []
+    # Conditions présentes AVANT ce tour (celles posées ce tour gardent leur durée).
+    pre = {"me": (set(me.screens), me.tailwind > 0),
+           "opp": (set(opp.screens), opp.tailwind > 0)}
 
-    # 1) Changements d'abord.
+    # 1) Changements d'abord (l'entrant subit les pièges).
     for side, action in ((me, my_action), (opp, opp_action)):
         if action and action[0] == "switch":
             _do_switch(side, action[1], log)
 
-    # 2) Coups, dans l'ordre de vitesse des actifs courants.
+    # 2) Coups, dans l'ordre de vitesse (Tailwind inclus).
     mv_me = my_action[1] if my_action and my_action[0] == "move" else None
     mv_opp = opp_action[1] if opp_action and opp_action[0] == "move" else None
-    sides = {"me": me.active, "opp": opp.active}
+    side_of = {"me": me, "opp": opp}
     moves = {"me": mv_me, "opp": mv_opp}
-    for who in action_order(me.active, opp.active, mv_me, mv_opp, field):
-        actor = sides[who]
-        target = sides["opp" if who == "me" else "me"]
-        if actor.fainted or target.fainted or not moves[who]:
+    order = action_order(me.active, opp.active, mv_me, mv_opp, field,
+                         me_tailwind=me.tailwind > 0, opp_tailwind=opp.tailwind > 0)
+    for who in order:
+        atk_side = side_of[who]
+        def_side = side_of["opp" if who == "me" else "me"]
+        if atk_side.active.fainted or def_side.active.fainted or not moves[who]:
             continue
-        _apply_move(actor, target, moves[who], field, roll, log)
+        _apply_move(atk_side.active, def_side.active, moves[who], field, roll, log,
+                    atk_side=atk_side, def_side=def_side, field_dur=field_dur)
 
     _end_of_turn(me.active, field, log)
     _end_of_turn(opp.active, field, log)
+    _tick_conditions(me, opp, pre, log)
     return ActionResult(me=me, opp=opp, log=log,
                         me_fainted=me.active.fainted, opp_fainted=opp.active.fainted)
+
+
+def _tick_conditions(me: Side, opp: Side, pre: dict, log: list[str]) -> None:
+    """Décrémente écrans / Tailwind — seulement ceux présents AVANT ce tour (les
+    conditions posées ce tour-ci gardent leur durée), et les retire à expiration."""
+    for key, side in (("me", me), ("opp", opp)):
+        pre_screens, pre_tw = pre[key]
+        for name in list(side.screens):
+            if name not in pre_screens:
+                continue
+            side.screens[name] -= 1
+            if side.screens[name] <= 0:
+                del side.screens[name]
+                log.append(f"  écran dissipé ({name})")
+        if pre_tw and side.tailwind > 0:
+            side.tailwind -= 1
+            if side.tailwind == 0:
+                log.append("  Tailwind dissipé")
 
 
 def rollout(me: Mon, opp: Mon, my_moves: list[str], opp_moves: list[str],

@@ -426,7 +426,11 @@ python -m simupoke.cli sim garchomp jolly swordsdance,earthquake amoonguss sassy
 Les **changements** sont gérés via `simulate_turn_actions(Side, Side, action, …)`
 où une action est `("move", nom)` ou `("switch", indice)` : les switchs se
 résolvent avant les coups (le coup adverse touche l'entrant), boosts du sortant
-remis à zéro.
+remis à zéro. Ce chemin gère aussi les **conditions de camp/champ** : écrans
+(Protection/Mur Lumière/Voile Aurore), **Tailwind** (vitesse ×2), **pièges
+d'entrée** (Piège de Roc selon l'efficacité Roche, Picots pour les non-Vol/
+Lévitation), et les coups posant **météo/terrain/Trick Room**. Recul et drain
+sont appliqués partout (y compris `rollout`/`sim`).
 
 > Périmètre v1 (assumé, extensible) : Singles ; dégâts déterministes à un roll ;
 > effets secondaires probabilistes non modélisés (para 25 %, flinch, gel/dégel…).
