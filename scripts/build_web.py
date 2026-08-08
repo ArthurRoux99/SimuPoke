@@ -24,7 +24,8 @@ DIST = WEB / "dist"
 def _compact_pokedex() -> dict:
     """Pokédex réduit aux champs utiles à l'UI (allège le fichier)."""
     full = json.loads((DATA / "pokedex.json").read_text(encoding="utf-8"))["species"]
-    return {sid: {"name": s["name"], "types": s["types"], "baseStats": s["baseStats"]}
+    return {sid: {"name": s["name"], "types": s["types"],
+                  "baseStats": s["baseStats"], "num": s.get("num", 0)}
             for sid, s in full.items()}
 
 
@@ -50,6 +51,7 @@ def build() -> Path:
     style = (WEB / "style.css").read_text(encoding="utf-8")
     engine = (WEB / "engine.js").read_text(encoding="utf-8")
     bench = (WEB / "bench.js").read_text(encoding="utf-8")
+    team = (WEB / "team.js").read_text(encoding="utf-8")
     app = (WEB / "app.js").read_text(encoding="utf-8")
 
     data = {
@@ -65,6 +67,7 @@ def build() -> Path:
             .replace("/* @DATA */", data_js)
             .replace("/* @ENGINE */", engine)
             .replace("/* @BENCH */", bench)
+            .replace("/* @TEAM */", team)
             .replace("/* @APP */", app))
 
     DIST.mkdir(parents=True, exist_ok=True)

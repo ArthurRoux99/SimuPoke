@@ -5,6 +5,7 @@
   const DATA = window.SIMUPOKE_DATA;
   const E = window.SimuEngine.makeEngine(DATA);
   const B = window.SimuBench.makeBench(E);
+  const TEAM = window.SimuTeam.makeTeam(E);
   const $ = (id) => document.getElementById(id);
   const SP = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
   const SP_FR = { hp: 'PV', atk: 'Atq', def: 'Déf', spa: 'A.Sp', spd: 'D.Sp', spe: 'Vit' };
@@ -53,7 +54,61 @@
       b.addEventListener('click', () => applyPreset(b.dataset.preset)));
     initTabs();
     initBench();
+    initTeam();
     compute();
+  }
+
+  // --- Équipe (B3) ---
+  const DEFAULT_TEAM = [
+    { species: 'Garchomp', nature: 'jolly', item: 'lifeorb', ability: 'roughskin', moves: 'earthquake, dragonclaw, stoneedge, swordsdance' },
+    { species: 'Incineroar', nature: 'careful', item: 'assaultvest', ability: 'intimidate', moves: 'fakeout, knockoff, flareblitz, partingshot' },
+    { species: 'Rotom-Wash', nature: 'bold', item: 'leftovers', ability: 'levitate', moves: 'hydropump, voltswitch, willowisp' },
+    { species: 'Flutter Mane', nature: 'timid', item: 'choicespecs', ability: 'protosynthesis', moves: 'moonblast, shadowball' },
+    { species: 'Iron Hands', nature: 'adamant', item: 'choiceband', ability: 'quarkdrive', moves: 'drainpunch, wildcharge' },
+    { species: 'Amoonguss', nature: 'sassy', item: 'rockyhelmet', ability: 'regenerator', moves: 'spore, ragepowder, sludgebomb' },
+  ];
+  function initTeam() {
+    DEFAULT_TEAM.forEach(addTeamRow);
+    $('team-add').addEventListener('click', () => addTeamRow({}));
+    $('team-run').addEventListener('click', runTeam);
+  }
+  function addTeamRow(d) {
+    d = d || {};
+    const row = document.createElement('div');
+    row.className = 'controls team-row';
+    row.style.gridTemplateColumns = '1.2fr 1fr 1fr 1fr 2fr auto';
+    row.style.marginTop = '6px';
+    row.innerHTML =
+      `<input class="t-species" list="species-list" placeholder="espèce" value="${esc(d.species)}">` +
+      `<select class="t-nature"></select>` +
+      `<input class="t-item" placeholder="objet" value="${esc(d.item)}">` +
+      `<input class="t-ability" placeholder="talent" value="${esc(d.ability)}">` +
+      `<input class="t-moves" placeholder="capa1, capa2, …" value="${esc(d.moves)}">` +
+      `<button class="t-del" type="button" title="retirer">✕</button>`;
+    fillNatures(row.querySelector('.t-nature'));
+    row.querySelector('.t-nature').value = d.nature || 'serious';
+    row.querySelector('.t-del').addEventListener('click', () => $('team-rows').removeChild(row));
+    $('team-rows').appendChild(row);
+  }
+  function runTeam() {
+    const out = $('team-out');
+    try {
+      const team = Array.from($('team-rows').querySelectorAll('.team-row')).map((row) => ({
+        species: row.querySelector('.t-species').value.trim(),
+        nature: row.querySelector('.t-nature').value,
+        item: row.querySelector('.t-item').value.trim() || null,
+        ability: row.querySelector('.t-ability').value.trim() || null,
+        moves: row.querySelector('.t-moves').value.split(',').map((x) => x.trim()).filter(Boolean),
+      })).filter((m) => m.species);
+      const r = TEAM.analyzeTeam(team);
+      const lines = [];
+      lines.push(r.clauseViolations.length ? 'Clauses :\n  ✗ ' + r.clauseViolations.join('\n  ✗ ') : 'Clauses : OK (Species + Item)');
+      const sw = Object.entries(r.sharedWeaknesses).sort((a, b) => b[1] - a[1]);
+      lines.push(sw.length ? 'Trous défensifs (≥ moitié faible) : ' + sw.map(([t, n]) => `${t} (${n})`).join(', ') : 'Trous défensifs : aucun majeur');
+      lines.push(r.offensiveGaps.length ? 'Couverture manquante (non touché ×2) : ' + r.offensiveGaps.join(', ') : 'Couverture offensive : complète');
+      lines.push('Rôles : ' + Object.entries(r.roles).map(([k, n]) => `${TEAM.ROLE_FR[k] || k}×${n}`).join(', '));
+      out.textContent = lines.join('\n');
+    } catch (e) { out.textContent = '⚠ ' + e.message; }
   }
 
   // --- Onglets ---

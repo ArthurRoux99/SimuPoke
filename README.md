@@ -263,13 +263,16 @@ Ouvrir ensuite `web/dist/simupoke.html` dans un navigateur : tout est embarqué
   Sash / Fermeté inclus) et un **optimiseur de spread** (objectifs combinés →
   spread SP légal). Port JS de `bench.py`/`optimize.py` vérifié par parité
   (`node web/verify_bench.mjs` → 6/6).
+- **Équipe (B3)** — clauses (Species/Item), trous défensifs, couverture
+  offensive manquante, distribution des rôles. Port JS de `analysis.py`/`team.py`
+  vérifié par parité (`node web/verify_team.mjs` → 4/4).
 
 > Source dans `web/` (`index.html` + `style.css` + `engine.js` + `bench.js` +
 > `app.js`), assemblée par `scripts/build_web.py`. **Version en ligne** (§15 Q4) :
 > les modules sont portés progressivement en JS pour tourner **entièrement dans
-> le navigateur** (hors-ligne, publiable sur GitHub Pages) — Dégâts, Seuils et
-> optimiseur de spread sont faits ; B1/B2/B3 et la recherche suivront, à parité
-> avec le cœur Python.
+> le navigateur** (hors-ligne, publiable sur GitHub Pages) — Dégâts, Seuils,
+> optimiseur de spread et **analyse d'équipe (B3)** sont faits ; team preview,
+> B2 et la recherche B1 suivront, à parité avec le cœur Python.
 
 ### Publication sur GitHub Pages
 

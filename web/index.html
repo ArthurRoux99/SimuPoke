@@ -16,6 +16,7 @@
 <div class="tabs" id="tabs">
   <button data-tab="damage" class="active">Dégâts</button>
   <button data-tab="bench">Seuils</button>
+  <button data-tab="team">Équipe</button>
 </div>
 
 <main>
@@ -182,6 +183,23 @@
       <div class="bench-out" id="sp-out"></div>
     </div>
   </section>
+
+  <!-- ===== ÉQUIPE ===== -->
+  <section class="tab-panel" id="tab-team">
+    <div class="bench-block">
+      <h2>Analyse d'équipe (B3) — clauses, trous défensifs, couverture, rôles</h2>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 10px">Une ligne par
+        Pokémon : espèce, nature, objet, talent, capacités (séparées par des
+        virgules). Tout est calculé dans le navigateur.</p>
+      <div id="team-rows"></div>
+      <div class="controls" style="grid-template-columns:auto auto 1fr;margin-top:8px">
+        <button id="team-add" type="button">+ Pokémon</button>
+        <button class="primary" id="team-run">Analyser l'équipe</button>
+        <span></span>
+      </div>
+      <pre class="report" id="team-out" style="white-space:pre-wrap;margin-top:12px"></pre>
+    </div>
+  </section>
 </main>
 
 <footer>
@@ -196,6 +214,7 @@
 <script>/* @DATA */</script>
 <script>/* @ENGINE */</script>
 <script>/* @BENCH */</script>
+<script>/* @TEAM */</script>
 <script>/* @APP */</script>
 </body>
 </html>
