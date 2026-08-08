@@ -50,5 +50,14 @@ check('survive_sash', [r.feasible, r.totalSp, r.byEndure], [true, 0, true]);
 const tiers = B.speedTiers([mk('snorlax', 'brave'), mk('garchomp', 'jolly', { spe: 32 })]);
 check('tiers', tiers.map((t) => [t.species, t.speed]), [['garchomp', 169], ['snorlax', 45]]);
 
+// optimiseur de spread : Tyranitar OHKO Garchomp (Ice Punch) + survivre Séisme + dépasser Amoonguss
+const spr = B.optimizeSpread('tyranitar', 'adamant', [
+  { kind: 'ko', defender: mk('garchomp', 'jolly', { spe: 32 }), move: 'icepunch', hits: 1 },
+  { kind: 'survive', attacker: mk('garchomp', 'adamant', { atk: 32 }), move: 'earthquake' },
+  { kind: 'outspeed', target: mk('amoonguss', 'sassy', { spe: 0 }) },
+]);
+check('spread', [spr.feasible, spr.sp.hp, spr.sp.atk, spr.sp.def, spr.total],
+  [true, 2, 15, 22, 39]);
+
 console.log(`Parité Seuils JS : ${pass}/${pass + fail} OK`);
 process.exit(fail ? 1 : 0);

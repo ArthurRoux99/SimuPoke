@@ -164,6 +164,23 @@
       </div>
       <div class="bench-out" id="ko-out"></div>
     </div>
+
+    <div class="bench-block">
+      <h2>Optimiseur de spread — combine plusieurs objectifs</h2>
+      <div class="controls" style="grid-template-columns:1.4fr 1fr 1fr auto;">
+        <div><label>Mon Pokémon</label><input id="sp-species" list="species-list" value="Tyranitar" autocomplete="off"></div>
+        <div><label>Nature</label><select id="sp-nature"></select></div>
+        <div><label>Objet (opt.)</label><input id="sp-item" autocomplete="off"></div>
+        <div><label>Budget</label><input id="sp-budget" type="number" min="0" max="66" value="66"></div>
+      </div>
+      <div id="sp-objs" style="margin-top:8px"></div>
+      <div class="controls" style="grid-template-columns:auto auto 1fr;">
+        <button id="sp-add" type="button">+ Objectif</button>
+        <button class="primary" id="sp-run">Optimiser</button>
+        <span></span>
+      </div>
+      <div class="bench-out" id="sp-out"></div>
+    </div>
   </section>
 </main>
 

@@ -76,6 +76,61 @@
     $('os-run').addEventListener('click', runOutspeed);
     $('sv-run').addEventListener('click', runSurvive);
     $('ko-run').addEventListener('click', runKo);
+    // Optimiseur de spread
+    fillNatures($('sp-nature')); $('sp-nature').value = 'adamant';
+    addObjRow({ kind: 'ko', species: 'Garchomp', nature: 'jolly', move: 'Ice Punch', num: 1 });
+    addObjRow({ kind: 'survive', species: 'Garchomp', nature: 'adamant', move: 'Earthquake', num: 32 });
+    addObjRow({ kind: 'outspeed', species: 'Amoonguss', nature: 'sassy', num: 0 });
+    $('sp-add').addEventListener('click', () => addObjRow({}));
+    $('sp-run').addEventListener('click', runSpread);
+  }
+
+  const esc = (s) => String(s == null ? '' : s).replace(/"/g, '&quot;');
+  function addObjRow(d) {
+    d = d || {};
+    const row = document.createElement('div');
+    row.className = 'controls';
+    row.style.gridTemplateColumns = 'auto 1.4fr 1fr 1.4fr auto auto';
+    row.style.marginTop = '6px';
+    row.innerHTML =
+      `<select class="o-kind"><option value="outspeed">dépasser</option><option value="survive">survivre</option><option value="ko">tuer</option></select>` +
+      `<input class="o-species" list="species-list" placeholder="espèce cible" value="${esc(d.species)}">` +
+      `<select class="o-nature"></select>` +
+      `<input class="o-move" list="move-list" placeholder="capacité (survivre/tuer)" value="${esc(d.move)}">` +
+      `<input class="o-num" type="number" placeholder="SP / coups" style="max-width:88px" value="${d.num != null ? d.num : ''}">` +
+      `<button class="o-del" type="button" title="retirer">✕</button>`;
+    fillNatures(row.querySelector('.o-nature'));
+    row.querySelector('.o-nature').value = d.nature || 'serious';
+    row.querySelector('.o-kind').value = d.kind || 'outspeed';
+    row.querySelector('.o-del').addEventListener('click', () => $('sp-objs').removeChild(row));
+    $('sp-objs').appendChild(row);
+  }
+  function collectObjectives() {
+    return Array.from($('sp-objs').querySelectorAll('.controls')).map((row) => {
+      const kind = row.querySelector('.o-kind').value;
+      const species = row.querySelector('.o-species').value.trim();
+      const nature = row.querySelector('.o-nature').value;
+      const move = row.querySelector('.o-move').value.trim();
+      const num = parseInt(row.querySelector('.o-num').value || '0', 10);
+      if (!species) return null;
+      if (kind === 'outspeed') return { kind, target: { species, nature, sp: { spe: num || 0 } } };
+      if (kind === 'survive') return { kind, attacker: { species, nature, sp: { atk: num || 0, spa: num || 0 } }, move };
+      return { kind: 'ko', defender: { species, nature, sp: {} }, move, hits: num || 1 };
+    }).filter(Boolean);
+  }
+  function runSpread() {
+    const out = $('sp-out');
+    try {
+      const r = B.optimizeSpread($('sp-species').value, $('sp-nature').value, collectObjectives(),
+        { item: $('sp-item').value || null, budget: parseInt($('sp-budget').value || '66', 10) });
+      const order = [['hp', 'PV'], ['atk', 'Atq'], ['def', 'Déf'], ['spa', 'A.Sp'], ['spd', 'D.Sp'], ['spe', 'Vit']];
+      const parts = order.filter(([k]) => r.sp[k]).map(([k, l]) => `${l} ${r.sp[k]}`);
+      out.className = outClass(r.feasible);
+      let txt = 'Spread : ' + (parts.join(', ') || 'aucun SP requis') + ` — ${r.total}/${r.budget}`;
+      txt += r.leftover > 0 ? ` (reste ${r.leftover})` : r.leftover < 0 ? ` (DÉPASSEMENT ${-r.leftover})` : '';
+      if (r.unmet.length) txt += ' | ⚠ ' + r.unmet.join(' ; ');
+      out.textContent = txt;
+    } catch (e) { out.className = 'bench-out no'; out.textContent = '⚠ ' + e.message; }
   }
   const outClass = (ok) => 'bench-out ' + (ok ? 'ok' : 'no');
   function runOutspeed() {

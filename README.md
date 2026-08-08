@@ -259,15 +259,17 @@ Ouvrir ensuite `web/dist/simupoke.html` dans un navigateur : tout est embarqué
 - **Dégâts** — attaquant/défenseur (espèce, nature, SP, objet, talent, boosts,
   statut, PV %), météo/terrain, critique et attaque de zone → dégâts min–max, %,
   KO en N coups, delta Champions (ex. `dragonize`).
-- **Seuils** — combien de SP pour **dépasser** en vitesse, **survivre** à une
-  attaque, ou **tuer** en N coups (Focus Sash / Fermeté inclus), port JS de
-  `bench.py` vérifié par parité (`node web/verify_bench.mjs` → 5/5).
+- **Seuils** — combien de SP pour **dépasser**, **survivre**, **tuer** (Focus
+  Sash / Fermeté inclus) et un **optimiseur de spread** (objectifs combinés →
+  spread SP légal). Port JS de `bench.py`/`optimize.py` vérifié par parité
+  (`node web/verify_bench.mjs` → 6/6).
 
 > Source dans `web/` (`index.html` + `style.css` + `engine.js` + `bench.js` +
 > `app.js`), assemblée par `scripts/build_web.py`. **Version en ligne** (§15 Q4) :
 > les modules sont portés progressivement en JS pour tourner **entièrement dans
-> le navigateur** (hors-ligne, publiable sur GitHub Pages) — Dégâts et Seuils
-> sont faits ; B1/B2/B3 et la recherche suivront, à parité avec le cœur Python.
+> le navigateur** (hors-ligne, publiable sur GitHub Pages) — Dégâts, Seuils et
+> optimiseur de spread sont faits ; B1/B2/B3 et la recherche suivront, à parité
+> avec le cœur Python.
 
 ### Publication sur GitHub Pages
 

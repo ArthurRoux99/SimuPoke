@@ -108,7 +108,69 @@
       return { feasible: false, sp: null, stat, hits, blockedByEndure: end && hits < 2, move: m.name };
     }
 
-    return { effectiveSpeed, computeSpeed, speedTiers, minSpToOutspeed, minSpToSurvive, minSpToKo };
+    // --- Optimiseur de spread (port de optimize.py) ---
+    function minDefGivenHp(meDef, obj, hp, defKey) {
+      for (let dsp = 0; dsp <= CAP; dsp++) {
+        const trial = Object.assign({}, meDef, { hpPct: 1, sp: Object.assign({}, meDef.sp, { hp, [defKey]: dsp }) });
+        const r = engine.calculate(obj.attacker, trial, obj.move, obj.field || {}, { crit: !!obj.crit });
+        if (r.max < r.maxHp) return dsp;
+      }
+      return null;
+    }
+    function solveDefense(meDef, survives) {
+      const phys = survives.filter((o) => engine.move(o.move).category === 'Physical');
+      const spec = survives.filter((o) => engine.move(o.move).category !== 'Physical');
+      if (!phys.length && !spec.length) return { hp: 0, def: 0, spd: 0 };
+      let best = null;
+      for (let hp = 0; hp <= CAP; hp++) {
+        let defNeed = 0, spdNeed = 0;
+        for (const o of phys) defNeed = Math.max(defNeed, minDefGivenHp(meDef, o, hp, 'def') || 0);
+        for (const o of spec) spdNeed = Math.max(spdNeed, minDefGivenHp(meDef, o, hp, 'spd') || 0);
+        const total = hp + defNeed + spdNeed;
+        if (best === null || total < best.total) best = { total, hp, def: defNeed, spd: spdNeed };
+      }
+      return best;
+    }
+    function optimizeSpread(species, nature, objectives, opts) {
+      opts = opts || {};
+      const budget = opts.budget || 66;
+      const item = opts.item || null, ability = opts.ability || null;
+      const me = (extra) => Object.assign({ species, nature, item, ability, sp: {} }, extra || {});
+      const sp = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+      const unmet = [];
+      const outs = objectives.filter((o) => o.kind === 'outspeed');
+      const kos = objectives.filter((o) => o.kind === 'ko');
+      const survives = objectives.filter((o) => o.kind === 'survive');
+
+      for (const o of outs) {
+        const r = minSpToOutspeed(me(), o.target, { strict: o.strict !== false, meTailwind: o.meTailwind, targetTailwind: o.targetTailwind });
+        if (!r.feasible) unmet.push('dépasser ' + (o.label || o.target.species) + ' : hors de portée (vitesse)');
+        else sp.spe = Math.max(sp.spe, r.sp);
+      }
+      for (const o of kos) {
+        const r = minSpToKo(me(), o.defender, o.move, o.field || {}, { hits: o.hits || 1, crit: o.crit });
+        const tag = o.label || (o.move + ' sur ' + o.defender.species);
+        if (!r.feasible) unmet.push('KO ' + tag + ' : ' + (r.blockedByEndure ? 'bloqué par Focus Sash / Fermeté' : 'hors de portée (>' + CAP + ' SP ' + r.stat + ')'));
+        else sp[r.stat] = Math.max(sp[r.stat], r.sp);
+      }
+      const meDef = me();
+      const okSurv = [];
+      for (const o of survives) {
+        const chk = minSpToSurvive(meDef, o.attacker, o.move, o.field || {}, { crit: o.crit });
+        if (!chk.feasible) unmet.push('survivre à ' + (o.label || (o.move + ' de ' + o.attacker.species)) + ' : hors de portée (même à fond)');
+        else okSurv.push(o);
+      }
+      const d = solveDefense(meDef, okSurv);
+      sp.hp = d.hp; sp.def = d.def; sp.spd = d.spd;
+
+      const total = sp.hp + sp.atk + sp.def + sp.spa + sp.spd + sp.spe;
+      if (total > budget) unmet.push('budget dépassé : ' + total + ' SP requis > ' + budget);
+      let stats = null;
+      try { stats = engine.battleStats({ species, nature, sp }); } catch (e) { stats = null; }
+      return { feasible: unmet.length === 0, sp, total, budget, leftover: budget - total, stats, unmet };
+    }
+
+    return { effectiveSpeed, computeSpeed, speedTiers, minSpToOutspeed, minSpToSurvive, minSpToKo, optimizeSpread };
   }
 
   return { makeBench, toId };
