@@ -39,8 +39,9 @@ from pathlib import Path
 
 from .basestats import to_id
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-USAGE_DIR = REPO_ROOT / "data" / "usage"
+from .paths import DATA_DIR
+
+USAGE_DIR = DATA_DIR / "usage"
 
 
 def usage_path(reg_id: str = "reg_m_b") -> Path:

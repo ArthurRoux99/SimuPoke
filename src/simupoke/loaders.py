@@ -10,10 +10,7 @@ import json
 from pathlib import Path
 
 from .model import OwnedPokemon
-
-# Racine du dépôt : .../SimuPoke (ce fichier est dans src/simupoke/)
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = REPO_ROOT / "data"
+from .paths import DATA_DIR  # ré-exporté : plusieurs modules l'importent d'ici
 
 
 def _read_json(path: Path) -> dict:

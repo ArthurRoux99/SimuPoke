@@ -19,9 +19,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-# Racine du dépôt : .../SimuPoke (ce fichier est dans src/simupoke/)
-REPO_ROOT = Path(__file__).resolve().parents[2]
-POKEDEX_PATH = REPO_ROOT / "data" / "pokedex.json"
+from .paths import DATA_DIR
+
+POKEDEX_PATH = DATA_DIR / "pokedex.json"
 
 # Ordre canonique des stats (doit rester cohérent avec stats.STAT_KEYS).
 _STAT_KEYS = ("hp", "atk", "def", "spa", "spd", "spe")
