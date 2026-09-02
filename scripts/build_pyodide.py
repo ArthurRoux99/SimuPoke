@@ -34,6 +34,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gen_icons import make_icons  # noqa: E402  (script voisin, stdlib pure)
+
 ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT / "web"
 PYO = WEB / "pyodide"
@@ -74,6 +77,21 @@ def _compose_app() -> None:
     """Compose dist/index.html depuis le frontend hébergé + bootstrap Pyodide."""
     html = (WEB / "server" / "index.html").read_text(encoding="utf-8")
     html = html.replace("/static/", "./static/")
+
+    # En-tête PWA (manifest, thème, icône iOS, mode application plein écran).
+    head = (
+        '<link rel="manifest" href="./manifest.webmanifest">\n'
+        '<meta name="theme-color" content="#0E141B">\n'
+        '<link rel="apple-touch-icon" href="./icon-192.png">\n'
+        '<meta name="apple-mobile-web-app-capable" content="yes">\n'
+        '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n'
+        '<meta name="apple-mobile-web-app-title" content="SimuPoke">\n'
+    )
+    vp = '<meta name="viewport" content="width=device-width, initial-scale=1">'
+    if vp not in html:
+        raise SystemExit("Gabarit inattendu : balise viewport introuvable.")
+    html = html.replace(vp, vp + "\n" + head)
+
     inject = (f'<script src="{PYODIDE_CDN}"></script>\n'
               '<script src="./bootstrap.js"></script>\n')
     marker = '<script src="./static/app.js"></script>'
@@ -102,6 +120,9 @@ def build() -> Path:
     shutil.copyfile(WEB / "server" / "app.js", static / "app.js")
     shutil.copyfile(PYO / "bootstrap.js", DIST / "bootstrap.js")
     shutil.copyfile(PYO / "parity.html", DIST / "parity.html")
+    shutil.copyfile(PYO / "manifest.webmanifest", DIST / "manifest.webmanifest")
+    shutil.copyfile(PYO / "sw.js", DIST / "sw.js")
+    make_icons(DIST)  # icon-192.png / icon-512.png (PWA)
     _compose_app()
 
     (DIST / "manifest.json").write_text(

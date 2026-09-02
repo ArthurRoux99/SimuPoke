@@ -25,15 +25,19 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Build la page autonome
+      - name: Build la page autonome (calc, racine)
         run: python scripts/build_web.py
 
+      - name: Build l'app Pyodide (PWA, /app/)
+        run: python scripts/build_pyodide.py
+
       - name: Préparer _site
-        # La page autonome devient la racine du site : tout est embarqué
-        # (données + moteur), aucun autre fichier n'est nécessaire.
+        # Racine = page calc autonome (légère, moteur JS embarqué).
+        # /app/ = l'app complète en PWA (moteur Python via Pyodide, installable).
         run: |
-          mkdir -p _site
+          mkdir -p _site/app
           cp web/dist/simupoke.html _site/index.html
+          cp -r web/pyodide/dist/. _site/app/
 
       - uses: actions/configure-pages@v5
         with:
