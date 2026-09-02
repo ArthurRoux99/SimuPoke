@@ -118,6 +118,105 @@ def _payoff_matrix(me: Mon, my_bench: list[Mon], particles: list[Particle],
 
 
 # ---------------------------------------------------------------------------
+# Jeu bayésien : l'adversaire connaît son set (info privée) et joue PAR MONDE
+# ---------------------------------------------------------------------------
+# Un cran vers l'état de l'art (PokaiTrainer : une table de regret par monde pour
+# le seat 2). L'adversaire n'est plus un « type moyen » : dans chaque monde
+# (particule de croyance) il joue au mieux contre moi, et je dois committer une
+# stratégie unique **avant** de savoir quel monde est réel. Résultat : robuste à
+# un adversaire qui exploite ce qu'il sait.
+
+def _world_payoff(me: Mon, my_bench: list[Mon], particle: Particle,
+                  my_actions: list[tuple], opp_actions_w: list[str | None],
+                  field: FieldState | None) -> list[list[float]]:
+    """Matrice de gains DANS un monde : U[a][b] moyennée sur les jets."""
+    opp_mon = Mon.from_state(particle.build)
+    matrix: list[list[float]] = []
+    for action in my_actions:
+        row: list[float] = []
+        for omv in opp_actions_w:
+            vals = []
+            for roll in ROLLS:
+                res = simulate_turn_actions(
+                    Side(active=me, bench=my_bench), Side(active=opp_mon),
+                    action, ("move", omv), field, roll=roll, copy=True)
+                vals.append(evaluate_side(res.me, res.opp.active))
+            row.append(sum(vals) / len(vals))
+        matrix.append(row)
+    return matrix
+
+
+def solve_bayesian(my_n: int, worlds: list[tuple[float, list[list[float]],
+                   list[str | None]]], iters: int = 2000
+                   ) -> tuple[list[float], float, list[tuple[str | None, float]],
+                              int]:
+    """Résout le jeu bayésien : je maximise une stratégie **unique** (`my_n`
+    actions) ; dans chaque monde `w` (poids, matrice `U_w`, libellés adverses)
+    l'adversaire minimise avec sa **propre** stratégie. Regret matching :
+    une table pour moi, une par monde pour l'adversaire (converge vers l'équilibre
+    bayésien ex-ante).
+
+    Renvoie (ma stratégie moyenne, valeur, stratégie adverse **marginale**
+    (label → proba), indice de ma meilleure réponse pure).
+    """
+    r1 = [0.0] * my_n
+    s1 = [0.0] * my_n
+    r2 = [[0.0] * len(U[0]) for _, U, _ in worlds]
+    s2 = [[0.0] * len(U[0]) for _, U, _ in worlds]
+
+    def strat(reg: list[float]) -> list[float]:
+        pos = [r if r > 0 else 0.0 for r in reg]
+        tot = sum(pos)
+        return [p / tot for p in pos] if tot > 0 else [1.0 / len(reg)] * len(reg)
+
+    for _ in range(iters):
+        sig1 = strat(r1)
+        sig2 = [strat(r2[w]) for w in range(len(worlds))]
+        for a in range(my_n):
+            s1[a] += sig1[a]
+        for w in range(len(worlds)):
+            for b in range(len(sig2[w])):
+                s2[w][b] += sig2[w][b]
+        # Utilités de MES actions : moyenne pondérée sur les mondes et la
+        # stratégie adverse propre à chaque monde.
+        u1 = [0.0] * my_n
+        for a in range(my_n):
+            for w, (pw, U, _) in enumerate(worlds):
+                u1[a] += pw * sum(sig2[w][b] * U[a][b] for b in range(len(U[a])))
+        v1 = sum(sig1[a] * u1[a] for a in range(my_n))
+        for a in range(my_n):
+            r1[a] += u1[a] - v1
+        # Utilités adverses PAR MONDE (il minimise U_w, i.e. maximise -U_w).
+        for w, (_, U, _) in enumerate(worlds):
+            ucol = [-sum(sig1[a] * U[a][b] for a in range(my_n))
+                    for b in range(len(U[0]))]
+            vcol = sum(sig2[w][b] * ucol[b] for b in range(len(ucol)))
+            for b in range(len(ucol)):
+                r2[w][b] += ucol[b] - vcol
+
+    my_strat = [x / sum(s1) for x in s1]
+    world_strat = [[x / sum(s2[w]) for x in s2[w]] for w in range(len(worlds))]
+
+    value = 0.0
+    for w, (pw, U, _) in enumerate(worlds):
+        value += pw * sum(my_strat[a] * U[a][b] * world_strat[w][b]
+                          for a in range(my_n) for b in range(len(U[0])))
+
+    # Stratégie adverse marginale (pour l'affichage), sur l'union des libellés.
+    marg: dict[str | None, float] = {}
+    for w, (pw, _, labels) in enumerate(worlds):
+        for b, lbl in enumerate(labels):
+            marg[lbl] = marg.get(lbl, 0.0) + pw * world_strat[w][b]
+    opp_marginal = sorted(marg.items(), key=lambda t: t[1], reverse=True)
+
+    br = max(range(my_n),
+             key=lambda a: sum(pw * sum(world_strat[w][b] * U[a][b]
+                                        for b in range(len(U[0])))
+                               for w, (pw, U, _) in enumerate(worlds)))
+    return my_strat, value, opp_marginal, br
+
+
+# ---------------------------------------------------------------------------
 # Résultat + résolution de tour
 # ---------------------------------------------------------------------------
 
@@ -158,12 +257,17 @@ def _label(action: tuple, me: Mon, my_bench: list[Mon]) -> str:
 def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
                my_bench: list[Mon] | None = None, reg_id: str = "reg_m_b",
                iters: int = 2000, belief_samples: int = 80,
-               seed: int | None = 0) -> NashResult:
+               per_world: bool = True, seed: int | None = 0) -> NashResult:
     """Résout le tour courant vers Nash et renvoie ma stratégie mixte.
 
     Mes actions = mes coups (connus) + un changement par membre vivant du banc.
     L'adversaire = coups plausibles sur la croyance (usage §10.3, filtrée par
     l'observé). La chance (jets de dégâts) est énumérée sur `ROLLS`.
+
+    `per_world=True` (défaut) : jeu **bayésien** — l'adversaire connaît son set
+    (info privée) et joue au mieux **dans chaque monde** de la croyance ; je
+    committe une stratégie unique (robuste). `per_world=False` : adversaire
+    « moyen » (une stratégie de colonne unique sur la croyance).
     """
     bench = my_bench or []
     particles = opponent_belief(opp.build, reg_id, n_samples=belief_samples,
@@ -176,15 +280,24 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
         my_actions = [("move", None)]
     labels = [_label(a, me, bench) for a in my_actions]
 
-    U = _payoff_matrix(me, bench, particles, my_actions, opp_moves, field)
-    rst, cst, val = solve_matrix(U, iters=iters)
+    if per_world and len(particles) > 1:
+        worlds = []
+        for part in particles:
+            opp_w: list[str | None] = [m for m in part.build.moves
+                                       if move_known(m)] or [None]
+            U_w = _world_payoff(me, bench, part, my_actions, opp_w, field)
+            worlds.append((part.weight, U_w, opp_w))
+        rst, val, opp_strat, br_idx = solve_bayesian(len(my_actions), worlds,
+                                                     iters=iters)
+    else:
+        U = _payoff_matrix(me, bench, particles, my_actions, opp_moves, field)
+        rst, cst, val = solve_matrix(U, iters=iters)
+        opp_strat = sorted(zip(opp_moves, cst), key=lambda t: t[1], reverse=True)
+        br_idx = max(range(len(my_actions)),
+                     key=lambda i: sum(cst[j] * U[i][j]
+                                       for j in range(len(opp_moves))))
 
     strat = sorted(zip(labels, rst), key=lambda t: t[1], reverse=True)
-    opp_strat = sorted(zip(opp_moves, cst), key=lambda t: t[1], reverse=True)
-
-    # Meilleure réponse PURE à la stratégie adverse moyenne (info « coup sûr »).
-    br_idx = max(range(len(my_actions)),
-                 key=lambda i: sum(cst[j] * U[i][j] for j in range(len(opp_moves))))
     best_response = labels[br_idx]
 
     top_label, top_p = strat[0]

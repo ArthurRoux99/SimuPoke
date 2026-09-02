@@ -54,9 +54,11 @@ heuristique transparente.
 
 Par ordre d'impact / coût croissant — chaque cran rapproche de PokaiTrainer :
 
-1. **Stratégie adverse par monde** (seat-2 par-world de PokaiTrainer) : une table
-   de regret par particule au lieu d'un adversaire « moyen ». Rend la croyance
-   pleinement exploitée. *Pur algo, hors-ligne.*
+1. ~~**Stratégie adverse par monde** (seat-2 par-world de PokaiTrainer)~~ **✅ fait** :
+   `solve_bayesian` — une table de regret par particule ; l'adversaire connaît son
+   set et joue au mieux dans chaque monde, je committe une stratégie robuste. Plus
+   juste que l'adversaire « moyen » (qui sur-arme l'adversaire en lui prêtant des
+   coups absents de certains mondes). *Pur algo, hors-ligne.*
 2. **Profondeur par sous-jeu** : CFR récursif / PUCT sur `sim` au-delà d'un tour
    (le `search.py` expectimax existe déjà comme brique), avec budget d'expansion.
 3. **Mise à jour de croyance inter-tours** : rebrancher l'action jointe observée
