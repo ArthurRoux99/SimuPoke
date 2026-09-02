@@ -28,3 +28,7 @@ npm-debug.log*
 
 # Claude Code (local)
 .claude/settings.local.json
+
+# Pyodide PoC (artefacts générés)
+web/pyodide/dist/
+*.whl

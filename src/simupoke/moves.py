@@ -13,8 +13,9 @@ from pathlib import Path
 
 from .basestats import to_id
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-MOVES_PATH = REPO_ROOT / "data" / "moves.json"
+from .paths import DATA_DIR
+
+MOVES_PATH = DATA_DIR / "moves.json"
 
 
 @dataclass(frozen=True)

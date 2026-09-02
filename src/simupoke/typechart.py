@@ -11,8 +11,9 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-TYPECHART_PATH = REPO_ROOT / "data" / "typechart.json"
+from .paths import DATA_DIR
+
+TYPECHART_PATH = DATA_DIR / "typechart.json"
 
 
 @lru_cache(maxsize=1)

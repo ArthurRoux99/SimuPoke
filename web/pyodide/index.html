@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SimuPoke — Moteur Python dans le navigateur (Pyodide)</title>
+<style>
+  :root{
+    --bg:#0E141B; --surface:#161F29; --surface-2:#1D2833; --border:#2A3947;
+    --ink:#E6EDF3; --muted:#93A4B4; --accent:#F0B429;
+    --ok:#46B658; --ok-soft:#16301E; --ko:#F0776C; --ko-soft:#331916;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    padding:clamp(1rem,4vw,2.5rem)}
+  .wrap{max-width:780px;margin:0 auto}
+  h1{font-size:clamp(1.4rem,4vw,1.9rem);margin:0;letter-spacing:-.02em;line-height:1.1}
+  .eyebrow{font-family:var(--mono);font-size:.72rem;text-transform:uppercase;
+    letter-spacing:.15em;color:var(--accent);font-weight:600}
+  .lede{color:var(--muted);margin:.7rem 0 0;max-width:60ch}
+  .card{background:var(--surface);border:1px solid var(--border);
+    border-radius:12px;padding:1.1rem 1.2rem;margin-top:1.4rem}
+  .verdict{display:flex;align-items:center;gap:.8rem;font-weight:600;font-size:1.05rem}
+  .badge{font-family:var(--mono);font-size:.8rem;font-weight:700;padding:.3rem .7rem;
+    border-radius:7px;white-space:nowrap}
+  .badge.ok{background:var(--ok-soft);color:var(--ok)}
+  .badge.ko{background:var(--ko-soft);color:var(--ko)}
+  .badge.run{background:var(--surface-2);color:var(--muted)}
+  table{width:100%;border-collapse:collapse;margin-top:.8rem;font-size:.9rem}
+  th,td{text-align:left;padding:.55rem .6rem;border-bottom:1px solid var(--border)}
+  th{font-family:var(--mono);font-size:.68rem;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--muted);font-weight:600}
+  td.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+  td.v{font-family:var(--mono);font-weight:600}
+  td.v.ok{color:var(--ok)} td.v.ko{color:var(--ko)}
+  tbody tr:last-child td{border-bottom:none}
+  #log{font-family:var(--mono);font-size:.8rem;color:var(--muted);
+    background:var(--surface-2);border-radius:8px;padding:.8rem .9rem;margin-top:1rem;
+    white-space:pre-wrap;max-height:230px;overflow:auto}
+  #log b{color:var(--ink);font-weight:600}
+  .foot{color:var(--muted);font-size:.82rem;margin-top:1.4rem}
+  code{font-family:var(--mono);background:var(--surface-2);padding:.05rem .35rem;border-radius:4px}
+  .spin{display:inline-block;width:.8rem;height:.8rem;border:2px solid var(--border);
+    border-top-color:var(--accent);border-radius:50%;animation:s .7s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">SimuPoke · preuve de concept</div>
+  <h1>Le moteur Python, dans le navigateur</h1>
+  <p class="lede">Cette page charge le paquet <code>simupoke</code> (wheel pure-Python)
+  dans <b>Pyodide</b> (CPython compilé en WebAssembly), monte les données de jeu dans
+  le système de fichiers virtuel, puis exécute le <b>calculateur de dégâts Python testé</b>
+  — sans aucun port JavaScript. Elle vérifie la parité contre des valeurs de référence.</p>
+
+  <div class="card">
+    <div class="verdict"><span id="badge" class="badge run"><span class="spin"></span> exécution…</span>
+      <span id="verdict-txt">Chargement de Pyodide et du moteur…</span></div>
+    <table id="results" hidden>
+      <thead><tr><th>Scénario</th><th>Attendu</th><th>Navigateur</th><th>Parité</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="log"></div>
+
+  <p class="foot">Ce que ça prouve : la source de vérité unique (<code>src/simupoke</code>,
+  testée) tourne côté client, hors-ligne après mise en cache — donc le port
+  <code>web/engine.js</code> pourra être retiré. Étape 1 du chantier « moteur unique ».</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+// Vecteurs de référence (valeurs produites par le moteur Python côté dépôt).
+const EXPECTED = [
+  {label:"garchomp earthquake → tyranitar (CB, +Atq)", min:258, max:306,
+   py:{atk:"garchomp",anat:"adamant",asp:{atk:31},aitem:"choiceband",dfn:"tyranitar",dnat:"jolly",move:"earthquake"}},
+  {label:"garchomp earthquake → tyranitar (neutre)", min:132, max:156,
+   py:{atk:"garchomp",dfn:"tyranitar",move:"earthquake"}},
+  {label:"pikachu thunderbolt → charizard", min:108, max:128,
+   py:{atk:"pikachu",anat:"modest",asp:{spa:31},dfn:"charizard",move:"thunderbolt"}},
+  {label:"dragonite icebeam → garchomp", min:172, max:204,
+   py:{atk:"dragonite",anat:"modest",dfn:"garchomp",move:"icebeam"}},
+];
+
+const logEl = document.getElementById("log");
+const log = (m, strong=false) => {
+  logEl.innerHTML += (strong ? `<b>${m}</b>` : m) + "\n";
+  logEl.scrollTop = logEl.scrollHeight;
+};
+
+function setVerdict(state, text){
+  const badge = document.getElementById("badge");
+  const txt = document.getElementById("verdict-txt");
+  badge.className = "badge " + state;
+  badge.textContent = state === "ok" ? "PARITÉ OK" : state === "ko" ? "ÉCHEC" : "…";
+  txt.textContent = text;
+}
+
+async function main(){
+  try{
+    log("Chargement de Pyodide (WASM)…");
+    const pyodide = await loadPyodide({
+      indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"
+    });
+    log("Pyodide prêt — Python " + pyodide.runPython("import sys;sys.version.split()[0]"), true);
+
+    const manifest = await (await fetch("./manifest.json")).json();
+
+    log("Montage des données de jeu dans le FS virtuel…");
+    for(const rel of manifest.data){
+      const dir = "/data/" + rel.split("/").slice(0,-1).join("/");
+      if(dir !== "/data/") pyodide.FS.mkdirTree(dir); else pyodide.FS.mkdirTree("/data");
+      const text = await (await fetch("./data/" + rel)).text();
+      pyodide.FS.writeFile("/data/" + rel, text);
+    }
+    // Pointer le moteur vers /data AVANT tout import de simupoke.
+    pyodide.runPython("import os; os.environ['SIMUPOKE_DATA_DIR']='/data'");
+    log(manifest.data.length + " fichiers data montés sous /data", true);
+
+    log("Installation de la wheel " + manifest.wheel + "…");
+    await pyodide.loadPackage("micropip");
+    const micropip = pyodide.pyimport("micropip");
+    await micropip.install(new URL("./" + manifest.wheel, location.href).href);
+    log("Paquet simupoke installé", true);
+
+    pyodide.globals.set("VECTORS", pyodide.toPy(EXPECTED.map(e=>e.py)));
+    log("Exécution du moteur de dégâts…");
+    const raw = pyodide.runPython(`
+import json
+from simupoke.damage import calculate
+from simupoke.model import PokemonState, FieldState
+
+def run(v):
+    a = PokemonState(species=v["atk"], nature=v.get("anat","serious"),
+                     stat_points=v.get("asp",{}) or {}, item=v.get("aitem"),
+                     ability=v.get("aab"), moves=[v["move"]])
+    d = PokemonState(species=v["dfn"], nature=v.get("dnat","serious"),
+                     stat_points=v.get("dsp",{}) or {}, item=v.get("ditem"),
+                     ability=v.get("dab"))
+    r = calculate(a, d, v["move"], FieldState())
+    return {"min": r.min_damage, "max": r.max_damage}
+
+json.dumps([run(v) for v in VECTORS])
+`);
+    const got = JSON.parse(raw);
+
+    const tbody = document.querySelector("#results tbody");
+    let allPass = true;
+    EXPECTED.forEach((e,i)=>{
+      const g = got[i];
+      const pass = g.min === e.min && g.max === e.max;
+      allPass = allPass && pass;
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td>${e.label}</td>`+
+        `<td class="num">${e.min}–${e.max}</td>`+
+        `<td class="num">${g.min}–${g.max}</td>`+
+        `<td class="v ${pass?"ok":"ko"}">${pass?"✓ OK":"✗ diff"}</td>`;
+      tbody.appendChild(tr);
+    });
+    document.getElementById("results").hidden = false;
+
+    if(allPass){
+      setVerdict("ok", `${EXPECTED.length}/${EXPECTED.length} scénarios identiques au moteur Python de référence.`);
+      log("VERDICT : parité totale — le moteur Python tourne à l'identique dans le navigateur.", true);
+    }else{
+      setVerdict("ko", "Au moins un scénario diffère — voir le tableau.");
+      log("VERDICT : divergence détectée.", true);
+    }
+  }catch(err){
+    setVerdict("ko", "Erreur d'exécution — voir le journal.");
+    log("ERREUR : " + (err && err.message ? err.message : err), true);
+    console.error(err);
+  }
+}
+main();
+</script>
+</body>
+</html>
