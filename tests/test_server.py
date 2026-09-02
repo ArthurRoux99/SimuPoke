@@ -118,6 +118,39 @@ def test_draft_endpoint_applies_usage():
     assert out["usageApplied"] is True
 
 
+# --- Dispatcher partagé serveur/Pyodide (garde le pont navigateur en CI) ---
+
+def test_dispatch_api_get_meta():
+    meta = server.dispatch_api("GET", "/api/meta")
+    assert len(meta["species"]) > 1000
+
+
+def test_dispatch_api_post_damage():
+    out = server.dispatch_api("POST", "/api/damage", {
+        "attacker": {"species": "garchomp", "nature": "adamant",
+                     "sp": {"atk": 31}, "item": "choiceband"},
+        "defender": {"species": "tyranitar", "nature": "jolly"},
+        "move": "earthquake"})
+    assert (out["min"], out["max"]) == (258, 306)
+
+
+def test_dispatch_api_unknown_route_raises():
+    with pytest.raises(KeyError):
+        server.dispatch_api("POST", "/api/nope", {})
+
+
+def test_dispatch_json_wraps_status():
+    ok = json.loads(server.dispatch_json("GET", "/api/meta"))
+    assert ok["status"] == 200 and len(ok["body"]["species"]) > 1000
+
+    missing = json.loads(server.dispatch_json("GET", "/api/nope"))
+    assert missing["status"] == 404 and missing["body"]["error"]
+
+    bad = json.loads(server.dispatch_json("POST", "/api/stats",
+                                          json.dumps({"species": "notamon"})))
+    assert bad["status"] == 400 and "notamon" in bad["body"]["error"]
+
+
 def test_speed_endpoint_sorts_and_tags():
     out = server.api_speed({"mons": [
         {"species": "snorlax", "nature": "brave"},
