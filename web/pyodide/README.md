@@ -35,7 +35,19 @@ python -m http.server -d web/pyodide/dist 8123     # http://127.0.0.1:8123
 > **Mon Box** n'est pas embarqué : `my_roster.json` est personnel (§3) et reste
 > sur ta machine. Côté navigateur, la box démarre vide ; l'édition tient le temps
 > de la session (FS virtuel). La persistance par navigateur (IndexedDB) viendra
-> avec l'empaquetage **PWA**.
+> avec le frontend React.
+
+## PWA — installable & hors-ligne
+
+L'app est une **PWA** : `manifest.webmanifest` + `sw.js` (service worker) mettent
+en cache la coquille, le runtime Pyodide, la wheel et les données. Après une
+première visite en ligne, elle **fonctionne sans réseau** et s'**installe** sur
+l'écran d'accueil (iOS : Partager → « Sur l'écran d'accueil »). Les icônes sont
+générées sans binaire versionné par [`scripts/gen_icons.py`](../../scripts/gen_icons.py).
+
+Publiée automatiquement par la CI Pages sous **`/app/`** :
+<https://arthurroux99.github.io/SimuPoke/app/>. La racine du site reste la page
+calc autonome légère.
 
 ## Vérifié
 

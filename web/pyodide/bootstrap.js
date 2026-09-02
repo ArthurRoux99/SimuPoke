@@ -13,6 +13,14 @@
   var PYODIDE_INDEX = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
   var origFetch = window.fetch.bind(window);
 
+  // PWA : installe le service worker (hors-ligne + installable). Sans effet en
+  // contexte non sécurisé (file://) ; échoue en silence.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js').catch(function () {});
+    });
+  }
+
   // --- Voile de chargement -------------------------------------------------
   var veil = document.createElement('div');
   veil.setAttribute('id', 'sp-veil');

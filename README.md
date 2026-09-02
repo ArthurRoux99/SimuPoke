@@ -285,8 +285,17 @@ périmée par rapport aux données.
 Le cadre hors-ligne (§3) est préservé : la page embarque tout (données +
 moteur) et ne fait **aucune requête réseau** une fois chargée. Elle n'embarque
 que `pokedex`/`moves`/`typechart` et la carte -ate de la régulation —
-**jamais `data/my_roster.json`** : rien de personnel n'est publié. Les modules
-B1/B2/B3, qui ont besoin du moteur Python, restent locaux (serveur ci-dessous).
+**jamais `data/my_roster.json`** : rien de personnel n'est publié.
+
+### App complète en PWA (`/app/`)
+
+Tous les modules (Dégâts, B1, B2, B3, Team preview, Seuils, Mon Box) tournent
+aussi **dans le navigateur** via **Pyodide** — le moteur Python lui-même compilé
+en WebAssembly, sans port JS. C'est une **PWA installable et hors-ligne**,
+publiée sous <https://arthurroux99.github.io/SimuPoke/app/> (détails :
+[`web/pyodide/README.md`](web/pyodide/README.md)). La racine du site reste la
+page calc autonome légère (300 Ko) ; l'app Pyodide charge un runtime plus lourd,
+mis en cache après la première visite.
 
 ### Version hébergée sur le PC (tous les modules)
 
