@@ -59,8 +59,11 @@ Par ordre d'impact / coût croissant — chaque cran rapproche de PokaiTrainer :
    set et joue au mieux dans chaque monde, je committe une stratégie robuste. Plus
    juste que l'adversaire « moyen » (qui sur-arme l'adversaire en lui prêtant des
    coups absents de certains mondes). *Pur algo, hors-ligne.*
-2. **Profondeur par sous-jeu** : CFR récursif / PUCT sur `sim` au-delà d'un tour
-   (le `search.py` expectimax existe déjà comme brique), avec budget d'expansion.
+2. **Profondeur** ✅ **premier cran fait** : le fond de la matrice de Nash évalue
+   l'état post-tour par un **lookahead expectimax** de `horizon` tours
+   (`solve_turn(horizon=…)`, réutilise `search._state_value`). `horizon=0` reste
+   le défaut rapide. Suite possible : CFR **récursif** (Nash à chaque étage, pas
+   seulement à la racine) avec budget d'expansion PUCT.
 3. **Mise à jour de croyance inter-tours** : rebrancher l'action jointe observée
    à travers les mondes (contradiction ⇒ synthèse de spreads), façon PokaiTrainer.
 4. **Réseau de valeur appris (ONNX)** — *le levier « au-delà »* : remplacer

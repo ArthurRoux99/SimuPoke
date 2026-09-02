@@ -29,7 +29,7 @@ from dataclasses import dataclass, field as dfield
 from .model import PokemonState, FieldState
 from .moves import get_move, is_known as move_known
 from .sim import Mon, Side, simulate_turn_actions
-from .search import evaluate_side          # réutilise la même éval d'équipe
+from .search import evaluate_side, _state_value  # éval d'équipe + lookahead
 from .belief import opponent_belief, opponent_move_support, Particle
 
 # Jets de dégâts représentatifs (énumération de la chance, poids uniforme).
@@ -87,9 +87,20 @@ def solve_matrix(U: list[list[float]], iters: int = 2000
 # Construction de la matrice croyance × chance
 # ---------------------------------------------------------------------------
 
+def _leaf_value(res, field: FieldState | None, roll: float,
+                opp_cands: list[str | None], horizon: int) -> float:
+    """Valeur de l'état post-tour. `horizon=0` : éval immédiate. `horizon>0` :
+    lookahead expectimax de `horizon` tours (réutilise `search._state_value`,
+    qui retombe sur l'éval immédiate à profondeur 0)."""
+    if horizon <= 0:
+        return evaluate_side(res.me, res.opp.active)
+    return _state_value(res.me, res.opp, field, horizon, roll, opp_cands,
+                        "expected")
+
+
 def _payoff_matrix(me: Mon, my_bench: list[Mon], particles: list[Particle],
                    my_actions: list[tuple], opp_moves: list[str | None],
-                   field: FieldState | None
+                   field: FieldState | None, horizon: int = 0
                    ) -> list[list[float]]:
     """U[i][j] = valeur attendue de mon état après (mon action i, coup adverse j),
     pondérée par les particules qui peuvent jouer j et moyennée sur les jets."""
@@ -109,7 +120,7 @@ def _payoff_matrix(me: Mon, my_bench: list[Mon], particles: list[Particle],
                     res = simulate_turn_actions(
                         Side(active=me, bench=my_bench), Side(active=opp_mon),
                         action, ("move", omv), field, roll=roll, copy=True)
-                    vals.append(evaluate_side(res.me, res.opp.active))
+                    vals.append(_leaf_value(res, field, roll, opp_moves, horizon))
                 num += part.weight * (sum(vals) / len(vals))
                 den += part.weight
             row.append(num / den if den > 0 else 0.0)
@@ -128,7 +139,7 @@ def _payoff_matrix(me: Mon, my_bench: list[Mon], particles: list[Particle],
 
 def _world_payoff(me: Mon, my_bench: list[Mon], particle: Particle,
                   my_actions: list[tuple], opp_actions_w: list[str | None],
-                  field: FieldState | None) -> list[list[float]]:
+                  field: FieldState | None, horizon: int = 0) -> list[list[float]]:
     """Matrice de gains DANS un monde : U[a][b] moyennée sur les jets."""
     opp_mon = Mon.from_state(particle.build)
     matrix: list[list[float]] = []
@@ -140,7 +151,7 @@ def _world_payoff(me: Mon, my_bench: list[Mon], particle: Particle,
                 res = simulate_turn_actions(
                     Side(active=me, bench=my_bench), Side(active=opp_mon),
                     action, ("move", omv), field, roll=roll, copy=True)
-                vals.append(evaluate_side(res.me, res.opp.active))
+                vals.append(_leaf_value(res, field, roll, opp_actions_w, horizon))
             row.append(sum(vals) / len(vals))
         matrix.append(row)
     return matrix
@@ -257,7 +268,8 @@ def _label(action: tuple, me: Mon, my_bench: list[Mon]) -> str:
 def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
                my_bench: list[Mon] | None = None, reg_id: str = "reg_m_b",
                iters: int = 2000, belief_samples: int = 80,
-               per_world: bool = True, seed: int | None = 0) -> NashResult:
+               per_world: bool = True, horizon: int = 0,
+               seed: int | None = 0) -> NashResult:
     """Résout le tour courant vers Nash et renvoie ma stratégie mixte.
 
     Mes actions = mes coups (connus) + un changement par membre vivant du banc.
@@ -280,17 +292,19 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
         my_actions = [("move", None)]
     labels = [_label(a, me, bench) for a in my_actions]
 
+    horizon = max(0, min(3, horizon))            # borne de sécurité (coût/ply)
     if per_world and len(particles) > 1:
         worlds = []
         for part in particles:
             opp_w: list[str | None] = [m for m in part.build.moves
                                        if move_known(m)] or [None]
-            U_w = _world_payoff(me, bench, part, my_actions, opp_w, field)
+            U_w = _world_payoff(me, bench, part, my_actions, opp_w, field, horizon)
             worlds.append((part.weight, U_w, opp_w))
         rst, val, opp_strat, br_idx = solve_bayesian(len(my_actions), worlds,
                                                      iters=iters)
     else:
-        U = _payoff_matrix(me, bench, particles, my_actions, opp_moves, field)
+        U = _payoff_matrix(me, bench, particles, my_actions, opp_moves, field,
+                           horizon)
         rst, cst, val = solve_matrix(U, iters=iters)
         opp_strat = sorted(zip(opp_moves, cst), key=lambda t: t[1], reverse=True)
         br_idx = max(range(len(my_actions)),

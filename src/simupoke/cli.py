@@ -663,8 +663,8 @@ def cmd_nash(args: list[str]) -> int:
         print("Usage : nash <me_species> <me_nature> <me_moves> "
               "<opp_species> <opp_nature> [--me-sp k=v] [--opp-moves a,b,c] "
               "[--me-item X] [--opp-item X] [--me-hp 0..1] [--opp-hp 0..1] "
-              "[--weather X] [--bench 'esp,nat,c1|c2 ; …'] [--iters N]",
-              file=sys.stderr)
+              "[--weather X] [--bench 'esp,nat,c1|c2 ; …'] [--iters N] "
+              "[--horizon 0..3]", file=sys.stderr)
         return 2
     me_sp, me_nat, me_moves, opp_sp, opp_nat = pos
     for sp in (me_sp, opp_sp):
@@ -696,7 +696,8 @@ def cmd_nash(args: list[str]) -> int:
                                                  moves=mvs)))
     try:
         res = solve_turn(me, opp, field, my_bench=bench,
-                         iters=int(opts.get("iters", 2000)))
+                         iters=int(opts.get("iters", 2000)),
+                         horizon=int(opts.get("horizon", 0)))
     except (ValueError, KeyError) as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 1

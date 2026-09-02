@@ -297,7 +297,8 @@ def api_nash(body: dict) -> dict:
     bench = [Mon.from_state(_state(d)) for d in (body.get("bench") or [])]
     res = solve_turn(me, opp, field, my_bench=bench,
                      reg_id=body.get("regulation", "reg_m_b"),
-                     iters=int(body.get("iters", 2000)))
+                     iters=int(body.get("iters", 2000)),
+                     horizon=int(body.get("horizon", 0)))
     return {
         "strategy": [{"action": lbl, "prob": p} for lbl, p in res.strategy],
         "value": res.value,
