@@ -37,6 +37,20 @@ header .tag {
 
 main { max-width: 1040px; margin: 0 auto; }
 
+.tabs { max-width: 1040px; margin: 0 auto 14px; display: flex; gap: 4px; flex-wrap: wrap; }
+.tabs button {
+  background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+  border-radius: 8px 8px 0 0; padding: 8px 16px; font-size: 13px; cursor: pointer;
+}
+.tabs button.active { background: var(--panel-2); color: var(--text); border-bottom-color: var(--panel-2); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.bench-block { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px; }
+.bench-block h2 { margin: 0 0 10px; font-size: 15px; }
+.bench-out { margin-top: 10px; font-size: 15px; }
+.bench-out.ok { color: var(--good); }
+.bench-out.no { color: var(--warn); }
+
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 760px) { .grid-2 { grid-template-columns: 1fr; } }
 

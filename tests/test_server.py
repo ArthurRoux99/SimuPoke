@@ -118,6 +118,122 @@ def test_draft_endpoint_applies_usage():
     assert out["usageApplied"] is True
 
 
+def test_speed_endpoint_sorts_and_tags():
+    out = server.api_speed({"mons": [
+        {"species": "snorlax", "nature": "brave"},
+        {"species": "garchomp", "nature": "jolly", "sp": {"spe": 32},
+         "item": "choicescarf"},
+    ]})
+    assert out["tiers"][0]["species"] == "garchomp"
+    assert "Choice Scarf" in out["tiers"][0]["notes"]
+
+
+def test_outspeed_endpoint():
+    out = server.api_outspeed({
+        "me": {"species": "garchomp", "nature": "serious"},
+        "target": {"species": "garchomp", "nature": "serious", "sp": {"spe": 20}},
+    })
+    assert out["feasible"] is True
+    assert out["sp"] > 20
+
+
+def test_survive_endpoint():
+    out = server.api_survive({
+        "defender": {"species": "tyranitar", "nature": "careful"},
+        "attacker": {"species": "garchomp", "nature": "adamant",
+                     "item": "choiceband", "sp": {"atk": 32}},
+        "move": "earthquake",
+    })
+    # Séisme est physique -> côté Déf sollicité.
+    assert out["stat"] == "def"
+    assert "feasible" in out
+
+
+def test_ko_endpoint():
+    out = server.api_ko({
+        "attacker": {"species": "garchomp", "nature": "adamant",
+                     "item": "choiceband"},
+        "defender": {"species": "tyranitar", "nature": "adamant"},
+        "move": "earthquake", "hits": 1,
+    })
+    assert out["feasible"] is True
+    assert out["stat"] == "atk"
+    assert out["minPct"] >= 100.0
+
+
+def test_spread_endpoint_combines_objectives():
+    out = server.api_spread({
+        "species": "tyranitar", "nature": "adamant",
+        "objectives": [
+            {"kind": "ko", "defender": {"species": "garchomp", "nature": "jolly",
+             "sp": {"spe": 32}}, "move": "icepunch", "hits": 1},
+            {"kind": "survive", "attacker": {"species": "garchomp",
+             "nature": "adamant", "sp": {"atk": 32}}, "move": "earthquake"},
+            {"kind": "outspeed", "target": {"species": "amoonguss",
+             "nature": "sassy", "sp": {"spe": 0}}},
+        ],
+    })
+    assert out["feasible"] is True
+    assert out["total"] <= out["budget"]
+    assert "sp" in out and "lines" in out
+
+
+def test_spread_endpoint_flags_unmet():
+    out = server.api_spread({
+        "species": "magikarp", "nature": "serious",
+        "objectives": [{"kind": "ko", "defender": {"species": "blissey",
+                        "nature": "calm"}, "move": "tackle"}],
+    })
+    assert out["feasible"] is False
+    assert out["unmet"]
+
+
+def test_paste_endpoint_parses_and_converts():
+    out = server.api_paste({"paste":
+        "Garchomp @ Life Orb\nAbility: Rough Skin\n"
+        "EVs: 252 Atk / 252 Spe\nAdamant Nature\n- Earthquake\n- Dragon Claw"})
+    assert out["count"] == 1
+    e = out["team"][0]
+    assert e["species"] == "garchomp"
+    assert e["stat_points"]["atk"] == 32          # 252 EV -> 32 SP
+    assert e["item"] == "lifeorb"
+    assert out["unknown"] == []
+
+
+def test_export_endpoint_roundtrips():
+    entries = [{"species": "garchomp", "nature": "adamant",
+                "stat_points": {"atk": 32, "spe": 32}, "item": "lifeorb",
+                "moves": ["earthquake"]}]
+    paste = server.api_export({"team": entries})["paste"]
+    assert "Garchomp" in paste
+    assert server.api_paste({"paste": paste})["team"][0]["species"] == "garchomp"
+
+
+def test_decide_endpoint():
+    out = server.api_decide({
+        "me": {"species": "garchomp", "nature": "jolly",
+               "sp": {"atk": 32, "spe": 32},
+               "moves": ["earthquake", "dragonclaw", "stoneedge"]},
+        "opp": {"species": "tyranitar", "nature": "adamant", "moves": ["crunch"]},
+    })
+    assert out["actions"][0]["move"] == "Earthquake"
+    assert "recommendation" in out and "lines" in out
+
+
+def test_decide_endpoint_with_switch():
+    out = server.api_decide({
+        "me": {"species": "gengar", "nature": "timid",
+               "sp": {"spa": 32, "spe": 32}, "moves": ["shadowball"]},
+        "opp": {"species": "garchomp", "nature": "jolly",
+                "sp": {"atk": 32, "spe": 32}, "item": "choiceband",
+                "moves": ["earthquake"]},
+        "bench": [{"species": "skarmory", "nature": "impish",
+                   "sp": {"hp": 32, "def": 32}, "moves": ["bravebird"]}],
+    })
+    assert out["actions"][0]["kind"] == "switch"
+    assert "Changer pour skarmory" in out["recommendation"]
+
+
 def test_likely_endpoint():
     # Agnostique aux données importées : on valide le comportement de l'endpoint.
     out = server.api_likely("incineroar")

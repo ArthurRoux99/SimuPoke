@@ -34,6 +34,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 import json
+import random
 from pathlib import Path
 
 from .basestats import to_id
@@ -102,6 +103,62 @@ class LikelySet:
             self.moves = []
         if self.teammates is None:
             self.teammates = []
+
+
+def _weighted_choice(weights: dict[str, float] | None,
+                     rng: random.Random) -> str | None:
+    """Tire une clé au hasard proportionnellement à son poids d'usage."""
+    if not weights:
+        return None
+    items = list(weights.items())
+    total = sum(w for _, w in items)
+    if total <= 0:
+        return None
+    r = rng.random() * total
+    acc = 0.0
+    for k, w in items:
+        acc += w
+        if r <= acc:
+            return k
+    return items[-1][0]
+
+
+def _weighted_sample(weights: dict[str, float] | None, k: int,
+                     rng: random.Random) -> list[str]:
+    """Tire jusqu'à `k` clés distinctes sans remise, pondérées par l'usage."""
+    if not weights:
+        return []
+    remaining = dict(weights)
+    out: list[str] = []
+    while remaining and len(out) < k:
+        pick = _weighted_choice(remaining, rng)
+        if pick is None:
+            break
+        out.append(pick)
+        remaining.pop(pick, None)
+    return out
+
+
+def sample_set(species: str, reg_id: str = "reg_m_b", *, rng: random.Random | None = None,
+               n_moves: int = 4, table: dict[str, dict] | None = None) -> LikelySet:
+    """**Échantillonne** un build plausible d'après l'usage (déterminisation §0.1).
+
+    Contrairement à `likely_set` (toujours le plus probable), tire objet, talent,
+    nature et capacités selon leurs distributions — pour explorer plusieurs
+    builds adverses crédibles pendant la recherche (ISMCTS-lite).
+    """
+    rng = rng or random.Random()
+    if table is None:
+        table = load_usage(reg_id)
+    rec = table.get(to_id(species), {})
+    return LikelySet(
+        species=to_id(species),
+        item=_weighted_choice(rec.get("items"), rng),
+        ability=_weighted_choice(rec.get("abilities"), rng),
+        nature=_weighted_choice(rec.get("natures"), rng),
+        moves=_weighted_sample(rec.get("moves"), n_moves, rng),
+        teammates=_top_n(rec.get("teammates"), 3),
+    )
 
 
 def likely_set(species: str, reg_id: str = "reg_m_b", *, n_moves: int = 4,

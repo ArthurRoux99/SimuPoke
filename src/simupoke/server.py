@@ -18,6 +18,14 @@ Endpoints :
     POST /api/draft             B2 — classement d'un tirage
     POST /api/team              B3 — analyse d'équipe
     POST /api/preview           B3 — assistant team preview
+    POST /api/speed             speed tiers (Tailwind/Trick Room)
+    POST /api/outspeed          SP mini en Vitesse pour dépasser une cible
+    POST /api/survive           SP défensif mini pour survivre à une attaque
+    POST /api/ko                SP offensif mini pour garantir un KO en N coups
+    POST /api/spread            optimiseur de spread SP (objectifs combinés)
+    POST /api/decide            recherche 1-ply à coups simultanés (§10.2)
+    POST /api/paste             importe un paste Showdown (EV -> SP)
+    POST /api/export            regénère un paste Showdown (SP -> EV)
 """
 
 from __future__ import annotations
@@ -32,6 +40,13 @@ from .stats import STAT_KEYS, NATURES, compute_all_stats, validate_sp
 from .basestats import get_base_stats, is_known, get_species
 from .damage import calculate, DamageResult
 from .combat import analyze_turn
+from .bench import (
+    speed_tiers, min_sp_to_outspeed, min_sp_to_survive, min_sp_to_ko,
+)
+from .optimize import optimize_spread, Outspeed, Survive, Ko
+from .sim import Mon
+from .search import rank_actions, rank_actions_sampled
+from .showdown import parse_team as parse_showdown, format_team as format_showdown
 from .draft import rank_lineup
 from .team import analyze_team, select_team_preview
 from .usage import usage_prior, has_usage, likely_set
@@ -136,14 +151,17 @@ def api_damage(body: dict) -> dict:
     r = calculate(_state(body["attacker"]), _state(body["defender"]),
                   body["move"], FieldState(**(body.get("field") or {})),
                   crit=body.get("crit", False),
-                  apply_spread=body.get("spread", False))
+                  apply_spread=body.get("spread", False),
+                  screen=body.get("screen") or None)
     return _damage_json(r)
 
 
 def api_analyze(body: dict) -> dict:
     me, opp = _state(body["me"]), _state(body["opp"])
     field = FieldState(**(body.get("field") or {}))
-    a = analyze_turn(me, opp, field, opp_move=body.get("opp_move") or None)
+    bench = [_state(d) for d in (body.get("bench") or [])]
+    a = analyze_turn(me, opp, field, opp_move=body.get("opp_move") or None,
+                     bench=bench)
     inc = a.incoming
     return {
         "incoming": {"move": inc.move, "maxPct": inc.max_pct,
@@ -152,10 +170,134 @@ def api_analyze(body: dict) -> dict:
         "options": [{"move": e.move, "minPct": e.min_pct, "maxPct": e.max_pct,
                      "ko": e.ko, "first": e.first, "value": e.value,
                      "notes": e.notes} for e in a.options],
-        "other": [e.move for e in a.other],
+        "other": [{"move": e.move, "value": e.value, "notes": e.notes}
+                  for e in a.other],
+        "switches": [{"species": s.species, "incomingPct": s.incoming_pct,
+                      "survives": s.survives, "bestMove": s.best_move,
+                      "bestMovePct": s.best_move_pct, "value": s.value,
+                      "notes": s.notes} for s in a.switches],
         "recommendation": a.recommendation,
         "lines": a.lines(),
     }
+
+
+def api_speed(body: dict) -> dict:
+    """Speed tiers d'une liste de Pokémon (avec Tailwind/Trick Room)."""
+    states = [_state(d) for d in body.get("mons", [])]
+    tailwinds = body.get("tailwinds")
+    tiers = speed_tiers(states, tailwinds=tailwinds,
+                        trick_room=body.get("trick_room", False))
+    return {"trickRoom": body.get("trick_room", False),
+            "tiers": [{"species": e.species, "speed": e.speed, "notes": e.notes}
+                      for e in tiers]}
+
+
+def api_outspeed(body: dict) -> dict:
+    """SP minimal en Vitesse pour (dé)passer une cible."""
+    res = min_sp_to_outspeed(
+        _state(body["me"]), _state(body["target"]),
+        me_tailwind=body.get("me_tailwind", False),
+        target_tailwind=body.get("target_tailwind", False),
+        strict=body.get("strict", True))
+    return {"feasible": res.feasible, "sp": res.sp, "mySpeed": res.my_speed,
+            "targetSpeed": res.target_speed, "tiesOnly": res.ties_only,
+            "line": res.line()}
+
+
+def api_survive(body: dict) -> dict:
+    """SP défensif minimal (PV + Déf/Déf.Spé) pour survivre à une attaque."""
+    res = min_sp_to_survive(
+        _state(body["defender"]), _state(body["attacker"]), body["move"],
+        FieldState(**(body.get("field") or {})), crit=body.get("crit", False))
+    return {"feasible": res.feasible, "hpSp": res.hp_sp, "defSp": res.def_sp,
+            "totalSp": res.total_sp, "stat": res.stat, "move": res.move,
+            "maxPct": res.max_pct, "line": res.line()}
+
+
+def api_ko(body: dict) -> dict:
+    """SP offensif minimal (Atq/Atq.Spé) pour garantir un KO en N coups."""
+    res = min_sp_to_ko(
+        _state(body["attacker"]), _state(body["defender"]), body["move"],
+        FieldState(**(body.get("field") or {})),
+        hits=int(body.get("hits", 1)), crit=body.get("crit", False))
+    return {"feasible": res.feasible, "sp": res.sp, "stat": res.stat,
+            "move": res.move, "hits": res.hits, "minPct": res.min_pct,
+            "line": res.line()}
+
+
+def _objective(d: dict):
+    """Construit un objectif d'optimisation depuis le JSON entrant."""
+    kind = d.get("kind")
+    field = FieldState(**(d.get("field") or {}))
+    if kind == "outspeed":
+        return Outspeed(target=_state(d["target"]),
+                        strict=d.get("strict", True),
+                        me_tailwind=d.get("me_tailwind", False),
+                        target_tailwind=d.get("target_tailwind", False),
+                        label=d.get("label", ""))
+    if kind == "survive":
+        return Survive(attacker=_state(d["attacker"]), move=d["move"],
+                       field=field, crit=d.get("crit", False),
+                       label=d.get("label", ""))
+    if kind == "ko":
+        return Ko(defender=_state(d["defender"]), move=d["move"],
+                  hits=int(d.get("hits", 1)), field=field,
+                  crit=d.get("crit", False), label=d.get("label", ""))
+    raise ValueError(f"objectif inconnu : {kind!r}")
+
+
+def api_spread(body: dict) -> dict:
+    """Optimiseur de spread : résout un spread SP couvrant tous les objectifs."""
+    objectives = [_objective(o) for o in body.get("objectives", [])]
+    res = optimize_spread(
+        body["species"], body.get("nature", "serious"), objectives,
+        item=body.get("item") or None, ability=body.get("ability") or None,
+        budget=int(body.get("budget", 66)))
+    return {"feasible": res.feasible, "sp": res.sp, "total": res.total,
+            "budget": res.budget, "leftover": res.leftover,
+            "stats": res.stats, "unmet": res.unmet, "lines": res.lines()}
+
+
+def api_decide(body: dict) -> dict:
+    """Recherche 1-ply à coups simultanés : classe mes actions (§10.2)."""
+    me = Mon.from_state(_state(body["me"]))
+    opp = Mon.from_state(_state(body["opp"]))
+    field = FieldState(**(body.get("field") or {}))
+    bench = [Mon.from_state(_state(d)) for d in (body.get("bench") or [])]
+    samples = int(body.get("samples", 0))
+    if samples > 0:
+        res = rank_actions_sampled(
+            me, opp, field, my_bench=bench, depth=int(body.get("depth", 1)),
+            opp_model=body.get("opp_model", "expected"),
+            roll=float(body.get("roll", 0.5)), n_samples=samples)
+    else:
+        res = rank_actions(me, opp, field, my_bench=bench,
+                           use_usage=body.get("use_usage", True),
+                           roll=float(body.get("roll", 0.5)),
+                           depth=int(body.get("depth", 1)),
+                           opp_model=body.get("opp_model", "expected"))
+    return {"oppMoves": res.opp_moves,
+            "actions": [{"move": a.move, "kind": a.kind, "expected": a.expected,
+                         "worst": a.worst, "koChance": a.ko_chance,
+                         "survivesWorst": a.survives_worst}
+                        for a in res.actions],
+            "recommendation": res.recommendation, "lines": res.lines()}
+
+
+def api_paste(body: dict) -> dict:
+    """Parse un paste Showdown en entrées d'équipe (EV -> SP Champions)."""
+    team = parse_showdown(body.get("paste", ""))
+    entries = [{"species": m.species, "nature": m.nature,
+                "stat_points": m.stat_points, "item": m.item,
+                "ability": m.ability, "moves": m.moves, "is_shiny": m.is_shiny}
+               for m in team]
+    unknown = [e["species"] for e in entries if not is_known(e["species"])]
+    return {"team": entries, "count": len(entries), "unknown": unknown}
+
+
+def api_export(body: dict) -> dict:
+    """Regénère un paste Showdown à partir d'entrées d'équipe (SP -> EV)."""
+    return {"paste": format_showdown(_owned_list(body.get("team", [])))}
 
 
 def api_draft(body: dict) -> dict:
@@ -202,10 +344,11 @@ def api_team(body: dict) -> dict:
 def api_preview(body: dict) -> dict:
     res = select_team_preview(_owned_list(body["my_team"]),
                               _owned_list(body["opp_team"]),
-                              body.get("format", "singles"))
+                              body.get("format", "singles"),
+                              use_damage=body.get("use_damage", True))
     pick = lambda p: {"species": p.species, "value": p.value,
                       "beats": p.beats, "threatenedBy": p.threatened_by}
-    return {"fmt": res.fmt, "bring": res.bring,
+    return {"fmt": res.fmt, "bring": res.bring, "byDamage": res.by_damage,
             "picks": [pick(p) for p in res.picks],
             "bench": [pick(p) for p in res.bench],
             "lines": res.lines()}
@@ -250,6 +393,10 @@ _POST_ROUTES = {
     "/api/stats": api_stats, "/api/damage": api_damage, "/api/analyze": api_analyze,
     "/api/draft": api_draft, "/api/team": api_team, "/api/preview": api_preview,
     "/api/roster": api_roster_save,
+    "/api/speed": api_speed, "/api/outspeed": api_outspeed,
+    "/api/survive": api_survive, "/api/ko": api_ko, "/api/spread": api_spread,
+    "/api/decide": api_decide,
+    "/api/paste": api_paste, "/api/export": api_export,
 }
 _GET_API = {"/api/meta": api_meta, "/api/samples": api_samples,
             "/api/roster": api_roster_get}
@@ -327,9 +474,34 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+def _lan_ip() -> str | None:
+    """Adresse IP de l'interface réseau locale (LAN), sans émettre de paquet.
+
+    Le `connect` UDP ne transmet rien : il ne fait que sélectionner l'interface
+    de sortie, ce qui permet de lire l'IP locale (proximité mobile/2e écran, §3
+    respecté — rien ne quitte le PC)."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("192.0.2.1", 1))          # réseau de test (RFC 5737), non routé
+        return s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+
+
 def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
     httpd = ThreadingHTTPServer((host, port), Handler)
     print(f"SimuPoke en écoute sur http://{host}:{port}  (Ctrl-C pour arrêter)")
+    loopback = host in ("127.0.0.1", "localhost", "::1")
+    if loopback:
+        print("  Astuce : --host 0.0.0.0 pour ouvrir sur ton mobile / 2e écran "
+              "(même wifi). Rien ne quitte ton PC.")
+    else:
+        lan = _lan_ip()
+        if lan:
+            print(f"  Accès mobile / 2e écran (même wifi) : http://{lan}:{port}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
@@ -339,7 +511,8 @@ def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Serveur local SimuPoke")
-    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--host", default="127.0.0.1",
+                   help="127.0.0.1 (défaut, local) ou 0.0.0.0 (accès LAN mobile)")
     p.add_argument("--port", type=int, default=8000)
     args = p.parse_args()
     serve(args.host, args.port)

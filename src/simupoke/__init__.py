@@ -17,6 +17,7 @@ from .model import (
     OwnedPokemon, PokemonState, SideState, FieldState, BattleState,
 )
 from .loaders import load_my_roster, load_regulation, load_lineup, load_team
+from .showdown import parse_team as parse_showdown, format_team as format_showdown
 from .moves import Move, get_move
 from .typechart import effectiveness
 from .damage import calculate, battle_stats, DamageResult
@@ -27,10 +28,28 @@ from .analysis import (
 from .draft import rank_lineup, evaluate_candidate, DraftEvaluation, team_threats
 from .team import (
     analyze_team, select_team_preview, TeamReport, PreviewResult,
-    matchup_score, check_clauses,
+    matchup_score, damage_matchup_score, check_clauses,
 )
-from .combat import analyze_turn, TurnAnalysis, MoveEval, effective_speed, moves_first
-from .usage import load_usage, usage_prior, likely_set, has_usage, LikelySet
+from .combat import (
+    analyze_turn, TurnAnalysis, MoveEval, SwitchEval, evaluate_switches,
+    effective_speed, moves_first,
+)
+from .bench import (
+    speed_tiers, compute_speed, min_sp_to_outspeed, min_sp_to_survive,
+    min_sp_to_ko, SpeedEntry, OutspeedResult, SurviveResult, KoResult,
+)
+from .optimize import (
+    optimize_spread, Outspeed, Survive, Ko, SpreadResult,
+)
+from .sim import (
+    Mon, Side, simulate_turn, simulate_turn_actions, rollout, action_order,
+    TurnResult, ActionResult,
+)
+from .search import (
+    rank_actions, rank_actions_sampled, evaluate_state, evaluate_side,
+    opponent_moves, ActionValue, SearchResult,
+)
+from .usage import load_usage, usage_prior, likely_set, sample_set, has_usage, LikelySet
 from . import i18n
 
 __all__ = [
@@ -40,14 +59,23 @@ __all__ = [
     "get_base_stats", "get_species", "get_types", "is_known", "to_id",
     "OwnedPokemon", "PokemonState", "SideState", "FieldState", "BattleState",
     "load_my_roster", "load_regulation", "load_lineup", "load_team",
+    "parse_showdown", "format_showdown",
     "Move", "get_move", "effectiveness",
     "calculate", "battle_stats", "DamageResult",
     "defensive_profile", "offensive_types", "coverage_count", "infer_role",
     "base_stat_total", "DefensiveProfile", "RoleAssessment",
     "rank_lineup", "evaluate_candidate", "DraftEvaluation", "team_threats",
     "analyze_team", "select_team_preview", "TeamReport", "PreviewResult",
-    "matchup_score", "check_clauses",
-    "analyze_turn", "TurnAnalysis", "MoveEval", "effective_speed", "moves_first",
-    "load_usage", "usage_prior", "likely_set", "has_usage", "LikelySet",
+    "matchup_score", "damage_matchup_score", "check_clauses",
+    "analyze_turn", "TurnAnalysis", "MoveEval", "SwitchEval", "evaluate_switches",
+    "effective_speed", "moves_first",
+    "speed_tiers", "compute_speed", "min_sp_to_outspeed", "min_sp_to_survive",
+    "min_sp_to_ko", "SpeedEntry", "OutspeedResult", "SurviveResult", "KoResult",
+    "optimize_spread", "Outspeed", "Survive", "Ko", "SpreadResult",
+    "Mon", "Side", "simulate_turn", "simulate_turn_actions", "rollout",
+    "action_order", "TurnResult", "ActionResult",
+    "rank_actions", "rank_actions_sampled", "evaluate_state", "evaluate_side",
+    "opponent_moves", "ActionValue", "SearchResult",
+    "load_usage", "usage_prior", "likely_set", "sample_set", "has_usage", "LikelySet",
     "i18n",
 ]

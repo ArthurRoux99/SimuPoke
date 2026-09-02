@@ -2,6 +2,9 @@
  *
  * Formule Génération 5+ : modificateurs chaînés en base 4096, pokeRound,
  * 16 rolls (85..100 %). Delta Champions : famille -ate + Mega Sol.
+ * Couvre aussi les items type-boost, Muscle Band/Wise Glasses, Water Bubble,
+ * Solar Power, Sand Force, Protosynthèse/Charge Quantique, type-boost (Steelworker
+ * & co.) et les talents défensifs (Fluffy, Ice Scales, Sel Purifiant, Peau Sèche).
  *
  * Données attendues dans `data` : { pokedex, moves, typechart, ateMap }.
  * Utilisable côté navigateur (window.SimuEngine) et côté Node (module.exports),
@@ -35,6 +38,21 @@
   };
   const PERSONAL_WEATHER = { megasol: 'sun' };
   const ATE_POWER_MOD = 4915;
+
+  // Items « type-boost » (×1.2 sur la puissance des moves de ce type).
+  const TYPE_ITEM = {
+    charcoal: 'Fire', mysticwater: 'Water', magnet: 'Electric', miracleseed: 'Grass',
+    nevermeltice: 'Ice', blackbelt: 'Fighting', poisonbarb: 'Poison', softsand: 'Ground',
+    sharpbeak: 'Flying', twistedspoon: 'Psychic', silverpowder: 'Bug', hardstone: 'Rock',
+    spelltag: 'Ghost', dragonfang: 'Dragon', blackglasses: 'Dark', metalcoat: 'Steel',
+    silkscarf: 'Normal', fairyfeather: 'Fairy',
+  };
+  // Talents « type-boost » offensifs (modifient la stat d'attaque, base 4096).
+  const TYPE_BOOST_ABILITY = {
+    steelworker: ['Steel', 6144], steelyspirit: ['Steel', 6144],
+    dragonsmaw: ['Dragon', 6144], rockypayload: ['Rock', 6144],
+    transistor: ['Electric', 5325],
+  };
 
   const WEATHER_ALIASES = {
     sun: 'sun', sunnyday: 'sun', harshsunlight: 'sun', desolateland: 'sun',
@@ -122,6 +140,22 @@
       const aStats = battleStats(attacker), dStats = battleStats(defender);
       const defTypes = species(defender.species).types || [];
       const atkTypes = species(attacker.species).types || [];
+      const weather = WEATHER_ALIASES[toId(field.weather)] || null;
+      const terrain = TERRAIN_ALIASES[toId(field.terrain)] || null;
+
+      // Protosynthèse / Charge Quantique : stat dopée (plus haute hors PV).
+      function paradoxStat(mon, ab) {
+        let active;
+        if (ab === 'protosynthesis') active = weather === 'sun' || toId(mon.item) === 'boosterenergy';
+        else if (ab === 'quarkdrive') active = terrain === 'electric' || toId(mon.item) === 'boosterenergy';
+        else return null;
+        if (!active) return null;
+        const s = battleStats(mon);
+        const order = ['atk', 'def', 'spa', 'spd', 'spe'];
+        let best = order[0];
+        for (const k of order) if (s[k] > s[best]) best = k;
+        return best;
+      }
 
       // Delta : type effectif (-ate)
       let moveType = mv.type;
@@ -139,6 +173,11 @@
       if (!physical && atkItem === 'choicespecs') atMods.push(6144);
       if (physical && (atkAb === 'hugepower' || atkAb === 'purepower')) atMods.push(8192);
       if (atkAb === 'guts' && attacker.status) atMods.push(6144);
+      if (atkAb === 'waterbubble' && moveType === 'Water') atMods.push(8192);
+      if (atkAb === 'solarpower' && !physical && weather === 'sun') atMods.push(6144);
+      const tb = TYPE_BOOST_ABILITY[atkAb];
+      if (tb && tb[0] === moveType) atMods.push(tb[1]);
+      if (paradoxStat(attacker, atkAb) === atkKey) atMods.push(5325);
       if (defAb === 'thickfat' && (moveType === 'Fire' || moveType === 'Ice')) atMods.push(2048);
       if (defAb === 'heatproof' && moveType === 'Fire') atMods.push(2048);
       if (atMods.length) attack = applyMod(attack, chainMods(atMods));
@@ -147,10 +186,10 @@
       // Stat défensive
       let defense = Math.floor(dStats[defKey] * boostMult((defender.boosts || {})[defKey] || 0, false, crit));
       const dfMods = [];
-      const weather = WEATHER_ALIASES[toId(field.weather)] || null;
       if (!physical && defItem === 'assaultvest') dfMods.push(6144);
       if (!physical && weather === 'sand' && defTypes.indexOf('Rock') >= 0) dfMods.push(6144);
       if (physical && weather === 'snow' && defTypes.indexOf('Ice') >= 0) dfMods.push(6144);
+      if (paradoxStat(defender, defAb) === defKey) dfMods.push(5325);
       if (dfMods.length) defense = applyMod(defense, chainMods(dfMods));
       defense = Math.max(1, defense);
 
@@ -159,6 +198,11 @@
       const bpMods = [];
       if (atkAb === 'technician' && bp <= 60) bpMods.push(6144);
       if (typeChanged) bpMods.push(ATE_POWER_MOD);
+      if (TYPE_ITEM[atkItem] === moveType) bpMods.push(4915);
+      if (atkItem === 'muscleband' && physical) bpMods.push(4506);
+      if (atkItem === 'wiseglasses' && !physical) bpMods.push(4506);
+      if (atkAb === 'sandforce' && weather === 'sand'
+          && (moveType === 'Ground' || moveType === 'Rock' || moveType === 'Steel')) bpMods.push(5325);
       if (bpMods.length) bp = Math.max(1, applyMod(bp, chainMods(bpMods)));
 
       // Dégâts de base
@@ -174,7 +218,6 @@
         else if (moveType === 'Fire') baseDamage = applyMod(baseDamage, 2048);
       }
 
-      const terrain = TERRAIN_ALIASES[toId(field.terrain)] || null;
       if (terrain && grounded(attacker)) {
         if (terrain === 'electric' && moveType === 'Electric') baseDamage = applyMod(baseDamage, 5325);
         else if (terrain === 'grassy' && moveType === 'Grass') baseDamage = applyMod(baseDamage, 5325);
@@ -198,6 +241,22 @@
       const dHpPct = defender.hpPct === undefined ? 1 : defender.hpPct;
       if ((defAb === 'multiscale' || defAb === 'shadowshield') && dHpPct >= 1) finalMods.push(2048);
       if ((defAb === 'filter' || defAb === 'solidrock' || defAb === 'prismarmor') && eff > 1) finalMods.push(3072);
+      // Talents défensifs modulant les dégâts finaux.
+      if (defAb === 'fluffy') {
+        if (moveType === 'Fire') finalMods.push(8192);
+        if (mv.makesContact) finalMods.push(2048);
+      }
+      if (defAb === 'icescales' && !physical) finalMods.push(2048);
+      if (defAb === 'purifyingsalt' && moveType === 'Ghost') finalMods.push(2048);
+      if (defAb === 'waterbubble' && moveType === 'Fire') finalMods.push(2048);
+      if (defAb === 'dryskin' && moveType === 'Fire') finalMods.push(5120);
+      // Écrans (Mur Lumière / Protection / Voile Aurore), ignorés par le crit.
+      const scr = toId(opts.screen);
+      if (!crit && (scr === 'reflect' || scr === 'lightscreen' || scr === 'auroraveil')) {
+        const blocks = (physical && (scr === 'reflect' || scr === 'auroraveil'))
+          || (!physical && (scr === 'lightscreen' || scr === 'auroraveil'));
+        if (blocks) finalMods.push(applySpread ? 2732 : 2048);
+      }
       const finalMod = chainMods(finalMods);
 
       const rolls = [];

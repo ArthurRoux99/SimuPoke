@@ -5,16 +5,24 @@ Showdown / `@smogon/calc` : modificateurs chaînés en base 4096, `pokeRound`
 (arrondi au plus proche, départage vers le bas) et 16 « rolls » aléatoires
 (85 %…100 %). Objectif : un calc **fiable et explicable** (§1).
 
-Couverture Phase 0 (documentée, extensible pour le « delta » Champions §7.2) :
+Couverture (documentée, extensible pour le « delta » Champions §7.2) :
   - STAB (×1.5, ×2 avec Adaptability), efficacité des types, coup critique,
     brûlure, météo (soleil/pluie/sable/neige), terrains, esquive multi-cibles
     (spread), boosts de stats.
-  - Items : Choice Band/Specs, Life Orb, Expert Belt, Assault Vest.
-  - Talents : Huge/Pure Power, Guts, Technician, Adaptability, Tinted Lens,
-    Neuroforce, Multiscale/Shadow Shield, Filter/Solid Rock/Prism Armor.
+  - Items : Choice Band/Specs, Life Orb, Expert Belt, Assault Vest ; items
+    « type-boost » (Charbon, Eau Mystique…) ×1.2 ; Muscle Band / Wise Glasses ×1.1.
+  - Talents offensifs : Huge/Pure Power, Guts, Technician, Adaptability, Tinted
+    Lens, Neuroforce, Water Bubble, Solar Power, Sand Force, Protosynthèse /
+    Charge Quantique (Paradox), type-boost (Steelworker, Dragon's Maw,
+    Rocky Payload, Transistor).
+  - Talents défensifs : Multiscale/Shadow Shield, Filter/Solid Rock/Prism Armor,
+    Thick Fat, Heatproof, Fluffy, Ice Scales, Purifying Salt, Water Bubble,
+    Dry Skin, Protosynthèse / Charge Quantique ; immunités de talent.
+  - Écrans : Mur Lumière / Protection / Voile Aurore (×0.5 singles, ×0.667
+    doubles ; ignorés par le crit).
 
-Tout le reste (autres items/talents, Tera, etc.) viendra par extension des
-mêmes points d'accroche (listes de modificateurs).
+Tout le reste (autres items/talents, Tera — absent de Champions au lancement,
+§4.6) viendra par extension des mêmes points d'accroche (modificateurs base-4096).
 """
 
 from __future__ import annotations
@@ -83,6 +91,27 @@ def battle_stats(state: PokemonState) -> dict[str, int]:
     }
 
 
+def _paradox_stat(state: PokemonState, field: FieldState | None,
+                  ability: str) -> str | None:
+    """Stat dopée par Protosynthèse / Charge Quantique, sinon None.
+
+    Actif sous soleil (Protosynthèse) / champ électrifié (Charge Quantique) ou
+    avec Énergie Booster. Dope la **plus haute** stat (hors PV), départage dans
+    l'ordre Showdown atk > def > spa > spd > spe.
+    """
+    if ability == "protosynthesis":
+        active = _weather(field) == "sun" or _norm_item(state) == "boosterenergy"
+    elif ability == "quarkdrive":
+        active = _terrain(field) == "electric" or _norm_item(state) == "boosterenergy"
+    else:
+        return None
+    if not active:
+        return None
+    stats = battle_stats(state)
+    order = ["atk", "def", "spa", "spd", "spe"]
+    return max(order, key=lambda k: stats[k])
+
+
 def _norm_ability(state: PokemonState) -> str:
     return to_id(state.ability) if state.ability else ""
 
@@ -115,6 +144,24 @@ _TERRAIN_ALIASES = {
 }
 
 
+# Items « type-boost » (×1.2 sur la puissance des moves de ce type).
+_TYPE_ITEM: dict[str, str] = {
+    "charcoal": "Fire", "mysticwater": "Water", "magnet": "Electric",
+    "miracleseed": "Grass", "nevermeltice": "Ice", "blackbelt": "Fighting",
+    "poisonbarb": "Poison", "softsand": "Ground", "sharpbeak": "Flying",
+    "twistedspoon": "Psychic", "silverpowder": "Bug", "hardstone": "Rock",
+    "spelltag": "Ghost", "dragonfang": "Dragon", "blackglasses": "Dark",
+    "metalcoat": "Steel", "silkscarf": "Normal", "fairyfeather": "Fairy",
+}
+
+# Talents « type-boost » offensifs (modifient la stat d'attaque, base 4096).
+_TYPE_BOOST_ABILITY: dict[str, tuple[str, int]] = {
+    "steelworker": ("Steel", 6144), "steelyspirit": ("Steel", 6144),
+    "dragonsmaw": ("Dragon", 6144), "rockypayload": ("Rock", 6144),
+    "transistor": ("Electric", 5325),
+}
+
+
 def _weather(field: FieldState | None) -> str | None:
     if not field or not field.weather:
         return None
@@ -140,6 +187,7 @@ class DamageResult:
     type_effectiveness: float
     is_stab: bool
     crit: bool
+    move_type: str = ""           # type EFFECTIF du coup (après -ate)
 
     @property
     def min_damage(self) -> int:
@@ -199,12 +247,19 @@ class DamageResult:
 # Calcul principal
 # ---------------------------------------------------------------------------
 
+_SCREENS = {"reflect", "lightscreen", "auroraveil"}
+
+
 def calculate(attacker: PokemonState, defender: PokemonState,
               move: str | Move, field: FieldState | None = None, *,
-              crit: bool = False, apply_spread: bool = False) -> DamageResult:
+              crit: bool = False, apply_spread: bool = False,
+              screen: str | None = None) -> DamageResult:
     """Calcule les dégâts d'un `move` de `attacker` sur `defender`.
 
     `apply_spread` : pénalité ×0.75 des attaques de zone en doubles.
+    `screen` : écran côté défenseur ('reflect' = physique, 'lightscreen' =
+    spécial, 'auroraveil' = les deux). Divise les dégâts (×0.5 en singles,
+    ×0.667 en doubles) ; **ignoré par un coup critique** (le crit passe l'écran).
     """
     mv = move if isinstance(move, Move) else get_move(move)
     if mv.is_status or mv.base_power <= 0:
@@ -244,6 +299,15 @@ def calculate(attacker: PokemonState, defender: PokemonState,
         at_mods.append(8192)
     if atk_ability == "guts" and attacker.status:
         at_mods.append(6144)
+    if atk_ability == "waterbubble" and move_type == "Water":
+        at_mods.append(8192)                       # Water Bubble : ×2 sur l'Eau
+    if atk_ability == "solarpower" and not physical and _weather(field) == "sun":
+        at_mods.append(6144)                       # Solar Power : ×1.5 A.Spé au soleil
+    _tb = _TYPE_BOOST_ABILITY.get(atk_ability)
+    if _tb and _tb[0] == move_type:
+        at_mods.append(_tb[1])                     # Steelworker/Dragon's Maw/Transistor…
+    if _paradox_stat(attacker, field, atk_ability) == atk_key:
+        at_mods.append(5325)                       # Protosynthèse / Charge Quantique ×1.3
     # Talents défensifs réduisant la stat offensive (Thick Fat, Heatproof).
     if def_ability == "thickfat" and move_type in ("Fire", "Ice"):
         at_mods.append(2048)
@@ -265,6 +329,8 @@ def calculate(attacker: PokemonState, defender: PokemonState,
         df_mods.append(6144)            # boost SpD du Roche sous tempête de sable
     if physical and weather == "snow" and "Ice" in def_types:
         df_mods.append(6144)            # boost Déf de la Glace sous neige (Gen 9)
+    if _paradox_stat(defender, field, def_ability) == def_key:
+        df_mods.append(5325)            # Protosynthèse / Charge Quantique défensive ×1.3
     if df_mods:
         defense = _apply_mod(defense, _chain_mods(df_mods))
     defense = max(1, defense)
@@ -276,6 +342,15 @@ def calculate(attacker: PokemonState, defender: PokemonState,
         bp_mods.append(6144)
     if type_changed:                       # -ate / Dragonize : ×1.2
         bp_mods.append(ATE_POWER_MOD)
+    if _TYPE_ITEM.get(atk_item) == move_type:
+        bp_mods.append(4915)               # Charbon, Eau Mystique… : ×1.2
+    if atk_item == "muscleband" and physical:
+        bp_mods.append(4506)               # Muscle Band : ×1.1 physique
+    if atk_item == "wiseglasses" and not physical:
+        bp_mods.append(4506)               # Wise Glasses : ×1.1 spécial
+    if atk_ability == "sandforce" and weather == "sand" \
+            and move_type in ("Ground", "Rock", "Steel"):
+        bp_mods.append(5325)               # Sand Force : ×1.3 (Sol/Roche/Acier) sous sable
     if bp_mods:
         base_power = max(1, _apply_mod(base_power, _chain_mods(bp_mods)))
 
@@ -343,6 +418,27 @@ def calculate(attacker: PokemonState, defender: PokemonState,
         final_mods.append(2048)
     if def_ability in ("filter", "solidrock", "prismarmor") and eff > 1:
         final_mods.append(3072)
+    # Talents défensifs modulant les dégâts finaux.
+    if def_ability == "fluffy":
+        if move_type == "Fire":
+            final_mods.append(8192)         # ×2 sur le Feu
+        if mv.makes_contact:
+            final_mods.append(2048)         # ×0.5 au contact
+    if def_ability == "icescales" and not physical:
+        final_mods.append(2048)             # ×0.5 sur les spéciales
+    if def_ability == "purifyingsalt" and move_type == "Ghost":
+        final_mods.append(2048)             # ×0.5 sur le Spectre
+    if def_ability == "waterbubble" and move_type == "Fire":
+        final_mods.append(2048)             # ×0.5 sur le Feu
+    if def_ability == "dryskin" and move_type == "Fire":
+        final_mods.append(5120)             # ×1.25 sur le Feu
+    # Écrans (Mur Lumière / Protection / Voile Aurore), ignorés par le crit.
+    scr = to_id(screen) if screen else ""
+    if not crit and scr in _SCREENS:
+        blocks = (physical and scr in ("reflect", "auroraveil")) or \
+                 (not physical and scr in ("lightscreen", "auroraveil"))
+        if blocks:
+            final_mods.append(2732 if apply_spread else 2048)
     final_mod = _chain_mods(final_mods)
 
     # --- 16 rolls ---
@@ -375,4 +471,5 @@ def calculate(attacker: PokemonState, defender: PokemonState,
         type_effectiveness=eff,
         is_stab=is_stab,
         crit=crit,
+        move_type=move_type,
     )

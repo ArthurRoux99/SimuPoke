@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import random
+
 from simupoke.usage import (
-    load_usage, usage_prior, likely_set, has_usage,
+    load_usage, usage_prior, likely_set, sample_set, has_usage,
 )
 from simupoke.model import OwnedPokemon
 from simupoke.draft import evaluate_candidate
@@ -23,6 +25,32 @@ FIX = {
                   "abilities": {"sandstream": 1.0}},
     "fluttermane": {"usage": 0.10, "items": {"choicespecs": 0.7}},
 }
+
+
+def test_sample_set_draws_from_distributions():
+    rng = random.Random(0)
+    ls = sample_set("incineroar", rng=rng, table=FIX)
+    assert ls.item in FIX["incineroar"]["items"]
+    assert ls.ability == "intimidate"
+    assert ls.nature in FIX["incineroar"]["natures"]
+    assert 1 <= len(ls.moves) <= 4
+    assert all(m in FIX["incineroar"]["moves"] for m in ls.moves)
+    assert len(set(ls.moves)) == len(ls.moves)          # sans doublon
+
+
+def test_sample_set_reproducible_and_varies():
+    a = sample_set("incineroar", rng=random.Random(1), table=FIX)
+    b = sample_set("incineroar", rng=random.Random(1), table=FIX)
+    assert (a.item, a.nature, a.moves) == (b.item, b.nature, b.moves)
+    # Des graines différentes explorent des builds différents (au moins parfois).
+    variants = {tuple(sample_set("incineroar", rng=random.Random(s), table=FIX).moves)
+                for s in range(20)}
+    assert len(variants) > 1
+
+
+def test_sample_set_absent_species_is_empty():
+    ls = sample_set("magikarp", rng=random.Random(0), table=FIX)
+    assert ls.item is None and ls.moves == []
 
 
 def test_usage_file_present_and_loaded():

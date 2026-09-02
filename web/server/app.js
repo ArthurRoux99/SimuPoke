@@ -8,6 +8,7 @@
   let META = { species: [], moves: [], natures: [] };
   let SAMPLES = {};
   const builders = {};
+  let spObjs = null;   // conteneur des lignes d'objectifs de l'optimiseur
 
   async function api(path, body) {
     const opt = body ? { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -110,7 +111,7 @@
       const r = await api('/api/damage', {
         attacker: readMon('a'), defender: readMon('d'), move: $('move').value,
         field: { weather: $('weather').value, terrain: $('terrain').value },
-        crit: $('crit').checked, spread: $('spread').checked,
+        crit: $('crit').checked, spread: $('spread').checked, screen: $('screen').value,
       });
       const left = Math.min(100, r.minPct), w = Math.min(100, r.maxPct) - left;
       $('dmg-result').innerHTML = `
@@ -138,6 +139,14 @@
       $('c-likely-status').textContent = 'rempli depuis l\'usage' + (bits.length ? ' (' + bits.join(', ') + ')' : '');
     } catch (e) { $('c-likely-status').textContent = '⚠ ' + e.message; }
   }
+  function parseBench(spec) {
+    return (spec || '').split(';').map((chunk) => {
+      const parts = chunk.split(',').map((x) => x.trim());
+      if (!parts[0]) return null;
+      return { species: parts[0], nature: parts[1] || 'serious',
+        moves: (parts[2] || '').split('|').map((x) => x.trim()).filter(Boolean) };
+    }).filter(Boolean);
+  }
   async function runCombat() {
     try {
       const me = { species: $('c-me-species').value, nature: $('c-me-nature').value,
@@ -146,6 +155,22 @@
       const opp = { species: $('c-opp-species').value, nature: $('c-opp-nature').value,
         moves: splitMoves($('c-opp-moves').value), hpPct: parseFloat($('c-opp-hp').value || '100') / 100 };
       const r = await api('/api/analyze', { me, opp, opp_move: $('c-opp-move').value,
+        bench: parseBench($('c-bench').value),
+        field: { weather: $('c-weather').value, terrain: $('c-terrain').value } });
+      $('combat-result').textContent = r.lines.join('\n');
+    } catch (e) { $('combat-result').textContent = '⚠ ' + e.message; }
+  }
+
+  async function runDecide() {
+    try {
+      const me = { species: $('c-me-species').value, nature: $('c-me-nature').value,
+        sp: readSP('c-me'), moves: splitMoves($('c-me-moves').value),
+        hpPct: parseFloat($('c-me-hp').value || '100') / 100 };
+      const opp = { species: $('c-opp-species').value, nature: $('c-opp-nature').value,
+        moves: splitMoves($('c-opp-moves').value), hpPct: parseFloat($('c-opp-hp').value || '100') / 100 };
+      const r = await api('/api/decide', { me, opp, bench: parseBench($('c-bench').value),
+        depth: parseInt($('c-depth').value || '1', 10),
+        opp_model: $('c-cautious').checked ? 'worst' : 'expected',
         field: { weather: $('c-weather').value, terrain: $('c-terrain').value } });
       $('combat-result').textContent = r.lines.join('\n');
     } catch (e) { $('combat-result').textContent = '⚠ ' + e.message; }
@@ -176,13 +201,117 @@
     } catch (e) { $('team-result').textContent = '⚠ ' + e.message; }
   }
 
+  async function importPaste() {
+    const status = $('team-paste-status');
+    try {
+      const r = await api('/api/paste', { paste: $('team-paste').value });
+      if (!r.count) { status.textContent = 'aucun Pokémon reconnu'; return; }
+      builders.team.setEntries(r.team);
+      let msg = `${r.count} Pokémon importé(s).`;
+      if (r.unknown && r.unknown.length) msg += ` ⚠ inconnus : ${r.unknown.join(', ')}`;
+      status.textContent = msg;
+    } catch (e) { status.textContent = '⚠ ' + e.message; }
+  }
+
   // ---------- Preview ----------
   async function runPreview() {
     try {
       const r = await api('/api/preview', { my_team: builders.prevMine.getEntries(),
-        opp_team: builders.prevOpp.getEntries(), format: $('prev-format').value });
+        opp_team: builders.prevOpp.getEntries(), format: $('prev-format').value,
+        use_damage: $('prev-damage').checked });
       $('preview-result').textContent = r.lines.join('\n');
     } catch (e) { $('preview-result').textContent = '⚠ ' + e.message; }
+  }
+
+  // ---------- Seuils (benchmarks) ----------
+  function benchClass(ok) { return ok ? 'headline' : 'headline error'; }
+  async function runOutspeed() {
+    const out = $('os-result');
+    try {
+      const r = await api('/api/outspeed', {
+        me: { species: $('os-me-species').value, nature: $('os-me-nature').value },
+        target: { species: $('os-tg-species').value, nature: $('os-tg-nature').value,
+          sp: { spe: parseInt($('os-tg-spe').value || '0', 10) } },
+        me_tailwind: $('os-me-tw').checked, target_tailwind: $('os-tg-tw').checked,
+        strict: !$('os-tie').checked,
+      });
+      out.innerHTML = `<div class="${benchClass(r.feasible)}">${esc(r.line)}</div>`;
+    } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
+  }
+  async function runSurvive() {
+    const out = $('sv-result');
+    try {
+      const off = parseInt($('sv-atk-off').value || '0', 10);
+      const r = await api('/api/survive', {
+        defender: { species: $('sv-def-species').value, nature: $('sv-def-nature').value },
+        attacker: { species: $('sv-atk-species').value, nature: $('sv-atk-nature').value,
+          item: $('sv-atk-item').value, sp: { atk: off, spa: off } },
+        move: $('sv-move').value,
+      });
+      out.innerHTML = `<div class="${benchClass(r.feasible)}">${esc(r.line)}</div>`;
+    } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
+  }
+  async function runKo() {
+    const out = $('ko-result');
+    try {
+      const r = await api('/api/ko', {
+        attacker: { species: $('ko-atk-species').value, nature: $('ko-atk-nature').value,
+          item: $('ko-atk-item').value },
+        defender: { species: $('ko-def-species').value, nature: $('ko-def-nature').value,
+          hpPct: parseFloat($('ko-def-hp').value || '100') / 100 },
+        move: $('ko-move').value, hits: parseInt($('ko-hits').value || '1', 10),
+      });
+      out.innerHTML = `<div class="${benchClass(r.feasible)}">${esc(r.line)}</div>`;
+    } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
+  }
+
+  // ---------- Optimiseur de spread ----------
+  function addObjRow(d) {
+    d = d || {};
+    const row = document.createElement('div');
+    row.className = 'builder-row';
+    row.innerHTML =
+      `<select class="o-kind">
+         <option value="outspeed">dépasser</option>
+         <option value="survive">survivre</option>
+         <option value="ko">tuer</option></select>` +
+      `<input class="o-species" list="species-list" placeholder="espèce cible" value="${esc(d.species)}">` +
+      `<select class="o-nature">${natureOptions(d.nature || 'serious')}</select>` +
+      `<input class="o-move" list="move-list" placeholder="capacité (survivre/tuer)" value="${esc(d.move)}">` +
+      `<input class="o-num" type="number" placeholder="SP / coups" style="max-width:88px" value="${d.num != null ? d.num : ''}">` +
+      `<input class="o-item" placeholder="objet cible" value="${esc(d.item)}">` +
+      `<button class="b-del" type="button" title="retirer">✕</button>`;
+    row.querySelector('.o-kind').value = d.kind || 'outspeed';
+    row.querySelector('.b-del').addEventListener('click', () => spObjs.removeChild(row));
+    spObjs.appendChild(row);
+  }
+  function collectObjectives() {
+    return Array.from(spObjs.querySelectorAll('.builder-row')).map((row) => {
+      const kind = row.querySelector('.o-kind').value;
+      const species = row.querySelector('.o-species').value.trim();
+      const nature = row.querySelector('.o-nature').value;
+      const move = row.querySelector('.o-move').value.trim();
+      const num = parseInt(row.querySelector('.o-num').value || '0', 10);
+      const item = row.querySelector('.o-item').value.trim() || null;
+      if (!species) return null;
+      if (kind === 'outspeed') return { kind, target: { species, nature, sp: { spe: num || 0 }, item } };
+      if (kind === 'survive') return { kind, attacker: { species, nature, sp: { atk: num || 0, spa: num || 0 }, item }, move };
+      return { kind: 'ko', defender: { species, nature, item }, move, hits: num || 1 };
+    }).filter(Boolean);
+  }
+  async function runSpread() {
+    const out = $('sp-result');
+    try {
+      const r = await api('/api/spread', {
+        species: $('sp-species').value, nature: $('sp-nature').value,
+        item: $('sp-item').value || null,
+        budget: parseInt($('sp-budget').value || '66', 10),
+        objectives: collectObjectives(),
+      });
+      out.innerHTML = `<div class="${r.feasible ? 'headline' : 'headline error'}">`
+        + (r.feasible ? '✓ spread trouvé' : '⚠ objectifs non tous tenus') + '</div>'
+        + `<pre class="report" style="margin-top:8px">${esc(r.lines.join('\n'))}</pre>`;
+    } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
   }
 
   // ---------- Mon Box ----------
@@ -207,7 +336,7 @@
     try { META = await api('/api/meta'); } catch (e) { /* listes vides */ }
     try { SAMPLES = await api('/api/samples'); } catch (e) { SAMPLES = {}; }
 
-    document.querySelectorAll('#tab-damage select[id$="-nature"], #tab-combat select[id$="-nature"]')
+    document.querySelectorAll('#tab-damage select[id$="-nature"], #tab-combat select[id$="-nature"], #tab-bench select[id$="-nature"]')
       .forEach((s) => { s.innerHTML = natureOptions('serious'); });
     document.querySelectorAll('.boost').forEach(fillBoost);
     ['a', 'd', 'c-me'].forEach((p) => { const el = $(`${p}-sp`); if (el) fillSP(el, p); });
@@ -234,6 +363,7 @@
       el.addEventListener('input', computeDamage); el.addEventListener('change', computeDamage);
     });
     $('c-run').addEventListener('click', runCombat);
+    $('c-decide').addEventListener('click', runDecide);
     $('c-opp-likely').addEventListener('click', fillLikelyOpponent);
     $('draft-run').addEventListener('click', runDraft);
     $('draft-sample').addEventListener('click', () => builders.draft.setEntries(entriesFrom(SAMPLES.lineup, 'lineup')));
@@ -242,11 +372,29 @@
     $('team-frombox').addEventListener('click', async () => {
       try { const r = await api('/api/roster'); builders.team.setEntries(r.roster); } catch (e) { /* */ }
     });
+    $('team-import').addEventListener('click', importPaste);
     $('prev-run').addEventListener('click', runPreview);
     $('prev-sample').addEventListener('click', () => {
       builders.prevMine.setEntries(entriesFrom(SAMPLES.team, 'team'));
       builders.prevOpp.setEntries(entriesFrom(SAMPLES.opponent, 'team'));
     });
+    $('os-run').addEventListener('click', runOutspeed);
+    $('sv-run').addEventListener('click', runSurvive);
+    $('ko-run').addEventListener('click', runKo);
+    // Optimiseur de spread : conteneur d'objectifs + exemples de départ.
+    spObjs = $('sp-objs');
+    if (spObjs) {
+      $('sp-nature').value = 'adamant';
+      addObjRow({ kind: 'ko', species: 'Garchomp', nature: 'jolly', move: 'icepunch', num: 1 });
+      addObjRow({ kind: 'survive', species: 'Garchomp', nature: 'adamant', move: 'earthquake', num: 32 });
+      addObjRow({ kind: 'outspeed', species: 'Amoonguss', nature: 'sassy', num: 0 });
+      $('sp-add').addEventListener('click', () => addObjRow({}));
+      $('sp-run').addEventListener('click', runSpread);
+    }
+    // Natures par défaut plus parlantes pour les seuils.
+    if ($('os-me-nature')) { $('os-me-nature').value = 'jolly'; $('sv-def-nature').value = 'careful'; }
+    if ($('sv-atk-nature')) { $('sv-atk-nature').value = 'adamant'; $('ko-atk-nature').value = 'adamant'; }
+    if ($('ko-def-nature')) $('ko-def-nature').value = 'jolly';
     $('box-save').addEventListener('click', saveBox);
     $('box-reload').addEventListener('click', loadBox);
 

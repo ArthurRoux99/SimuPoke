@@ -1,16 +1,33 @@
-"""Couche d'affichage / internationalisation (§0.5).
+"""Couche d'affichage / internationalisation (§0.5, §15 Q8).
 
-Les IDs canoniques internes sont en anglais (style Showdown). Cette couche
-mappe ID -> libellé FR/EN. Le français est la langue par défaut ; la bascule
-EN n'impacte jamais le moteur (simple changement de table).
+Les IDs canoniques internes sont en anglais (style Showdown). Cette couche mappe
+ID -> libellé FR/EN sans jamais toucher au moteur. Le français est la langue par
+défaut ; la bascule EN est **effective** :
 
-Seules quelques entrées sont remplies en Phase 0 ; les tables se complèteront
-au fil des phases (idéalement alimentées par une source de données).
+  - une table de traduction par catégorie/langue (species, nature, stat, …) ;
+  - à défaut d'entrée, on **dérive le libellé des données** (nom anglais du
+    Pokédex / des capacités) ou on « embellit » l'ID — jamais on ne retombe sur
+    l'autre langue (le mode EN ne doit pas afficher « Carchacrok »).
+
+La langue courante est un état de processus (`set_language`) que la CLI pilote
+via `--lang` / `SIMUPOKE_LANG` ; les appels peuvent aussi passer `lang=` en dur.
 """
 
 from __future__ import annotations
 
 DEFAULT_LANG = "fr"
+_CURRENT_LANG = DEFAULT_LANG
+
+
+def set_language(lang: str) -> None:
+    """Fixe la langue d'affichage courante ('fr' ou 'en')."""
+    global _CURRENT_LANG
+    _CURRENT_LANG = "en" if str(lang).lower().startswith("en") else "fr"
+
+
+def get_language() -> str:
+    return _CURRENT_LANG
+
 
 # Catégorie -> { lang -> { id_anglais -> libellé } }
 TRANSLATIONS: dict[str, dict[str, dict[str, str]]] = {
@@ -26,18 +43,24 @@ TRANSLATIONS: dict[str, dict[str, dict[str, str]]] = {
     },
     "nature": {
         "fr": {
-            "jolly": "Jovial", "adamant": "Rigide", "timid": "Timide",
-            "modest": "Modeste", "bold": "Assuré", "calm": "Calme",
-            "serious": "Sérieux",
+            "hardy": "Hardi", "lonely": "Solo", "brave": "Brave",
+            "adamant": "Rigide", "naughty": "Mauvais", "bold": "Assuré",
+            "docile": "Docile", "relaxed": "Relax", "impish": "Malin",
+            "lax": "Lâche", "timid": "Timide", "hasty": "Pressé",
+            "serious": "Sérieux", "jolly": "Jovial", "naive": "Naïf",
+            "modest": "Modeste", "mild": "Doux", "quiet": "Discret",
+            "bashful": "Pudique", "rash": "Foufou", "calm": "Calme",
+            "gentle": "Gentil", "sassy": "Malpoli", "careful": "Prudent",
+            "quirky": "Bizarre",
         },
-        "en": {},  # l'ID anglais sert déjà de libellé EN par défaut
+        "en": {},  # l'ID anglais capitalisé sert de libellé EN
     },
     "species": {
         "fr": {
             "tyranitar": "Tyranocif", "garchomp": "Carchacrok",
             "incineroar": "Félinferno",
         },
-        "en": {},
+        "en": {},  # nom anglais dérivé du Pokédex
     },
     "item": {"fr": {}, "en": {}},
     "ability": {"fr": {}, "en": {}},
@@ -45,26 +68,42 @@ TRANSLATIONS: dict[str, dict[str, dict[str, str]]] = {
 }
 
 
-def label(category: str, ident: str, lang: str = DEFAULT_LANG) -> str:
-    """Libellé affichable d'un identifiant. Retombe sur l'ID si non traduit."""
-    cat = TRANSLATIONS.get(category, {})
-    table = cat.get(lang, {})
+def _canonical(category: str, ident: str) -> str:
+    """Libellé « données/anglais » d'un ID, servant de repli universel.
+
+    Ne dépend jamais de la table FR — c'est ce qui rend le mode EN correct.
+    """
+    if category == "species":
+        from .basestats import get_species, is_known
+        if is_known(ident):
+            return get_species(ident).get("name", ident)
+    elif category == "move":
+        from .moves import get_move, is_known as move_known
+        if move_known(ident):
+            try:
+                return get_move(ident).name
+            except KeyError:
+                pass
+    elif category == "stat":
+        return TRANSLATIONS["stat"]["en"].get(ident, ident)
+    if not ident:
+        return ident
+    # Natures, objets, talents… : ID « embelli » (mots capitalisés).
+    return " ".join(w.capitalize() for w in ident.replace("_", "-").split("-"))
+
+
+def label(category: str, ident: str, lang: str | None = None) -> str:
+    """Libellé affichable d'un identifiant dans la langue voulue.
+
+    `lang=None` utilise la langue courante (`set_language`). À défaut de
+    traduction, dérive le libellé des données (jamais de l'autre langue).
+    """
+    lang = lang or _CURRENT_LANG
+    table = TRANSLATIONS.get(category, {}).get(lang, {})
     if ident in table:
         return table[ident]
-    # Fallback : autre langue connue.
-    for other in cat.values():
-        if ident in other:
-            return other[ident]
-    # Pour une espèce non traduite, on récupère le nom anglais du Pokédex
-    # (couche de données) plutôt qu'un ID brut.
-    if category == "species":
-        from .basestats import get_species
-        try:
-            return get_species(ident)["name"]
-        except KeyError:
-            pass
-    return ident.replace("-", " ").capitalize()
+    return _canonical(category, ident)
 
 
-def stat_label(stat_key: str, lang: str = DEFAULT_LANG) -> str:
+def stat_label(stat_key: str, lang: str | None = None) -> str:
     return label("stat", stat_key, lang)

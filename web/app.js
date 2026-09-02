@@ -4,6 +4,8 @@
   'use strict';
   const DATA = window.SIMUPOKE_DATA;
   const E = window.SimuEngine.makeEngine(DATA);
+  const B = window.SimuBench.makeBench(E);
+  const TEAM = window.SimuTeam.makeTeam(E);
   const $ = (id) => document.getElementById(id);
   const SP = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
   const SP_FR = { hp: 'PV', atk: 'Atq', def: 'Déf', spa: 'A.Sp', spd: 'D.Sp', spe: 'Vit' };
@@ -44,13 +46,187 @@
       .map((m) => m.name).sort();
     $('move-list').innerHTML = moveNames.map((n) => `<option value="${n}">`).join('');
 
-    document.querySelectorAll('input, select').forEach((el) => {
+    document.querySelectorAll('#tab-damage input, #tab-damage select').forEach((el) => {
       el.addEventListener('input', compute);
       el.addEventListener('change', compute);
     });
     document.querySelectorAll('[data-preset]').forEach((b) =>
       b.addEventListener('click', () => applyPreset(b.dataset.preset)));
+    initTabs();
+    initBench();
+    initTeam();
     compute();
+  }
+
+  // --- Équipe (B3) ---
+  const DEFAULT_TEAM = [
+    { species: 'Garchomp', nature: 'jolly', item: 'lifeorb', ability: 'roughskin', moves: 'earthquake, dragonclaw, stoneedge, swordsdance' },
+    { species: 'Incineroar', nature: 'careful', item: 'assaultvest', ability: 'intimidate', moves: 'fakeout, knockoff, flareblitz, partingshot' },
+    { species: 'Rotom-Wash', nature: 'bold', item: 'leftovers', ability: 'levitate', moves: 'hydropump, voltswitch, willowisp' },
+    { species: 'Flutter Mane', nature: 'timid', item: 'choicespecs', ability: 'protosynthesis', moves: 'moonblast, shadowball' },
+    { species: 'Iron Hands', nature: 'adamant', item: 'choiceband', ability: 'quarkdrive', moves: 'drainpunch, wildcharge' },
+    { species: 'Amoonguss', nature: 'sassy', item: 'rockyhelmet', ability: 'regenerator', moves: 'spore, ragepowder, sludgebomb' },
+  ];
+  function initTeam() {
+    DEFAULT_TEAM.forEach(addTeamRow);
+    $('team-add').addEventListener('click', () => addTeamRow({}));
+    $('team-run').addEventListener('click', runTeam);
+  }
+  function addTeamRow(d) {
+    d = d || {};
+    const row = document.createElement('div');
+    row.className = 'controls team-row';
+    row.style.gridTemplateColumns = '1.2fr 1fr 1fr 1fr 2fr auto';
+    row.style.marginTop = '6px';
+    row.innerHTML =
+      `<input class="t-species" list="species-list" placeholder="espèce" value="${esc(d.species)}">` +
+      `<select class="t-nature"></select>` +
+      `<input class="t-item" placeholder="objet" value="${esc(d.item)}">` +
+      `<input class="t-ability" placeholder="talent" value="${esc(d.ability)}">` +
+      `<input class="t-moves" placeholder="capa1, capa2, …" value="${esc(d.moves)}">` +
+      `<button class="t-del" type="button" title="retirer">✕</button>`;
+    fillNatures(row.querySelector('.t-nature'));
+    row.querySelector('.t-nature').value = d.nature || 'serious';
+    row.querySelector('.t-del').addEventListener('click', () => $('team-rows').removeChild(row));
+    $('team-rows').appendChild(row);
+  }
+  function runTeam() {
+    const out = $('team-out');
+    try {
+      const team = Array.from($('team-rows').querySelectorAll('.team-row')).map((row) => ({
+        species: row.querySelector('.t-species').value.trim(),
+        nature: row.querySelector('.t-nature').value,
+        item: row.querySelector('.t-item').value.trim() || null,
+        ability: row.querySelector('.t-ability').value.trim() || null,
+        moves: row.querySelector('.t-moves').value.split(',').map((x) => x.trim()).filter(Boolean),
+      })).filter((m) => m.species);
+      const r = TEAM.analyzeTeam(team);
+      const lines = [];
+      lines.push(r.clauseViolations.length ? 'Clauses :\n  ✗ ' + r.clauseViolations.join('\n  ✗ ') : 'Clauses : OK (Species + Item)');
+      const sw = Object.entries(r.sharedWeaknesses).sort((a, b) => b[1] - a[1]);
+      lines.push(sw.length ? 'Trous défensifs (≥ moitié faible) : ' + sw.map(([t, n]) => `${t} (${n})`).join(', ') : 'Trous défensifs : aucun majeur');
+      lines.push(r.offensiveGaps.length ? 'Couverture manquante (non touché ×2) : ' + r.offensiveGaps.join(', ') : 'Couverture offensive : complète');
+      lines.push('Rôles : ' + Object.entries(r.roles).map(([k, n]) => `${TEAM.ROLE_FR[k] || k}×${n}`).join(', '));
+      out.textContent = lines.join('\n');
+    } catch (e) { out.textContent = '⚠ ' + e.message; }
+  }
+
+  // --- Onglets ---
+  function initTabs() {
+    document.querySelectorAll('#tabs button').forEach((b) => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('#tabs button').forEach((x) => x.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach((x) => x.classList.remove('active'));
+        b.classList.add('active'); $('tab-' + b.dataset.tab).classList.add('active');
+      });
+    });
+  }
+
+  // --- Seuils (bench) ---
+  function initBench() {
+    document.querySelectorAll('#tab-bench select[id$="-nature"]').forEach(fillNatures);
+    $('os-me-nature').value = 'jolly'; $('os-tg-nature').value = 'timid';
+    $('sv-def-nature').value = 'careful'; $('sv-atk-nature').value = 'adamant';
+    $('ko-atk-nature').value = 'adamant'; $('ko-def-nature').value = 'jolly';
+    $('os-run').addEventListener('click', runOutspeed);
+    $('sv-run').addEventListener('click', runSurvive);
+    $('ko-run').addEventListener('click', runKo);
+    // Optimiseur de spread
+    fillNatures($('sp-nature')); $('sp-nature').value = 'adamant';
+    addObjRow({ kind: 'ko', species: 'Garchomp', nature: 'jolly', move: 'Ice Punch', num: 1 });
+    addObjRow({ kind: 'survive', species: 'Garchomp', nature: 'adamant', move: 'Earthquake', num: 32 });
+    addObjRow({ kind: 'outspeed', species: 'Amoonguss', nature: 'sassy', num: 0 });
+    $('sp-add').addEventListener('click', () => addObjRow({}));
+    $('sp-run').addEventListener('click', runSpread);
+  }
+
+  const esc = (s) => String(s == null ? '' : s).replace(/"/g, '&quot;');
+  function addObjRow(d) {
+    d = d || {};
+    const row = document.createElement('div');
+    row.className = 'controls';
+    row.style.gridTemplateColumns = 'auto 1.4fr 1fr 1.4fr auto auto';
+    row.style.marginTop = '6px';
+    row.innerHTML =
+      `<select class="o-kind"><option value="outspeed">dépasser</option><option value="survive">survivre</option><option value="ko">tuer</option></select>` +
+      `<input class="o-species" list="species-list" placeholder="espèce cible" value="${esc(d.species)}">` +
+      `<select class="o-nature"></select>` +
+      `<input class="o-move" list="move-list" placeholder="capacité (survivre/tuer)" value="${esc(d.move)}">` +
+      `<input class="o-num" type="number" placeholder="SP / coups" style="max-width:88px" value="${d.num != null ? d.num : ''}">` +
+      `<button class="o-del" type="button" title="retirer">✕</button>`;
+    fillNatures(row.querySelector('.o-nature'));
+    row.querySelector('.o-nature').value = d.nature || 'serious';
+    row.querySelector('.o-kind').value = d.kind || 'outspeed';
+    row.querySelector('.o-del').addEventListener('click', () => $('sp-objs').removeChild(row));
+    $('sp-objs').appendChild(row);
+  }
+  function collectObjectives() {
+    return Array.from($('sp-objs').querySelectorAll('.controls')).map((row) => {
+      const kind = row.querySelector('.o-kind').value;
+      const species = row.querySelector('.o-species').value.trim();
+      const nature = row.querySelector('.o-nature').value;
+      const move = row.querySelector('.o-move').value.trim();
+      const num = parseInt(row.querySelector('.o-num').value || '0', 10);
+      if (!species) return null;
+      if (kind === 'outspeed') return { kind, target: { species, nature, sp: { spe: num || 0 } } };
+      if (kind === 'survive') return { kind, attacker: { species, nature, sp: { atk: num || 0, spa: num || 0 } }, move };
+      return { kind: 'ko', defender: { species, nature, sp: {} }, move, hits: num || 1 };
+    }).filter(Boolean);
+  }
+  function runSpread() {
+    const out = $('sp-out');
+    try {
+      const r = B.optimizeSpread($('sp-species').value, $('sp-nature').value, collectObjectives(),
+        { item: $('sp-item').value || null, budget: parseInt($('sp-budget').value || '66', 10) });
+      const order = [['hp', 'PV'], ['atk', 'Atq'], ['def', 'Déf'], ['spa', 'A.Sp'], ['spd', 'D.Sp'], ['spe', 'Vit']];
+      const parts = order.filter(([k]) => r.sp[k]).map(([k, l]) => `${l} ${r.sp[k]}`);
+      out.className = outClass(r.feasible);
+      let txt = 'Spread : ' + (parts.join(', ') || 'aucun SP requis') + ` — ${r.total}/${r.budget}`;
+      txt += r.leftover > 0 ? ` (reste ${r.leftover})` : r.leftover < 0 ? ` (DÉPASSEMENT ${-r.leftover})` : '';
+      if (r.unmet.length) txt += ' | ⚠ ' + r.unmet.join(' ; ');
+      out.textContent = txt;
+    } catch (e) { out.className = 'bench-out no'; out.textContent = '⚠ ' + e.message; }
+  }
+  const outClass = (ok) => 'bench-out ' + (ok ? 'ok' : 'no');
+  function runOutspeed() {
+    const out = $('os-out');
+    try {
+      const me = { species: $('os-me-species').value, nature: $('os-me-nature').value, sp: {} };
+      const tg = { species: $('os-tg-species').value, nature: $('os-tg-nature').value, sp: { spe: parseInt($('os-tg-spe').value || '0', 10) } };
+      const r = B.minSpToOutspeed(me, tg, { meTailwind: $('os-me-tw').checked, targetTailwind: $('os-tg-tw').checked, strict: !$('os-tie').checked });
+      out.className = outClass(r.feasible);
+      out.textContent = r.feasible
+        ? `${r.sp} SP en Vitesse suffisent (${r.mySpeed} vs ${r.targetSpeed}).`
+        : `Hors de portée : même à 32 SP, ${r.mySpeed} ≤ ${r.targetSpeed}` + (r.tiesOnly ? ' (égalité possible).' : '.');
+    } catch (e) { out.className = 'bench-out no'; out.textContent = '⚠ ' + e.message; }
+  }
+  function runSurvive() {
+    const out = $('sv-out');
+    try {
+      const off = parseInt($('sv-atk-off').value || '0', 10);
+      const def = { species: $('sv-def-species').value, nature: $('sv-def-nature').value, sp: {} };
+      const atk = { species: $('sv-atk-species').value, nature: $('sv-atk-nature').value, item: $('sv-atk-item').value, sp: { atk: off, spa: off } };
+      const r = B.minSpToSurvive(def, atk, $('sv-move').value, {});
+      out.className = outClass(r.feasible);
+      out.textContent = r.byEndure
+        ? `Survie garantie par Focus Sash / Fermeté — 0 SP.`
+        : r.feasible
+          ? `${r.totalSp} SP (PV ${r.hpSp} / ${r.stat} ${r.defSp}) — roll haut ${r.maxPct.toFixed(0)}%.`
+          : `Impossible même à fond (PV + ${r.stat}).`;
+    } catch (e) { out.className = 'bench-out no'; out.textContent = '⚠ ' + e.message; }
+  }
+  function runKo() {
+    const out = $('ko-out');
+    try {
+      const atk = { species: $('ko-atk-species').value, nature: $('ko-atk-nature').value, item: $('ko-atk-item').value, sp: {} };
+      const def = { species: $('ko-def-species').value, nature: $('ko-def-nature').value, hpPct: parseFloat($('ko-def-hp').value || '100') / 100, sp: {} };
+      const r = B.minSpToKo(atk, def, $('ko-move').value, {}, { hits: parseInt($('ko-hits').value || '1', 10) });
+      const what = r.hits === 1 ? 'OHKO' : `KO en ${r.hits}`;
+      out.className = outClass(r.feasible);
+      out.textContent = r.feasible
+        ? `${what} : ${r.sp} SP ${r.stat} (roll bas ${r.minPct.toFixed(0)}%).`
+        : r.blockedByEndure ? `${what} bloqué par Focus Sash / Fermeté.` : `${what} hors de portée même à 32 SP ${r.stat}.`;
+    } catch (e) { out.className = 'bench-out no'; out.textContent = '⚠ ' + e.message; }
   }
 
   function readMon(prefix) {

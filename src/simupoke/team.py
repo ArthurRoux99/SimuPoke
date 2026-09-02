@@ -16,9 +16,11 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from .model import OwnedPokemon
+from .model import OwnedPokemon, PokemonState
 from .basestats import is_known, get_base_stats, get_species
 from .typechart import effectiveness
+from .moves import get_move, is_known as move_known
+from .damage import calculate
 from .analysis import (
     STANDARD_TYPES, defensive_profile, offensive_types, infer_role, ROLE_FR,
 )
@@ -165,7 +167,7 @@ def _base_speed(mon: OwnedPokemon) -> int:
 
 
 def matchup_score(mine: OwnedPokemon, opp: OwnedPokemon) -> float:
-    """Score de matchup (positif = favorable à `mine`)."""
+    """Score de matchup par TYPES (positif = favorable à `mine`)."""
     off = _offensive_pressure(mine, opp)
     incoming = _offensive_pressure(opp, mine)
     score = off - incoming
@@ -176,6 +178,84 @@ def matchup_score(mine: OwnedPokemon, opp: OwnedPokemon) -> float:
     elif sm < so:
         score -= 0.5
     return score
+
+
+# --- Matchup affiné par le calculateur de dégâts ---------------------------
+
+def _resolve_moves(mon: OwnedPokemon) -> list[str]:
+    """Capacités connues du Pokémon, sinon son set le plus probable (usage §10.3)."""
+    if mon.moves:
+        return mon.moves
+    if is_known(mon.species):
+        from .usage import likely_set
+        ls = likely_set(mon.species)
+        if ls.moves:
+            return ls.moves
+    return []
+
+
+def _to_state(mon: OwnedPokemon, moves: list[str]) -> PokemonState:
+    return PokemonState(species=mon.species, nature=mon.nature or "serious",
+                        stat_points=mon.stat_points or {}, item=mon.item,
+                        ability=mon.ability, moves=moves)
+
+
+def _best_damage_pct(attacker: OwnedPokemon, defender: OwnedPokemon) -> float | None:
+    """Meilleur % de PV moyen que `attacker` inflige à `defender` en un coup.
+
+    None si aucune capacité offensive n'est estimable (ni connue, ni via usage).
+    """
+    amoves = _resolve_moves(attacker)
+    if not amoves:
+        return None
+    atk = _to_state(attacker, amoves)
+    dfd = _to_state(defender, _resolve_moves(defender))
+    best = 0.0
+    seen = False
+    for mv in amoves:
+        if not move_known(mv) or get_move(mv).is_status:
+            continue
+        try:
+            r = calculate(atk, dfd, mv)
+        except (ValueError, KeyError):
+            continue
+        seen = True
+        best = max(best, (r.min_pct + r.max_pct) / 2)
+    return best if seen else None
+
+
+def damage_matchup_score(mine: OwnedPokemon, opp: OwnedPokemon) -> float | None:
+    """Score de matchup par DÉGÂTS : qui met KO le plus vite (+ vitesse).
+
+    Compare les « coups pour KO » (100 / meilleur % moyen) des deux côtés. None
+    si aucun des deux camps n'a de capacité estimable (on retombe sur les types).
+    """
+    my = _best_damage_pct(mine, opp)
+    their = _best_damage_pct(opp, mine)
+    if my is None and their is None:
+        return None
+    my = my or 0.0
+    their = their or 0.0
+    my_ttk = math.ceil(100 / my) if my > 0 else 99
+    opp_ttk = math.ceil(100 / their) if their > 0 else 99
+    # Positif = je tue en moins de coups que l'adversaire. Borné pour rester
+    # comparable à l'échelle du score par types.
+    score = float(max(-4, min(4, opp_ttk - my_ttk)))
+    sm, so = _base_speed(mine), _base_speed(opp)
+    if sm > so:
+        score += 0.5
+    elif sm < so:
+        score -= 0.5
+    return score
+
+
+def _pair_score(mine: OwnedPokemon, opp: OwnedPokemon, use_damage: bool) -> float:
+    """Matchup d'une paire : par dégâts si possible, sinon repli sur les types."""
+    if use_damage:
+        dmg = damage_matchup_score(mine, opp)
+        if dmg is not None:
+            return dmg
+    return matchup_score(mine, opp)
 
 
 @dataclass
@@ -192,9 +272,11 @@ class PreviewResult:
     bring: int
     picks: list[PreviewPick]              # sélection ordonnée (lead en premier)
     bench: list[PreviewPick]
+    by_damage: bool = False               # matchups affinés par le calc ?
 
     def lines(self) -> list[str]:
-        out = [f"Format {self.fmt} — amener {self.bring} :"]
+        method = "dégâts" if self.by_damage else "types"
+        out = [f"Format {self.fmt} — amener {self.bring} (matchups par {method}) :"]
         for i, p in enumerate(self.picks):
             tag = "  (lead)" if i == 0 else ""
             out.append(f"  {i+1}. {p.species}{tag}  matchup {p.value:+.2f}")
@@ -208,8 +290,14 @@ class PreviewResult:
 
 
 def select_team_preview(my_team: list[OwnedPokemon], opp_team: list[OwnedPokemon],
-                        fmt: str = "singles") -> PreviewResult:
-    """Choisit les Pokémon à amener et l'ordre d'envoi selon les matchups."""
+                        fmt: str = "singles", *,
+                        use_damage: bool = True) -> PreviewResult:
+    """Choisit les Pokémon à amener et l'ordre d'envoi selon les matchups.
+
+    `use_damage` : affine les matchups avec le calculateur de dégâts (moves
+    connus, sinon set le plus probable §10.3) ; repli automatique sur les types
+    quand aucune capacité n'est estimable.
+    """
     bring = BRING_BY_FORMAT.get(fmt, 3)
     opp_known = [o for o in opp_team if is_known(o.species)]
 
@@ -218,7 +306,7 @@ def select_team_preview(my_team: list[OwnedPokemon], opp_team: list[OwnedPokemon
         if not is_known(mine.species):
             picks.append(PreviewPick(species=mine.species, value=-99.0))
             continue
-        scores = [(o, matchup_score(mine, o)) for o in opp_known]
+        scores = [(o, _pair_score(mine, o, use_damage)) for o in opp_known]
         value = sum(s for _, s in scores) / len(scores) if scores else 0.0
         beats = [o.species for o, s in scores if s > 0.5]
         threatened = [o.species for o, s in scores if s < -0.5]
@@ -227,4 +315,5 @@ def select_team_preview(my_team: list[OwnedPokemon], opp_team: list[OwnedPokemon
 
     picks.sort(key=lambda p: p.value, reverse=True)
     return PreviewResult(fmt=fmt, bring=bring,
-                         picks=picks[:bring], bench=picks[bring:])
+                         picks=picks[:bring], bench=picks[bring:],
+                         by_damage=use_damage)

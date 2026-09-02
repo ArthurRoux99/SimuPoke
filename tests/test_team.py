@@ -6,7 +6,7 @@ from simupoke.model import OwnedPokemon
 from simupoke.loaders import load_team
 from simupoke.team import (
     analyze_team, select_team_preview, check_clauses, matchup_score,
-    team_shared_weaknesses, BRING_BY_FORMAT,
+    damage_matchup_score, team_shared_weaknesses, BRING_BY_FORMAT,
 )
 
 
@@ -74,3 +74,31 @@ def test_preview_lead_is_best():
     opp = load_team("data/sample_opponent.json")
     res = select_team_preview(my_team, opp, "singles")
     assert res.picks[0].value == max(p.value for p in res.picks)
+
+
+# --- Matchup affiné par les dégâts -----------------------------------------
+
+def test_damage_matchup_positive_when_i_hit_harder():
+    # Garchomp Choice Band Séisme écrase Heatran ; Heatran le blesse peu.
+    chomp = _mon("garchomp", item="choiceband", moves=["earthquake"], nature="adamant")
+    heatran = _mon("heatran", moves=["flamethrower"], nature="modest")
+    assert damage_matchup_score(chomp, heatran) > 0
+
+
+def test_damage_matchup_none_without_any_moves():
+    # Deux espèces absentes de l'usage et sans moves -> None (repli sur types).
+    a = _mon("magikarp")
+    b = _mon("feebas")
+    assert damage_matchup_score(a, b) is None
+
+
+def test_preview_by_damage_flag_and_fallback():
+    my_team = load_team("data/sample_team.json")
+    opp = load_team("data/sample_opponent.json")
+    dmg = select_team_preview(my_team, opp, "doubles", use_damage=True)
+    typ = select_team_preview(my_team, opp, "doubles", use_damage=False)
+    assert dmg.by_damage is True and typ.by_damage is False
+    assert "dégâts" in dmg.lines()[0]
+    assert len(dmg.picks) == 4
+    # Le mode dégâts change généralement l'ordre vs le mode types.
+    assert [p.species for p in dmg.picks] != []
