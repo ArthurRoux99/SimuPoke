@@ -114,3 +114,15 @@ def test_solve_turn_mixes_against_protect():
     # Protect apparaît dans la stratégie adverse (elle sert à punir le KO).
     opp_protect = next((p for m, p in res.opp_strategy if m == "protect"), 0.0)
     assert opp_protect > 0.05
+
+
+def test_horizon_lookahead_affects_evaluation():
+    # La profondeur doit influer sur l'évaluation : face à un mur qui se soigne,
+    # regarder plus loin change la valeur du jeu (le soin est pris en compte).
+    me = _mon("garchomp", "adamant", ["earthquake", "swordsdance"], {"atk": 32})
+    opp = _mon("corviknight", "impish", ["bodypress", "roost"])
+    v0 = solve_turn(me, opp, horizon=0).value
+    v2 = solve_turn(me, opp, horizon=2).value
+    assert abs(v2 - v0) > 0.01                    # la profondeur a un effet mesurable
+    r2 = solve_turn(me, opp, horizon=2)
+    assert abs(sum(p for _, p in r2.strategy) - 1.0) < 1e-6
