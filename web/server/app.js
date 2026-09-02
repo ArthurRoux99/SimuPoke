@@ -176,6 +176,35 @@
     } catch (e) { $('combat-result').textContent = '⚠ ' + e.message; }
   }
 
+  async function runNash() {
+    const out = $('nash-result');
+    out.innerHTML = '<div class="muted">Résolution du jeu simultané…</div>';
+    try {
+      const me = { species: $('c-me-species').value, nature: $('c-me-nature').value,
+        sp: readSP('c-me'), moves: splitMoves($('c-me-moves').value),
+        hpPct: parseFloat($('c-me-hp').value || '100') / 100 };
+      const opp = { species: $('c-opp-species').value, nature: $('c-opp-nature').value,
+        moves: splitMoves($('c-opp-moves').value), hpPct: parseFloat($('c-opp-hp').value || '100') / 100 };
+      const r = await api('/api/nash', { me, opp, bench: parseBench($('c-bench').value),
+        field: { weather: $('c-weather').value, terrain: $('c-terrain').value } });
+      const bars = r.strategy.filter((s) => s.prob >= 0.005).map((s) => {
+        const pct = (s.prob * 100).toFixed(0);
+        return `<div class="nash-row"><span class="nash-lbl">${esc(s.action)}</span>`
+          + `<span class="nash-bar"><i style="width:${Math.max(2, s.prob * 100)}%"></i></span>`
+          + `<span class="nash-pct">${pct}%</span></div>`;
+      }).join('');
+      const opp3 = r.oppStrategy.filter((o) => o.prob >= 0.02)
+        .map((o) => `${o.move == null ? 'inactif' : esc(o.move)} ${(o.prob * 100).toFixed(0)}%`)
+        .join(' · ');
+      out.innerHTML =
+        `<div class="nash-head">Stratégie mixte de Nash — jeu simultané, croyance sur l'adversaire</div>`
+        + `<div class="nash-strat">${bars}</div>`
+        + `<div class="nash-meta">Adversaire (modèle Nash) : ${opp3 || '—'}`
+        + ` &nbsp;·&nbsp; Valeur du jeu : <b>${r.value >= 0 ? '+' : ''}${r.value.toFixed(2)}</b></div>`
+        + `<div class="nash-reco">➤ ${esc(r.recommendation)}</div>`;
+    } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
+  }
+
   // ---------- Tirage ----------
   async function runDraft() {
     const out = $('draft-result');
@@ -364,6 +393,7 @@
     });
     $('c-run').addEventListener('click', runCombat);
     $('c-decide').addEventListener('click', runDecide);
+    $('c-nash').addEventListener('click', runNash);
     $('c-opp-likely').addEventListener('click', fillLikelyOpponent);
     $('draft-run').addEventListener('click', runDraft);
     $('draft-sample').addEventListener('click', () => builders.draft.setEntries(entriesFrom(SAMPLES.lineup, 'lineup')));
