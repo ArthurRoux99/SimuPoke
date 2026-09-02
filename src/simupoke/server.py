@@ -46,6 +46,7 @@ from .bench import (
 from .optimize import optimize_spread, Outspeed, Survive, Ko
 from .sim import Mon
 from .search import rank_actions, rank_actions_sampled
+from .nash import solve_turn
 from .showdown import parse_team as parse_showdown, format_team as format_showdown
 from .draft import rank_lineup
 from .team import analyze_team, select_team_preview
@@ -284,6 +285,31 @@ def api_decide(body: dict) -> dict:
             "recommendation": res.recommendation, "lines": res.lines()}
 
 
+def api_nash(body: dict) -> dict:
+    """Résout le tour vers l'équilibre de Nash (§10.2) : stratégie mixte.
+
+    Jeu matriciel bayésien à coups simultanés (croyance sur le set adverse +
+    regret matching) — dans l'esprit de l'état de l'art (PokéChamp / PokaiTrainer).
+    """
+    me = Mon.from_state(_state(body["me"]))
+    opp = Mon.from_state(_state(body["opp"]))
+    field = FieldState(**(body.get("field") or {}))
+    bench = [Mon.from_state(_state(d)) for d in (body.get("bench") or [])]
+    res = solve_turn(me, opp, field, my_bench=bench,
+                     reg_id=body.get("regulation", "reg_m_b"),
+                     iters=int(body.get("iters", 2000)))
+    return {
+        "strategy": [{"action": lbl, "prob": p} for lbl, p in res.strategy],
+        "value": res.value,
+        "oppActions": res.opp_actions,
+        "oppStrategy": [{"move": m, "prob": p} for m, p in res.opp_strategy],
+        "bestResponse": res.best_response,
+        "recommendation": res.recommendation,
+        "notes": res.notes,
+        "lines": res.lines(),
+    }
+
+
 def api_paste(body: dict) -> dict:
     """Parse un paste Showdown en entrées d'équipe (EV -> SP Champions)."""
     team = parse_showdown(body.get("paste", ""))
@@ -395,7 +421,7 @@ _POST_ROUTES = {
     "/api/roster": api_roster_save,
     "/api/speed": api_speed, "/api/outspeed": api_outspeed,
     "/api/survive": api_survive, "/api/ko": api_ko, "/api/spread": api_spread,
-    "/api/decide": api_decide,
+    "/api/decide": api_decide, "/api/nash": api_nash,
     "/api/paste": api_paste, "/api/export": api_export,
 }
 _GET_API = {"/api/meta": api_meta, "/api/samples": api_samples,
