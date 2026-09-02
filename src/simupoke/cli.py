@@ -655,6 +655,57 @@ def cmd_decide(args: list[str]) -> int:
     return 0
 
 
+def cmd_nash(args: list[str]) -> int:
+    """Stratégie mixte de Nash pour le tour (jeu simultané, croyance adverse)."""
+    from .nash import solve_turn
+    pos, opts, _ = _split_args(args, set())
+    if len(pos) != 5:
+        print("Usage : nash <me_species> <me_nature> <me_moves> "
+              "<opp_species> <opp_nature> [--me-sp k=v] [--opp-moves a,b,c] "
+              "[--me-item X] [--opp-item X] [--me-hp 0..1] [--opp-hp 0..1] "
+              "[--weather X] [--bench 'esp,nat,c1|c2 ; …'] [--iters N]",
+              file=sys.stderr)
+        return 2
+    me_sp, me_nat, me_moves, opp_sp, opp_nat = pos
+    for sp in (me_sp, opp_sp):
+        if not is_known(sp):
+            print(f"Espèce inconnue : {sp!r}", file=sys.stderr)
+            return 1
+    me = Mon.from_state(PokemonState(
+        species=me_sp, nature=me_nat, stat_points=_parse_sp(opts.get("me-sp", "")),
+        moves=[m.strip() for m in me_moves.split(",") if m.strip()],
+        item=opts.get("me-item"), current_hp_pct=float(opts.get("me-hp", 1.0))))
+    opp = Mon.from_state(PokemonState(
+        species=opp_sp, nature=opp_nat, stat_points=_parse_sp(opts.get("opp-sp", "")),
+        moves=[m.strip() for m in opts.get("opp-moves", "").split(",") if m.strip()],
+        item=opts.get("opp-item"), current_hp_pct=float(opts.get("opp-hp", 1.0))))
+    field = FieldState(weather=opts.get("weather"), terrain=opts.get("terrain"))
+    bench: list[Mon] = []
+    for chunk in opts.get("bench", "").split(";"):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        parts = [p.strip() for p in chunk.split(",")]
+        if not is_known(parts[0]):
+            print(f"Espèce inconnue (banc) : {parts[0]!r}", file=sys.stderr)
+            return 1
+        nat = parts[1] if len(parts) > 1 and parts[1] else "serious"
+        mvs = ([m.strip() for m in parts[2].split("|") if m.strip()]
+               if len(parts) > 2 else [])
+        bench.append(Mon.from_state(PokemonState(species=parts[0], nature=nat,
+                                                 moves=mvs)))
+    try:
+        res = solve_turn(me, opp, field, my_bench=bench,
+                         iters=int(opts.get("iters", 2000)))
+    except (ValueError, KeyError) as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    print(f"{label('species', me_sp)}  vs  {label('species', opp_sp)}\n")
+    for line in res.lines():
+        print(line)
+    return 0
+
+
 def cmd_paste(args: list[str]) -> int:
     pos, _, flags = _split_args(args, {"json"})
     if len(pos) != 1:
@@ -744,6 +795,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_sim(rest)
     if cmd == "decide":
         return cmd_decide(rest)
+    if cmd == "nash":
+        return cmd_nash(rest)
     if cmd == "paste":
         return cmd_paste(rest)
     print(f"Commande inconnue : {cmd!r}", file=sys.stderr)

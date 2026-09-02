@@ -139,6 +139,28 @@ def test_dispatch_api_unknown_route_raises():
         server.dispatch_api("POST", "/api/nope", {})
 
 
+def test_nash_endpoint_returns_mixed_strategy():
+    out = server.api_nash({
+        "me": {"species": "garchomp", "nature": "jolly",
+               "sp": {"atk": 32, "spe": 32},
+               "moves": ["earthquake", "dragonclaw", "stoneedge"]},
+        "opp": {"species": "tyranitar", "nature": "adamant",
+                "moves": ["crunch", "rockslide"]},
+    })
+    assert abs(sum(s["prob"] for s in out["strategy"]) - 1.0) < 1e-6
+    assert out["bestResponse"]
+    assert "value" in out
+
+
+def test_dispatch_api_routes_nash():
+    out = server.dispatch_api("POST", "/api/nash", {
+        "me": {"species": "garchomp", "nature": "jolly",
+               "moves": ["earthquake", "dragonclaw"]},
+        "opp": {"species": "tyranitar", "moves": ["crunch", "rockslide"]},
+    })
+    assert out["strategy"] and "recommendation" in out
+
+
 def test_dispatch_json_wraps_status():
     ok = json.loads(server.dispatch_json("GET", "/api/meta"))
     assert ok["status"] == 200 and len(ok["body"]["species"]) > 1000

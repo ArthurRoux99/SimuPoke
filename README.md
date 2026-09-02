@@ -24,7 +24,7 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 | — | UI — page HTML autonome (calc, parité JS 33/33) | ✅ |
 | — | UI — serveur local (tous les modules + recherche) | ✅ |
 | — | Modèle d'usage + import Showdown paste + i18n FR/EN | ✅ |
-| 4 | B1 — Mode simultané : simulateur + recherche multi-tours/switchs/minimax/déterminisation | 🟡 (ISMCTS complet à venir) |
+| 4 | B1 — Mode simultané : simulateur + recherche multi-tours + **solveur de Nash** (croyance + regret matching) | 🟡 (profondeur/par-monde à venir) |
 | 5 | Doubles | ⏳ |
 | 6 | (optionnel) Apprentissage | ⏳ |
 
