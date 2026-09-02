@@ -405,6 +405,57 @@ _CONTENT_TYPES = {".html": "text/html", ".css": "text/css",
                   ".js": "application/javascript", ".json": "application/json"}
 
 
+# ---------------------------------------------------------------------------
+# Dispatcher d'API — source de vérité unique du routage /api/*
+# ---------------------------------------------------------------------------
+# Partagé par le serveur HTTP local ET l'exécution en navigateur (Pyodide, via
+# `dispatch_json`). Ne gère PAS les fichiers statiques (côté serveur uniquement).
+
+def dispatch_api(method: str, route: str, body: dict | None = None,
+                 query: str = "") -> dict:
+    """Route une requête `/api/*` vers sa fonction. Lève `KeyError` si la route
+    est inconnue, `ValueError`/`KeyError` sur entrée invalide."""
+    if method == "GET":
+        if route in _GET_API:
+            return _GET_API[route]()
+        if route == "/api/likely":
+            from urllib.parse import parse_qs
+            q = parse_qs(query)
+            species = (q.get("species") or [""])[0]
+            if not species:
+                raise ValueError("paramètre 'species' requis")
+            return api_likely(species, (q.get("reg") or ["reg_m_b"])[0])
+        raise KeyError(route)
+    if method == "POST":
+        fn = _POST_ROUTES.get(route)
+        if fn is None:
+            raise KeyError(route)
+        return fn(body or {})
+    raise KeyError(method)
+
+
+def dispatch_json(method: str, route: str, body_json: str = "",
+                  query: str = "") -> str:
+    """Pont « tout-chaîne » pour Pyodide (JS ↔ Python).
+
+    Renvoie une chaîne JSON ``{"status": int, "body": {...}}`` reproduisant la
+    sémantique HTTP du serveur (200 / 400 / 404 / 500), de sorte que le frontend
+    hébergé fonctionne à l'identique sans serveur.
+    """
+    body = json.loads(body_json) if body_json else {}
+    try:
+        data = dispatch_api(method, route, body, query)
+        return json.dumps({"status": 200, "body": data}, ensure_ascii=False)
+    except KeyError:
+        return json.dumps({"status": 404, "body": {"error": "route inconnue"}})
+    except ValueError as exc:
+        return json.dumps({"status": 400, "body": {"error": str(exc)}},
+                          ensure_ascii=False)
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"status": 500, "body": {"error": str(exc)}},
+                          ensure_ascii=False)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "SimuPoke/0.1"
 

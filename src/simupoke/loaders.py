@@ -46,6 +46,8 @@ def load_my_roster(path: str | Path | None = None) -> list[OwnedPokemon]:
     Les clés `_help`/`_*` sont ignorées (documentation du schéma).
     """
     path = Path(path) if path else DATA_DIR / "my_roster.json"
+    if not path.exists():
+        return []  # box vide (nouveau joueur, ou exécution hors dépôt / navigateur)
     raw = _read_json(path)
     return [_parse_owned(e) for e in raw.get("owned", [])]
 
