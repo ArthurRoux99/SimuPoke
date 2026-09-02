@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from simupoke.nash import solve_matrix, solve_turn
+from simupoke.nash import solve_matrix, solve_bayesian, solve_turn
 from simupoke.sim import Mon
 from simupoke.model import PokemonState
 
@@ -36,6 +36,35 @@ def test_solve_matrix_strategies_sum_to_one():
     rst, cst, _ = solve_matrix([[0.3, -0.2, 0.5], [-0.1, 0.4, 0.0]], iters=1500)
     assert abs(sum(rst) - 1.0) < 1e-6
     assert abs(sum(cst) - 1.0) < 1e-6
+
+
+# --- Jeu bayésien par-monde ------------------------------------------------
+
+def test_bayesian_informed_opponent_is_stronger():
+    # Deux mondes équiprobables. Dans le monde A, l'adversaire punit mon
+    # action 0 ; dans le monde B, il punit mon action 1. S'il CONNAÎT son monde
+    # (info privée), il exploite : ma valeur tombe sous celle du jeu « moyen ».
+    U_a = [[0.0, 1.0], [1.0, 1.0]]
+    U_b = [[1.0, 1.0], [1.0, 0.0]]
+    worlds = [(0.5, U_a, ["x", "y"]), (0.5, U_b, ["x", "y"])]
+    my_strat, value, opp_marg, br = solve_bayesian(2, worlds, iters=6000)
+
+    # Jeu « moyen » (adversaire non informé) : matrice moyenne.
+    U_avg = [[(U_a[i][j] + U_b[i][j]) / 2 for j in range(2)] for i in range(2)]
+    _, _, avg_val = solve_matrix(U_avg, iters=6000)
+
+    assert value < avg_val - 0.1                 # l'info privée renforce l'adversaire
+    assert abs(value - 0.5) < 0.05               # valeur bayésienne attendue
+    assert abs(sum(my_strat) - 1.0) < 1e-6
+    assert abs(sum(p for _, p in opp_marg) - 1.0) < 1e-6
+
+
+def test_bayesian_single_world_matches_matrix():
+    U = [[0.7, -0.2], [0.1, 0.4]]
+    ms, val, _, _ = solve_bayesian(2, [(1.0, U, ["a", "b"])], iters=4000)
+    rst, _, mval = solve_matrix(U, iters=4000)
+    assert abs(val - mval) < 0.02
+    assert abs(ms[0] - rst[0]) < 0.05
 
 
 # --- Résolution de tour ----------------------------------------------------
