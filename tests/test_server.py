@@ -152,6 +152,25 @@ def test_nash_endpoint_returns_mixed_strategy():
     assert "value" in out
 
 
+def test_nash_endpoint_exposes_belief():
+    out = server.api_nash({
+        "me": {"species": "garchomp", "nature": "jolly",
+               "moves": ["earthquake", "dragonclaw"]},
+        "opp": {"species": "tyranitar", "moves": ["crunch"]},
+    })
+    assert len(out["belief"]) > 1
+    assert abs(sum(b["weight"] for b in out["belief"]) - 1.0) < 1e-6
+    assert all("crunch" in b["moves"] for b in out["belief"])
+
+
+def test_belief_endpoint():
+    out = server.api_belief({"opp": {"species": "tyranitar", "moves": ["crunch"]}})
+    assert out["belief"] and all("moves" in b for b in out["belief"])
+    out2 = server.dispatch_api("POST", "/api/belief",
+                               {"opp": {"species": "tyranitar", "moves": ["crunch"]}})
+    assert out2["belief"]
+
+
 def test_dispatch_api_routes_nash():
     out = server.dispatch_api("POST", "/api/nash", {
         "me": {"species": "garchomp", "nature": "jolly",

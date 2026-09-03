@@ -204,3 +204,14 @@ pre.report { background: var(--panel); border: 1px solid var(--border); border-r
 .nash-meta { margin-top: 12px; font-size: 13px; color: var(--muted); }
 .nash-meta b { color: var(--good); font-variant-numeric: tabular-nums; }
 .nash-reco { margin-top: 8px; font-size: 13px; color: var(--text); }
+
+/* ---- Croyance sur le set adverse (panneau Nash) ---- */
+.nash-belief { margin-top: 12px; padding: 10px 12px; background: var(--panel-2);
+  border: 1px solid var(--border); border-radius: 8px; }
+.nash-belief-head { font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--muted); margin-bottom: 8px; }
+.nash-belief-row { display: grid; grid-template-columns: 42px 1fr; gap: 10px;
+  align-items: baseline; padding: 3px 0; font-size: 12.5px; }
+.nash-belief-w { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
+.nash-belief-set { color: var(--text); }
+.nash-belief-set b { color: var(--muted); font-weight: 600; }

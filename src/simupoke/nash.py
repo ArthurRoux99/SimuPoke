@@ -275,6 +275,7 @@ class NashResult:
     best_response: str                       # meilleure action PURE vs strat adverse
     recommendation: str
     notes: list[str] = dfield(default_factory=list)
+    belief: list[Particle] = dfield(default_factory=list)  # croyance sur le set adverse
 
     def lines(self) -> list[str]:
         out = ["Stratégie mixte de Nash (jeu simultané, croyance sur l'adversaire) :"]
@@ -286,6 +287,14 @@ class NashResult:
                         for m, p in self.opp_strategy if p >= 0.02)
         out.append(f"Adversaire (modèle Nash) : {opp}")
         out.append(f"Valeur du jeu : {self.value:+.2f}")
+        if len(self.belief) > 1:
+            out.append("")
+            out.append("Croyance sur le set adverse (usage §10.3) :")
+            for part in self.belief:
+                b = part.build
+                item = f" @ {b.item}" if b.item else ""
+                out.append(f"  {part.weight*100:4.0f} %{item}  ·  "
+                           f"{', '.join(b.moves)}")
         out.append("")
         out.append(f"➤ {self.recommendation}")
         return out
@@ -361,7 +370,7 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
         notes.append(f"croyance : {len(particles)} builds adverses pondérés")
     return NashResult(strategy=strat, value=val, opp_actions=opp_moves,
                       opp_strategy=opp_strat, best_response=best_response,
-                      recommendation=reco, notes=notes)
+                      recommendation=reco, notes=notes, belief=particles)
 
 
 def _phrase_label(label: str) -> str:

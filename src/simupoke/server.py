@@ -311,8 +311,24 @@ def api_nash(body: dict) -> dict:
         "bestResponse": res.best_response,
         "recommendation": res.recommendation,
         "notes": res.notes,
+        "belief": _belief_json(res.belief),
         "lines": res.lines(),
     }
+
+
+def _belief_json(particles) -> list[dict]:
+    """Sérialise la croyance (particules pondérées) sur le set adverse."""
+    return [{"weight": p.weight, "item": p.build.item, "ability": p.build.ability,
+             "nature": p.build.nature, "moves": list(p.build.moves)}
+            for p in particles]
+
+
+def api_belief(body: dict) -> dict:
+    """Croyance sur le set adverse (§10.3) : mixture pondérée filtrée par l'observé."""
+    from .belief import opponent_belief
+    opp = _state(body["opp"])
+    particles = opponent_belief(opp, body.get("regulation", "reg_m_b"))
+    return {"belief": _belief_json(particles)}
 
 
 def api_paste(body: dict) -> dict:
@@ -427,7 +443,7 @@ _POST_ROUTES = {
     "/api/roster": api_roster_save,
     "/api/speed": api_speed, "/api/outspeed": api_outspeed,
     "/api/survive": api_survive, "/api/ko": api_ko, "/api/spread": api_spread,
-    "/api/decide": api_decide, "/api/nash": api_nash,
+    "/api/decide": api_decide, "/api/nash": api_nash, "/api/belief": api_belief,
     "/api/paste": api_paste, "/api/export": api_export,
 }
 _GET_API = {"/api/meta": api_meta, "/api/samples": api_samples,
