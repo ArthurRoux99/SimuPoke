@@ -673,7 +673,8 @@ def cmd_nash(args: list[str]) -> int:
               "[--weather X] [--bench 'esp,nat,c1|c2 ; …'] [--iters N] "
               "[--horizon 0..3] [--opp-observed coup] "
               "[--opp-faster|--opp-slower] [--me-tailwind] [--opp-tailwind] "
-              "[--trick-room]", file=sys.stderr)
+              "[--trick-room] [--me-damage %] [--opp-damage % --my-move coup]",
+              file=sys.stderr)
         return 2
     me_sp, me_nat, me_moves, opp_sp, opp_nat = pos
     for sp in (me_sp, opp_sp):
@@ -707,11 +708,15 @@ def cmd_nash(args: list[str]) -> int:
     horizon = int(opts.get("horizon", 0))
     observed = (opts.get("opp-observed") or "").strip() or None
     order = ("opp-faster" in flags) - ("opp-slower" in flags)   # +1 / 0 / -1
+    me_dmg = opts.get("me-damage")               # % de MES PV subis (rôle attaquant)
+    opp_dmg = opts.get("opp-damage")             # % des PV adverses infligés (défenseur)
+    my_move = (opts.get("my-move") or "").strip() or None
     try:
         res = solve_turn(me, opp, field, my_bench=bench, iters=iters,
                          horizon=horizon)
         header = f"{label('species', me_sp)}  vs  {label('species', opp_sp)}\n"
-        if observed is not None or order:
+        if observed is not None or order or me_dmg or opp_dmg:
+            from .belief import update_belief_damage
             prior = res.belief
             posterior = prior
             print(header)
@@ -733,6 +738,20 @@ def cmd_nash(args: list[str]) -> int:
                 _print_belief_shift(before, posterior,
                                     f"ordre d'action : l'adversaire agit {sens} "
                                     f"(ma vitesse {me_speed})")
+            if me_dmg and observed is not None:
+                before = posterior
+                posterior = update_belief_damage(
+                    posterior, me.build, observed, float(me_dmg) / 100.0,
+                    opp_role="attacker", field=field)
+                _print_belief_shift(before, posterior,
+                                    f"dégâts subis : {observed} m'a infligé {me_dmg} %")
+            if opp_dmg and my_move is not None:
+                before = posterior
+                posterior = update_belief_damage(
+                    posterior, me.build, my_move, float(opp_dmg) / 100.0,
+                    opp_role="defender", field=field)
+                _print_belief_shift(before, posterior,
+                                    f"dégâts infligés : mon {my_move} a fait {opp_dmg} %")
             res = solve_turn(me, opp, field, my_bench=bench, iters=iters,
                              horizon=horizon, belief=posterior)
             for line in res.lines():

@@ -218,3 +218,45 @@ def update_belief_speed(particles: list[Particle], opp_faster: bool,
         post.append(Particle(build=p.build,
                              weight=p.weight * (1.0 if consistent else floor)))
     return _renorm(post)
+
+
+def update_belief_damage(particles: list[Particle], other: PokemonState,
+                         move: str, observed_frac: float, *,
+                         opp_role: str = "defender", field=None,
+                         tol: float = 0.035, floor: float = 0.02,
+                         crit: bool = False) -> list[Particle]:
+    """Reconditionne la croyance sur les **dégâts observés** d'un coup — révèle
+    l'investissement défensif (ou offensif) et l'objet adverse.
+
+    - `opp_role="defender"` : **j'ai attaqué l'adversaire** ; `other` est mon
+      attaquant (`PokemonState`), `move` mon coup, `observed_frac` la fraction
+      des **PV max adverses** infligée (0..1). Discrimine bulk/nature défensive,
+      Assault Vest, baie de résistance…
+    - `opp_role="attacker"` : **l'adversaire m'a attaqué** ; `other` est mon
+      défenseur, `move` le coup adverse observé, `observed_frac` la fraction de
+      **mes** PV max subie. Discrimine attaque/nature offensive, Choice Band,
+      Life Orb…
+
+    Pour chaque monde on calcule l'intervalle de dégâts (`min_pct`..`max_pct`) et
+    on garde ceux dont `[min-tol, max+tol]` contient `observed_frac` ; les autres
+    passent au plancher. Une marge `tol` absorbe l'imprécision de lecture. Un
+    monde dont le coup n'inflige pas de dégâts direct (puissance variable, statut)
+    n'est **pas évaluable** : il est laissé tel quel (vraisemblance 1).
+    """
+    from .damage import calculate
+    post: list[Particle] = []
+    for p in particles:
+        try:
+            if opp_role == "attacker":
+                res = calculate(p.build, other, move, field, crit=crit)
+            else:
+                res = calculate(other, p.build, move, field, crit=crit)
+        except (ValueError, KeyError):
+            post.append(Particle(build=p.build, weight=p.weight))  # non évaluable
+            continue
+        lo = res.min_pct / 100.0 - tol
+        hi = res.max_pct / 100.0 + tol
+        consistent = lo <= observed_frac <= hi
+        post.append(Particle(build=p.build,
+                             weight=p.weight * (1.0 if consistent else floor)))
+    return _renorm(post)

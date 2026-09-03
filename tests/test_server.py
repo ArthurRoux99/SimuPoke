@@ -194,6 +194,21 @@ def test_nash_endpoint_updates_belief_on_move_order():
     assert scarf > 0.8                               # le dépassement révèle le Scarf
 
 
+def test_nash_endpoint_updates_belief_on_damage_taken():
+    # L'adversaire me frappe avec Crunch ; les dégâts subis reconditionnent la
+    # croyance sur son investissement offensif. On vérifie le plumbing : drapeaux
+    # exposés et croyance a posteriori normalisée.
+    out = server.api_nash({
+        "me": {"species": "garchomp", "nature": "jolly", "moves": ["earthquake"]},
+        "opp": {"species": "tyranitar", "moves": ["crunch"]},
+        "oppObserved": "crunch",
+        "meDamagePct": 41.0,
+    })
+    assert out["meDamagePct"] == 41.0
+    assert "beliefPrior" in out
+    assert abs(sum(b["weight"] for b in out["belief"]) - 1.0) < 1e-6
+
+
 def test_belief_endpoint():
     out = server.api_belief({"opp": {"species": "tyranitar", "moves": ["crunch"]}})
     assert out["belief"] and all("moves" in b for b in out["belief"])

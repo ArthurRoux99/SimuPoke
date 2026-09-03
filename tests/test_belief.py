@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
-from simupoke.belief import Particle, update_belief, update_belief_speed
+from simupoke.belief import (
+    Particle,
+    update_belief,
+    update_belief_damage,
+    update_belief_speed,
+)
 from simupoke.bench import compute_speed
+from simupoke.damage import calculate
 from simupoke.model import PokemonState
 
 
@@ -160,3 +166,58 @@ def test_speed_update_trick_room_inverts_order():
                                trick_room=True)
     w_slow = next(p for p in post if p.build.nature == "adamant")
     assert w_slow.weight > 0.9                            # sous TR, le lent passe devant
+
+
+# --- Mise à jour sur les dégâts observés -----------------------------------
+
+def _dpart(weight, *, nature="adamant", item=None):
+    return Particle(build=PokemonState(species="tyranitar", nature=nature,
+                                       item=item, moves=["crunch"]),
+                    weight=weight)
+
+
+def test_damage_update_reveals_assault_vest():
+    # J'attaque Tyranitar au spécial. Deux mondes : nu vs Assault Vest (SpD ×1.5).
+    # Observer ~71 % (dans l'intervalle AV, bien sous le monde nu) révèle l'AV.
+    atk = PokemonState(species="ironvaliant", nature="modest",
+                       stat_points={"spa": 32}, moves=["moonblast"])
+    plain = _dpart(0.5)
+    av = _dpart(0.5, item="assaultvest")
+    r_av = calculate(atk, av.build, "moonblast")
+    observed = (r_av.min_pct + r_av.max_pct) / 200.0     # fraction, milieu AV
+    post = update_belief_damage([plain, av], atk, "moonblast", observed,
+                                opp_role="defender")
+    w_av = next(p for p in post if p.build.item == "assaultvest")
+    w_plain = next(p for p in post if p.build.item is None)
+    assert w_av.weight > 0.9                              # dégâts faibles → AV
+    assert w_plain.weight < 0.1
+
+
+def test_damage_update_attacker_role_reveals_choice_band():
+    # L'adversaire ME frappe. Deux mondes : nu vs Choice Band (Atq ×1.5).
+    # Observer les gros dégâts (milieu CB) révèle le Band.
+    me = PokemonState(species="garchomp", nature="jolly", moves=["earthquake"])
+    plain = Particle(build=PokemonState(species="tyranitar", nature="adamant",
+                                        stat_points={"atk": 32}, moves=["crunch"]),
+                     weight=0.5)
+    band = Particle(build=PokemonState(species="tyranitar", nature="adamant",
+                                       stat_points={"atk": 32}, item="choiceband",
+                                       moves=["crunch"]), weight=0.5)
+    r_band = calculate(band.build, me, "crunch")
+    observed = (r_band.min_pct + r_band.max_pct) / 200.0
+    post = update_belief_damage([plain, band], me, "crunch", observed,
+                                opp_role="attacker")
+    w_band = next(p for p in post if p.build.item == "choiceband")
+    assert w_band.weight > 0.9                            # gros dégâts → Band
+
+
+def test_damage_update_non_damaging_move_is_left_unchanged():
+    # Coup sans dégâts direct (statut / puissance variable non évaluable) : la
+    # croyance ne bouge pas (vraisemblance 1 partout).
+    atk = PokemonState(species="garchomp", nature="jolly", moves=["swordsdance"])
+    a = _dpart(0.6)
+    b = _dpart(0.4)
+    post = update_belief_damage([a, b], atk, "swordsdance", 0.3,
+                                opp_role="defender")
+    assert abs(post[0].weight - 0.6) < 1e-9
+    assert abs(post[1].weight - 0.4) < 1e-9

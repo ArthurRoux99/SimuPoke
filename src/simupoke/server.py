@@ -314,9 +314,13 @@ def api_nash(body: dict) -> dict:
     # puis on re-résout le tour.
     observed = (body.get("oppObserved") or "").strip() or None
     opp_faster = body.get("oppFaster")               # True / False / None
+    me_damage = body.get("meDamagePct")              # % de MES PV subis
+    opp_damage = body.get("oppDamagePct")            # % des PV adverses infligés
+    my_move = (body.get("oppDamageMove") or "").strip() or None
     prior_belief = res.belief
-    if observed is not None or opp_faster is not None:
-        from .belief import update_belief, update_belief_speed
+    if (observed is not None or opp_faster is not None
+            or me_damage is not None or opp_damage is not None):
+        from .belief import update_belief, update_belief_damage, update_belief_speed
         posterior = res.belief
         if observed is not None:
             posterior = update_belief(posterior, observed,
@@ -329,6 +333,14 @@ def api_nash(body: dict) -> dict:
                 posterior, opp_faster=bool(opp_faster), me_speed=me_speed,
                 opp_tailwind=bool(body.get("oppTailwind")),
                 trick_room=bool(body.get("trickRoom")))
+        if me_damage is not None and observed is not None:
+            posterior = update_belief_damage(
+                posterior, me.build, observed, float(me_damage) / 100.0,
+                opp_role="attacker", field=field)
+        if opp_damage is not None and my_move is not None:
+            posterior = update_belief_damage(
+                posterior, me.build, my_move, float(opp_damage) / 100.0,
+                opp_role="defender", field=field)
         res = solve_turn(me, opp, field, my_bench=bench, reg_id=reg_id,
                          iters=iters, horizon=horizon, belief=posterior)
 
@@ -343,12 +355,17 @@ def api_nash(body: dict) -> dict:
         "belief": _belief_json(res.belief),
         "lines": res.lines(),
     }
-    if observed is not None or opp_faster is not None:
+    if (observed is not None or opp_faster is not None
+            or me_damage is not None or opp_damage is not None):
         out["beliefPrior"] = _belief_json(prior_belief)
         if observed is not None:
             out["oppObserved"] = observed
         if opp_faster is not None:
             out["oppFaster"] = bool(opp_faster)
+        if me_damage is not None and observed is not None:
+            out["meDamagePct"] = float(me_damage)
+        if opp_damage is not None and my_move is not None:
+            out["oppDamagePct"] = float(opp_damage)
     return out
 
 

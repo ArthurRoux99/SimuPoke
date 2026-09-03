@@ -75,13 +75,22 @@ Par ordre d'impact / coût croissant — chaque cran rapproche de PokaiTrainer :
    probabilité qu'il jouait ce coup, **écrasé au plancher** s'il ne le possède
    pas (preuve dure), et le cas **contradiction** (coup dans aucun monde) est
    traité par **synthèse de spreads** — on l'injecte plutôt que d'effondrer la
-   croyance. En plus du coup, l'**ordre d'action observé** est reconditionné
-   (`update_belief_speed`) — le *scouting de vitesse* : « l'adversaire m'a
-   dépassé » écrase les mondes trop lents et remonte Choice Scarf / nature +Vit
-   (Trick Room, Tailwind et paralysie pris en compte). Exposé partout : CLI
-   `nash --opp-observed <coup>` / `--opp-faster|--opp-slower` (glissement de
-   croyance affiché), API `/api/nash` (`oppObserved`, `oppFaster`, renvoie
-   `beliefPrior`), et l'onglet Combat de l'app. *Pur algo, hors-ligne, explicable.*
+   croyance. Trois observables sont reconditionnés — le **triptyque** du scouting
+   compétitif :
+   - le **coup joué** (ci-dessus) ;
+   - l'**ordre d'action** (`update_belief_speed`) — *scouting de vitesse* :
+     « l'adversaire m'a dépassé » écrase les mondes trop lents et remonte Choice
+     Scarf / nature +Vit (Trick Room, Tailwind, paralysie pris en compte) ;
+   - les **dégâts observés** (`update_belief_damage`) — le % infligé/subi révèle
+     le bulk et l'objet défensif (Assault Vest…) ou l'investissement offensif
+     (Choice Band, Life Orb…) ; on garde les mondes dont l'intervalle de dégâts
+     contient l'observé, à une marge de lecture près.
+
+   Exposé partout : CLI `nash --opp-observed <coup>` / `--opp-faster|--opp-slower`
+   / `--me-damage %` / `--opp-damage % --my-move <coup>` (glissement de croyance
+   affiché), API `/api/nash` (`oppObserved`, `oppFaster`, `meDamagePct`,
+   `oppDamagePct`, renvoie `beliefPrior`), et l'onglet Combat de l'app.
+   *Pur algo, hors-ligne, explicable.*
 4. **Réseau de valeur appris (ONNX)** — *le levier « au-delà »* : remplacer
    l'éval heuristique de feuille par un petit réseau valeur/politique entraîné en
    self-play sur `sim`, exporté en ONNX et chargé **dans le navigateur**
