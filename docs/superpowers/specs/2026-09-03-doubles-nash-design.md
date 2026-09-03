@@ -156,10 +156,16 @@ ligne existant.
 ### 4.1 Élagage top-k par slot
 
 Pour chaque slot, les actions candidates (coups × cibles légales, plus un
-changement par membre vivant du banc) sont scorées par une passe rapide — dégâts
-attendus, K.O. atteint, valeur d'appui — et seules les **k meilleures** sont
-retenues (défaut `k = 3`, paramétrable). Les actions de camp sont le produit des
-survivantes : une matrice de l'ordre de 9×9.
+changement par membre vivant du banc) sont scorées par une passe rapide et seules
+les **k meilleures** sont retenues (défaut `k = 3`, paramétrable) :
+
+- coup offensif → dégâts attendus sur la cible, majorés si le coup met K.O. ;
+- coup de soutien → note de `combat.score_support`, déjà utilisée par le mode
+  analyse (setup / statut / protection / soin) ;
+- changement → note de l'entrant par `search.evaluate_side`.
+
+Les actions de camp sont le produit des survivantes : une matrice de l'ordre
+de 9×9.
 
 `nash.solve_matrix` est réutilisé **inchangé** et résout *exactement* le jeu
 réduit. Le filtre est reporté à l'utilisateur (« options considérées par slot »),
