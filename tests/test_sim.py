@@ -372,3 +372,25 @@ def test_grassy_terrain_heals_grounded():
     opp = mon("snorlax", "careful", {"hp": 32}, hp=0.5)
     r = simulate_turn(atk, opp, "thunderbolt", None, FieldState(terrain="grassy"))
     assert any("Champ Herbu" in ln for ln in r.log)
+
+
+# --- Relais des paramètres de calc (substrat Doubles) -----------------------
+
+def test_apply_move_relays_spread_and_power_mod():
+    from simupoke.sim import _apply_move
+
+    def hit(**kw):
+        atk = mon("garchomp", "adamant", {"atk": 31}, moves=["earthquake"])
+        # Défenseur assez massif pour survivre : sinon les dégâts saturent sur
+        # les PV restants et le modificateur devient invisible.
+        dfn = mon("snorlax", "careful", {"hp": 32, "def": 32})
+        before = dfn.hp
+        _apply_move(atk, dfn, "earthquake", None, 0.5, [], **kw)
+        assert not dfn.fainted, "le défenseur doit survivre pour mesurer"
+        return before - dfn.hp
+
+    plein = hit()
+    zone = hit(apply_spread=True)
+    boost = hit(power_mod=1.5)
+    assert zone < plein, "la pénalité de zone doit réduire les dégâts"
+    assert boost > plein, "power_mod doit augmenter les dégâts"

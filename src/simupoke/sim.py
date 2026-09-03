@@ -199,12 +199,16 @@ def _can_act(mon: Mon, log: list[str]) -> bool:
 def _apply_move(attacker: Mon, defender: Mon, move: str,
                 field: FieldState | None, roll: float, log: list[str], *,
                 atk_side: Side | None = None, def_side: Side | None = None,
-                field_dur: dict | None = None) -> None:
+                field_dur: dict | None = None,
+                apply_spread: bool = False, power_mod: float = 1.0) -> None:
     """Résout un coup de `attacker` sur `defender` (mutation en place).
 
     `atk_side`/`def_side`/`field_dur` (facultatifs, chemin « actions ») activent
     les conditions de camp/champ : écrans, Tailwind, météo/terrain/Trick Room,
     pièges d'entrée.
+
+    `apply_spread`/`power_mod` (chemin Doubles) sont relayés au calc : pénalité
+    de zone ×0.75 et modificateur de puissance externe (Helping Hand).
     """
     if attacker.fainted:
         return
@@ -273,7 +277,8 @@ def _apply_move(attacker: Mon, defender: Mon, move: str,
         elif not m.is_physical and ("lightscreen" in s or "auroraveil" in s):
             scr = "auroraveil" if "auroraveil" in s else "lightscreen"
     try:
-        r = calculate(attacker.snapshot(), defender.snapshot(), m, field, screen=scr)
+        r = calculate(attacker.snapshot(), defender.snapshot(), m, field,
+                      screen=scr, apply_spread=apply_spread, power_mod=power_mod)
     except (ValueError, KeyError):
         # Coup à puissance variable / non modélisé par le calc (ex. Balayage) :
         # on l'ignore plutôt que de planter la simulation.
