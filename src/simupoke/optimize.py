@@ -24,13 +24,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 
-from .stats import SP_CAP_PER_STAT, SP_TOTAL_BUDGET, STAT_KEYS, compute_all_stats
 from .basestats import get_base_stats, is_known
-from .moves import get_move
-from .model import PokemonState, FieldState
+from .bench import min_sp_to_ko, min_sp_to_outspeed, min_sp_to_survive
 from .damage import calculate
-from .bench import min_sp_to_outspeed, min_sp_to_ko, min_sp_to_survive
-
+from .model import FieldState, PokemonState
+from .moves import get_move
+from .stats import SP_CAP_PER_STAT, SP_TOTAL_BUDGET, STAT_KEYS, compute_all_stats
 
 # ---------------------------------------------------------------------------
 # Objectifs
@@ -117,7 +116,7 @@ def _me(species: str, nature: str, item: str | None, ability: str | None,
 def _min_def_given_hp(me_defender: PokemonState, obj: Survive, hp_sp: int,
                       def_key: str, cap: int) -> int | None:
     """Min de SP dans `def_key` pour survivre à `obj` à `hp_sp` PV fixés."""
-    for def_sp in range(0, cap + 1):
+    for def_sp in range(cap + 1):
         trial = replace(me_defender, stat_points={
             **me_defender.stat_points, "hp": hp_sp, def_key: def_sp})
         r = calculate(obj.attacker, trial, obj.move, obj.field, crit=obj.crit)
@@ -138,7 +137,7 @@ def _solve_defense(me_defender: PokemonState, survives: list[Survive],
     if not phys and not spec:
         return (0, 0, 0)
     best: tuple[int, int, int, int] | None = None   # (total, hp, def, spd)
-    for hp_sp in range(0, cap + 1):
+    for hp_sp in range(cap + 1):
         def_need = max((_min_def_given_hp(me_defender, o, hp_sp, "def", cap) or 0
                         for o in phys), default=0)
         spd_need = max((_min_def_given_hp(me_defender, o, hp_sp, "spd", cap) or 0
@@ -162,7 +161,7 @@ def optimize_spread(species: str, nature: str,
     défensif. Les objectifs hors de portée (même à 32 SP) ou le dépassement de
     budget sont signalés dans `unmet` plutôt que de faire échouer le calcul.
     """
-    sp = {k: 0 for k in STAT_KEYS}
+    sp = dict.fromkeys(STAT_KEYS, 0)
     unmet: list[str] = []
 
     outspeeds = [o for o in objectives if isinstance(o, Outspeed)]

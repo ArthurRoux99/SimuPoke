@@ -35,7 +35,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from gen_icons import make_icons  # noqa: E402  (script voisin, stdlib pure)
+from gen_icons import make_icons
 
 ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT / "web"

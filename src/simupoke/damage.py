@@ -29,14 +29,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .basestats import get_base_stats, get_species, to_id
-from .stats import STAT_KEYS, compute_stat, nature_multipliers
-from .moves import Move, get_move
-from .typechart import effectiveness
-from .model import PokemonState, FieldState
-from .delta import type_change_for, personal_weather_for, ATE_POWER_MOD
-
 from .analysis import ABILITY_TYPE_IMMUNITY as _ABILITY_IMMUNITY
+from .basestats import get_base_stats, get_species, to_id
+from .delta import ATE_POWER_MOD, personal_weather_for, type_change_for
+from .model import FieldState, PokemonState
+from .moves import Move, get_move
+from .stats import STAT_KEYS, compute_stat, nature_multipliers
+from .typechart import effectiveness
 
 LEVEL = 50
 
@@ -377,13 +376,11 @@ def calculate(attacker: PokemonState, defender: PokemonState,
 
     # Terrain (attaquant au sol)
     terrain = _terrain(field)
-    if terrain and _is_grounded(attacker):
-        if terrain == "electric" and move_type == "Electric":
-            base_damage = _apply_mod(base_damage, 5325)
-        elif terrain == "grassy" and move_type == "Grass":
-            base_damage = _apply_mod(base_damage, 5325)
-        elif terrain == "psychic" and move_type == "Psychic":
-            base_damage = _apply_mod(base_damage, 5325)
+    if terrain and _is_grounded(attacker) and (
+            (terrain == "electric" and move_type == "Electric")
+            or (terrain == "grassy" and move_type == "Grass")
+            or (terrain == "psychic" and move_type == "Psychic")):
+        base_damage = _apply_mod(base_damage, 5325)
     if terrain == "misty" and move_type == "Dragon" and _is_grounded(defender):
         base_damage = _apply_mod(base_damage, 2048)
 
@@ -393,10 +390,7 @@ def calculate(attacker: PokemonState, defender: PokemonState,
 
     # --- Facteurs finaux ---
     is_stab = move_type in atk_types
-    if is_stab:
-        stab_mod = 8192 if atk_ability == "adaptability" else 6144
-    else:
-        stab_mod = 4096
+    stab_mod = (8192 if atk_ability == "adaptability" else 6144) if is_stab else 4096
 
     eff = effectiveness(move_type, def_types)
     # Immunités de talent du défenseur (annulent les dégâts).

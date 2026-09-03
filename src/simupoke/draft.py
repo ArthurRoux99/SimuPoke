@@ -22,12 +22,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .model import OwnedPokemon
-from .basestats import is_known, to_id
 from .analysis import (
-    STANDARD_TYPES, defensive_profile, offensive_types, coverage_count,
-    infer_role, base_stat_total,
+    STANDARD_TYPES,
+    base_stat_total,
+    coverage_count,
+    defensive_profile,
+    infer_role,
+    offensive_types,
 )
+from .basestats import is_known, to_id
+from .model import OwnedPokemon
 
 # Pondérations par défaut (somme = 1.0). Ajustables via rank_lineup(weights=...).
 DEFAULT_WEIGHTS: dict[str, float] = {

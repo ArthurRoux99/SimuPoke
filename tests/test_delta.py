@@ -8,9 +8,9 @@ contre @smogon/calc dans test_damage.py (Pixilate).
 
 from __future__ import annotations
 
-from simupoke.model import PokemonState
 from simupoke.damage import calculate
-from simupoke.delta import type_change_for, personal_weather_for, ate_type_map
+from simupoke.delta import ate_type_map, personal_weather_for, type_change_for
+from simupoke.model import PokemonState
 
 
 def mk(species, nature="serious", sp=None, ability=None):

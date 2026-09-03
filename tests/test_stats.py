@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from simupoke.stats import (
-    Build, compute_all_stats, nature_multipliers, validate_sp,
-    SP_TOTAL_BUDGET, SP_CAP_PER_STAT,
-)
 from simupoke.basestats import get_base_stats
+from simupoke.stats import (
+    SP_CAP_PER_STAT,
+    SP_TOTAL_BUDGET,
+    Build,
+    compute_all_stats,
+    nature_multipliers,
+    validate_sp,
+)
 
 
 def test_tyranitar_jolly_reference():

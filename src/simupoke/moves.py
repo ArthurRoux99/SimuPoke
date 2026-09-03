@@ -8,11 +8,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from functools import lru_cache
-from pathlib import Path
+from functools import cache, lru_cache
 
 from .basestats import to_id
-
 from .paths import DATA_DIR
 
 MOVES_PATH = DATA_DIR / "moves.json"
@@ -49,7 +47,7 @@ def _load_moves() -> dict[str, dict]:
         return json.load(fh)["moves"]
 
 
-@lru_cache(maxsize=None)
+@cache
 def get_move(move: str) -> Move:
     """Renvoie un Move. Lève KeyError explicite si inconnu."""
     mid = to_id(move)

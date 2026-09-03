@@ -16,14 +16,19 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from .model import OwnedPokemon, PokemonState
-from .basestats import is_known, get_base_stats, get_species
-from .typechart import effectiveness
-from .moves import get_move, is_known as move_known
-from .damage import calculate
 from .analysis import (
-    STANDARD_TYPES, defensive_profile, offensive_types, infer_role, ROLE_FR,
+    ROLE_FR,
+    STANDARD_TYPES,
+    defensive_profile,
+    infer_role,
+    offensive_types,
 )
+from .basestats import get_base_stats, get_species, is_known
+from .damage import calculate
+from .model import OwnedPokemon, PokemonState
+from .moves import get_move
+from .moves import is_known as move_known
+from .typechart import effectiveness
 
 BRING_BY_FORMAT = {"singles": 3, "doubles": 4}
 

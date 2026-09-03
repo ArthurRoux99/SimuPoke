@@ -26,9 +26,10 @@ from __future__ import annotations
 
 import re
 
+from .basestats import get_species, is_known, to_id
 from .model import OwnedPokemon
-from .basestats import to_id, is_known, get_species
-from .moves import get_move, is_known as move_known
+from .moves import get_move
+from .moves import is_known as move_known
 
 # Libellés de stats Showdown -> clés internes.
 _EV_KEYS = {"hp": "hp", "atk": "atk", "def": "def", "spa": "spa",

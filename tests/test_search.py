@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from simupoke.model import PokemonState, FieldState
-from simupoke.sim import Mon
+from simupoke.model import PokemonState
 from simupoke.search import (
-    rank_actions, rank_actions_sampled, evaluate_state, opponent_moves,
+    evaluate_state,
+    opponent_moves,
+    rank_actions,
+    rank_actions_sampled,
 )
+from simupoke.sim import Mon
 
 
 def st(species, nature="serious", sp=None, item=None, ability=None,

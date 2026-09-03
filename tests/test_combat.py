@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from simupoke.model import PokemonState, FieldState
 from simupoke.combat import (
-    analyze_turn, effective_speed, moves_first, evaluate_switches,
+    analyze_turn,
+    effective_speed,
+    evaluate_switches,
+    moves_first,
 )
+from simupoke.model import FieldState, PokemonState
 
 
 def mk(species, nature="serious", sp=None, moves=None, item=None,

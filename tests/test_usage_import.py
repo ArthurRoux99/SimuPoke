@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 
 from simupoke.usage_import import (
-    from_showdown_chaos, build_usage, import_usage,
+    build_usage,
+    from_showdown_chaos,
+    import_usage,
 )
 
 CHAOS = {

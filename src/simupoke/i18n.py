@@ -78,7 +78,8 @@ def _canonical(category: str, ident: str) -> str:
         if is_known(ident):
             return get_species(ident).get("name", ident)
     elif category == "move":
-        from .moves import get_move, is_known as move_known
+        from .moves import get_move
+        from .moves import is_known as move_known
         if move_known(ident):
             try:
                 return get_move(ident).name

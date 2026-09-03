@@ -20,7 +20,7 @@ ne sont donc pas gérés ici (ils relèveront du simulateur de tour).
 
 from __future__ import annotations
 
-from functools import lru_cache
+from functools import cache
 
 from .loaders import load_regulation
 
@@ -39,7 +39,7 @@ ATE_POWER_MOD = 4915
 _PERSONAL_WEATHER: dict[str, str] = {"megasol": "sun"}
 
 
-@lru_cache(maxsize=None)
+@cache
 def ate_type_map(reg_id: str = "reg_m_b") -> dict[str, str]:
     """Talents qui transforment les moves Normal en un autre type (-ate).
 

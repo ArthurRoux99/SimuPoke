@@ -36,26 +36,29 @@ Usage (option globale : [--lang fr|en] ou SIMUPOKE_LANG) :
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
 
-from .stats import STAT_KEYS, Build, validate_sp
 from .basestats import is_known
-from .i18n import stat_label, label, set_language
-from .loaders import load_my_roster
-from .model import PokemonState, FieldState
-from .damage import calculate
-from .loaders import load_lineup, load_team
-from .draft import rank_lineup
-from .team import analyze_team, select_team_preview
-from .combat import analyze_turn
 from .bench import (
-    speed_tiers, min_sp_to_outspeed, min_sp_to_survive, min_sp_to_ko,
+    min_sp_to_ko,
+    min_sp_to_outspeed,
+    min_sp_to_survive,
+    speed_tiers,
 )
-from .optimize import optimize_spread, Outspeed, Survive, Ko
-from .sim import Mon, rollout
+from .combat import analyze_turn
+from .damage import calculate
+from .draft import rank_lineup
+from .i18n import label, set_language, stat_label
+from .loaders import load_lineup, load_my_roster, load_team
+from .model import FieldState, PokemonState
+from .optimize import Ko, Outspeed, Survive, optimize_spread
 from .search import rank_actions, rank_actions_sampled
 from .showdown import parse_team as parse_showdown
+from .sim import Mon, rollout
+from .stats import STAT_KEYS, Build, validate_sp
+from .team import analyze_team, select_team_preview
 
 
 def _print_stats(species: str, stats: dict[str, int]) -> None:
@@ -198,7 +201,7 @@ def cmd_draft(args: list[str]) -> int:
     roster = load_my_roster() if use_roster else []
     prior = None
     if use_usage:
-        from .usage import usage_prior, has_usage
+        from .usage import has_usage, usage_prior
         prior = usage_prior() if has_usage() else None
     print(f"Tirage du jour — {len(lineup)} Pokémon"
           + (f" (synergie avec mon Box : {len(roster)})" if roster else "")
@@ -748,10 +751,8 @@ def _force_utf8_stdout() -> None:
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is not None:
-            try:
+            with contextlib.suppress(ValueError, OSError):
                 reconfigure(encoding="utf-8")
-            except (ValueError, OSError):
-                pass
 
 
 def main(argv: list[str] | None = None) -> int:

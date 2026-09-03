@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import random
 
-from simupoke.usage import (
-    load_usage, usage_prior, likely_set, sample_set, has_usage,
-)
-from simupoke.model import OwnedPokemon
 from simupoke.draft import evaluate_candidate
+from simupoke.model import OwnedPokemon
+from simupoke.usage import (
+    has_usage,
+    likely_set,
+    load_usage,
+    sample_set,
+    usage_prior,
+)
 
 # Fixture contrôlée : teste la *logique* du modèle indépendamment des données
 # réelles (qui sont remplacées par des imports d'usage successifs).

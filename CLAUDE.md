@@ -53,14 +53,15 @@ conception : [`docs/conception_socle.md`](docs/conception_socle.md).
 ```bash
 # Installation (mode dev) + tests. pyproject fixe pythonpath=src, donc `pytest` suffit.
 pip install -e ".[dev]"
-pytest                       # 116+ tests (le vrai gate ; la CI le rejoue sur chaque PR)
+ruff check .                 # lint (config dans pyproject) — gate CI
+pytest                       # tests (le vrai gate ; la CI rejoue lint+tests sur chaque PR)
 
 # Sans installer : PYTHONPATH=src python -m simupoke.cli ...  /  PYTHONPATH=src pytest
 
 # CLI (sous-commandes) :
 python -m simupoke.cli roster|stats|damage|draft|team|preview|analyze
 python -m simupoke.cli speed|outspeed|survive|ko|spread     # seuils & optimiseur de SP
-python -m simupoke.cli sim|decide                           # simulateur + recherche (Phase 4)
+python -m simupoke.cli sim|decide|nash                      # simulateur + recherche + Nash (Phase 4)
 python -m simupoke.cli paste                                # import/export Showdown paste
 
 # UI — page HTML autonome (hors-ligne, un seul fichier) :

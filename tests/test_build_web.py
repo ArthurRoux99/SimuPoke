@@ -6,7 +6,6 @@ embarquées et le moteur, et que la carte -ate de Champions y figure.
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 

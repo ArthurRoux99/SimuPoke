@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from simupoke.model import PokemonState
-from simupoke.stats import SP_TOTAL_BUDGET, SP_CAP_PER_STAT
-from simupoke.optimize import optimize_spread, Outspeed, Survive, Ko
+from simupoke.optimize import Ko, Outspeed, Survive, optimize_spread
+from simupoke.stats import SP_CAP_PER_STAT, SP_TOTAL_BUDGET
 
 
 def st(species, nature, sp=None, item=None, hp=1.0):

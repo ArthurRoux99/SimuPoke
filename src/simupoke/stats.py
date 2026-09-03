@@ -70,7 +70,7 @@ def nature_multipliers(nature: str) -> dict[str, float]:
     if nature not in NATURES:
         raise ValueError(f"Nature inconnue : {nature!r}")
     plus, minus = NATURES[nature]
-    mult = {k: 1.0 for k in STAT_KEYS}
+    mult = dict.fromkeys(STAT_KEYS, 1.0)
     if plus:
         mult[plus] = 1.1
     if minus:
@@ -127,7 +127,7 @@ class Build:
     """Un build Champions minimal (sera étendu par OwnedPokemon / PokemonState)."""
     species: str
     nature: str = "serious"
-    sp: dict[str, int] = field(default_factory=lambda: {k: 0 for k in STAT_KEYS})
+    sp: dict[str, int] = field(default_factory=lambda: dict.fromkeys(STAT_KEYS, 0))
 
     def final_stats(self) -> dict[str, int]:
         return compute_all_stats(get_base_stats(self.species), self.sp, self.nature)

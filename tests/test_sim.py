@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from simupoke.model import PokemonState, FieldState
+from simupoke.model import FieldState, PokemonState
 from simupoke.sim import (
-    Mon, Side, simulate_turn, simulate_turn_actions, rollout, action_order,
+    Mon,
+    Side,
+    action_order,
+    rollout,
+    simulate_turn,
+    simulate_turn_actions,
 )
 
 
@@ -115,7 +120,7 @@ def test_sleep_prevents_action_then_wakes():
     res = rollout(me, opp, ["dragonclaw"] * 6, ["spore"] + ["sludgebomb"] * 5,
                   max_turns=6)
     # Tour 1 : Spore endort. Tours suivants : Garchomp dort puis se réveille.
-    joined = "\n".join(l for tr in res for l in tr.log)
+    joined = "\n".join(line for tr in res for line in tr.log)
     assert "est maintenant slp" in joined
     assert "se réveille" in joined
 

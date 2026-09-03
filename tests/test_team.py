@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
-from simupoke.model import OwnedPokemon
 from simupoke.loaders import load_team
+from simupoke.model import OwnedPokemon
 from simupoke.team import (
-    analyze_team, select_team_preview, check_clauses, matchup_score,
-    damage_matchup_score, team_shared_weaknesses, BRING_BY_FORMAT,
+    BRING_BY_FORMAT,
+    analyze_team,
+    check_clauses,
+    damage_matchup_score,
+    matchup_score,
+    select_team_preview,
+    team_shared_weaknesses,
 )
 
 

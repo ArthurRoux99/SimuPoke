@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 from simupoke.analysis import (
-    STANDARD_TYPES, defensive_profile, offensive_types, coverage_count,
-    infer_role, base_stat_total,
+    STANDARD_TYPES,
+    base_stat_total,
+    coverage_count,
+    defensive_profile,
+    infer_role,
+    offensive_types,
 )
 
 

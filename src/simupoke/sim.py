@@ -35,15 +35,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 
-from .model import PokemonState, FieldState
 from .basestats import get_species, to_id
-from .moves import get_move, is_known as move_known
-from .damage import calculate, battle_stats
 from .combat import (
-    effective_speed, _add_boosts, _STATUS_MOVES, _SETUP_BOOSTS,
-    _PROTECT_MOVES, _RECOVERY_MOVES, _POWDER_MOVES,
+    _POWDER_MOVES,
+    _PROTECT_MOVES,
+    _RECOVERY_MOVES,
+    _SETUP_BOOSTS,
+    _STATUS_MOVES,
+    _add_boosts,
+    effective_speed,
 )
-
+from .damage import battle_stats, calculate
+from .model import FieldState, PokemonState
+from .moves import get_move
+from .moves import is_known as move_known
 
 # ---------------------------------------------------------------------------
 # Combattant (état mutable d'un tour à l'autre)
@@ -63,7 +68,7 @@ class Mon:
     protected: bool = False
 
     @classmethod
-    def from_state(cls, st: PokemonState) -> "Mon":
+    def from_state(cls, st: PokemonState) -> Mon:
         mx = battle_stats(st)["hp"]
         hp = mx if st.current_hp_pct >= 1.0 else max(1, int(mx * st.current_hp_pct))
         return cls(build=st, hp=hp, max_hp=mx, status=st.status,
@@ -193,7 +198,7 @@ def _can_act(mon: Mon, log: list[str]) -> bool:
 
 def _apply_move(attacker: Mon, defender: Mon, move: str,
                 field: FieldState | None, roll: float, log: list[str], *,
-                atk_side: "Side | None" = None, def_side: "Side | None" = None,
+                atk_side: Side | None = None, def_side: Side | None = None,
                 field_dur: dict | None = None) -> None:
     """Résout un coup de `attacker` sur `defender` (mutation en place).
 
