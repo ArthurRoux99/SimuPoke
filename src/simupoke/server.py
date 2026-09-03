@@ -24,6 +24,9 @@ Endpoints :
     POST /api/ko                SP offensif mini pour garantir un KO en N coups
     POST /api/spread            optimiseur de spread SP (objectifs combinés)
     POST /api/decide            recherche 1-ply à coups simultanés (§10.2)
+    POST /api/nash              stratégie mixte de Nash (croyance + regret matching)
+    POST /api/belief            croyance sur le set adverse (§10.3)
+    POST /api/doubles           matrice de menaces Doubles 2v2 (Phase 5)
     POST /api/paste             importe un paste Showdown (EV -> SP)
     POST /api/export            regénère un paste Showdown (SP -> EV)
 """
@@ -44,6 +47,7 @@ from .bench import (
 )
 from .combat import analyze_turn
 from .damage import DamageResult, calculate
+from .doubles import analyze_doubles
 from .draft import rank_lineup
 from .loaders import DATA_DIR, load_my_roster
 from .model import FieldState, OwnedPokemon, PokemonState
@@ -331,6 +335,26 @@ def api_belief(body: dict) -> dict:
     return {"belief": _belief_json(particles)}
 
 
+def api_doubles(body: dict) -> dict:
+    """Matrice de menaces Doubles 2v2 (Phase 5) : qui KO quoi + focus fire + zone."""
+    field = FieldState(**(body.get("field") or {}))
+    mine = [_state(d) for d in body.get("mine", [])]
+    opp = [_state(d) for d in body.get("opp", [])]
+    rep = analyze_doubles(mine, opp, field)
+    return {
+        "targets": [{"target": t.target, "hp": t.hp, "focusKo": t.focus_ko,
+                     "hits": [{"attacker": h.attacker, "move": h.move,
+                               "minPct": h.min_pct, "maxPct": h.max_pct, "ko": h.ko}
+                              for h in t.hits]}
+                    for t in rep.targets],
+        "spreads": [{"attacker": s.attacker, "move": s.move,
+                     "perTarget": [{"target": tg, "minPct": mn, "maxPct": mx}
+                                   for tg, mn, mx in s.per_target]}
+                    for s in rep.spreads],
+        "lines": rep.lines(),
+    }
+
+
 def api_paste(body: dict) -> dict:
     """Parse un paste Showdown en entrées d'équipe (EV -> SP Champions)."""
     team = parse_showdown(body.get("paste", ""))
@@ -444,6 +468,7 @@ _POST_ROUTES = {
     "/api/speed": api_speed, "/api/outspeed": api_outspeed,
     "/api/survive": api_survive, "/api/ko": api_ko, "/api/spread": api_spread,
     "/api/decide": api_decide, "/api/nash": api_nash, "/api/belief": api_belief,
+    "/api/doubles": api_doubles,
     "/api/paste": api_paste, "/api/export": api_export,
 }
 _GET_API = {"/api/meta": api_meta, "/api/samples": api_samples,
