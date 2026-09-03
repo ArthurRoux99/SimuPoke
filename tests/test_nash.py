@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from simupoke.nash import solve_matrix, solve_bayesian, solve_turn
-from simupoke.sim import Mon
+from simupoke.nash import solve_matrix, solve_bayesian, solve_turn, _sm_nash_value
+from simupoke.search import _state_value
+from simupoke.sim import Mon, Side
 from simupoke.model import PokemonState
 
 
@@ -126,3 +127,26 @@ def test_horizon_lookahead_affects_evaluation():
     assert abs(v2 - v0) > 0.01                    # la profondeur a un effet mesurable
     r2 = solve_turn(me, opp, horizon=2)
     assert abs(sum(p for _, p in r2.strategy) - 1.0) < 1e-6
+
+
+def test_recursive_nash_base_case():
+    # À profondeur 0, le lookahead Nash = l'éval d'équipe immédiate.
+    from simupoke.search import evaluate_side
+    me = Side(active=_mon("garchomp", "jolly", ["earthquake"], {"atk": 32}))
+    opp = Side(active=_mon("tyranitar", "jolly", ["crunch"]))
+    assert _sm_nash_value(me, opp, None, 0, 0.5) == evaluate_side(me, opp.active)
+
+
+def test_recursive_nash_below_expectimax():
+    # Un adversaire jouant au mieux (Nash) ne me donne pas PLUS qu'un adversaire
+    # « moyen » (expectimax uniforme) : nash <= expectimax, et ils diffèrent.
+    me = Side(active=_mon("garchomp", "jolly",
+                          ["earthquake", "dragonclaw", "stoneedge"],
+                          {"atk": 32, "spe": 32}))
+    opp_moves = ["earthquake", "uturn", "stoneedge", "swordsdance"]
+    opp = Side(active=_mon("landorustherian", "jolly", opp_moves,
+                           {"atk": 32, "spe": 32}))
+    nash = _sm_nash_value(me, opp, None, 1, 0.5)
+    exp = _state_value(me, opp, None, 1, 0.5, opp_moves, "expected")
+    assert nash <= exp + 1e-6
+    assert abs(nash - exp) > 0.03                 # le raffinement Nash change la valeur
