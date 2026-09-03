@@ -185,8 +185,10 @@
         hpPct: parseFloat($('c-me-hp').value || '100') / 100 };
       const opp = { species: $('c-opp-species').value, nature: $('c-opp-nature').value,
         moves: splitMoves($('c-opp-moves').value), hpPct: parseFloat($('c-opp-hp').value || '100') / 100 };
+      const observed = ($('c-opp-observed').value || '').trim();
       const r = await api('/api/nash', { me, opp, bench: parseBench($('c-bench').value),
-        field: { weather: $('c-weather').value, terrain: $('c-terrain').value } });
+        field: { weather: $('c-weather').value, terrain: $('c-terrain').value },
+        oppObserved: observed || undefined });
       const bars = r.strategy.filter((s) => s.prob >= 0.005).map((s) => {
         const pct = (s.prob * 100).toFixed(0);
         return `<div class="nash-row"><span class="nash-lbl">${esc(s.action)}</span>`
@@ -198,12 +200,23 @@
         .join(' · ');
       let beliefHtml = '';
       if (r.belief && r.belief.length > 1) {
+        // Poids a priori (avant mise à jour) indexés par set, pour montrer le glissement.
+        const priorW = {};
+        (r.beliefPrior || []).forEach((p) => {
+          priorW[[...(p.moves || [])].sort().join('|')] = p.weight;
+        });
         const rows = r.belief.map((p) => {
           const item = p.item ? ` @ ${esc(p.item)}` : '';
-          return `<div class="nash-belief-row"><span class="nash-belief-w">${(p.weight * 100).toFixed(0)}%</span>`
+          const was = priorW[[...(p.moves || [])].sort().join('|')];
+          const shift = (r.oppObserved && was != null)
+            ? `<span class="nash-belief-shift">${(was * 100).toFixed(0)}% →</span> ` : '';
+          return `<div class="nash-belief-row"><span class="nash-belief-w">${shift}${(p.weight * 100).toFixed(0)}%</span>`
             + `<span class="nash-belief-set"><b>${item ? esc(p.item) : '—'}</b> · ${esc((p.moves || []).join(', '))}</span></div>`;
         }).join('');
-        beliefHtml = `<div class="nash-belief"><div class="nash-belief-head">Croyance sur le set adverse (usage)</div>${rows}</div>`;
+        const head = r.oppObserved
+          ? `Croyance mise à jour — coup adverse observé : <b>${esc(r.oppObserved)}</b>`
+          : 'Croyance sur le set adverse (usage)';
+        beliefHtml = `<div class="nash-belief"><div class="nash-belief-head">${head}</div>${rows}</div>`;
       }
       out.innerHTML =
         `<div class="nash-head">Stratégie mixte de Nash — jeu simultané, croyance sur l'adversaire</div>`

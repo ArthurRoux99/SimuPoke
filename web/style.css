@@ -210,9 +210,11 @@ pre.report { background: var(--panel); border: 1px solid var(--border); border-r
   border: 1px solid var(--border); border-radius: 8px; }
 .nash-belief-head { font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
   color: var(--muted); margin-bottom: 8px; }
-.nash-belief-row { display: grid; grid-template-columns: 42px 1fr; gap: 10px;
+.nash-belief-row { display: grid; grid-template-columns: minmax(42px, auto) 1fr; gap: 10px;
   align-items: baseline; padding: 3px 0; font-size: 12.5px; }
-.nash-belief-w { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
+.nash-belief-w { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600;
+  white-space: nowrap; }
+.nash-belief-shift { color: var(--muted); font-weight: 400; }
 .nash-belief-set { color: var(--text); }
 .nash-belief-set b { color: var(--muted); font-weight: 600; }
 
