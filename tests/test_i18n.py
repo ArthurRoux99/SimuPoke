@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from simupoke import i18n
-from simupoke.i18n import label, stat_label, set_language, get_language
+from simupoke.i18n import get_language, label, set_language, stat_label
 
 
 @pytest.fixture(autouse=True)

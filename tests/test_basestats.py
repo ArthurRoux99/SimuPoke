@@ -5,7 +5,11 @@ from __future__ import annotations
 import pytest
 
 from simupoke.basestats import (
-    get_base_stats, get_species, get_types, is_known, to_id,
+    get_base_stats,
+    get_species,
+    get_types,
+    is_known,
+    to_id,
 )
 
 

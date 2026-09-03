@@ -28,13 +28,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from .stats import SP_CAP_PER_STAT
 from .basestats import to_id
-from .moves import get_move
-from .model import PokemonState, FieldState
-from .damage import calculate
 from .combat import effective_speed
-
+from .damage import calculate
+from .model import FieldState, PokemonState
+from .moves import get_move
+from .stats import SP_CAP_PER_STAT
 
 # ---------------------------------------------------------------------------
 # Vitesse effective (avec Tailwind, en plus de Scarf/paralysie/boosts)
@@ -151,7 +150,7 @@ def min_sp_to_outspeed(me: PokemonState, target: PokemonState,
     target_speed = compute_speed(target, tailwind=target_tailwind)
     best_speed = -1
     ties = False
-    for sp in range(0, SP_CAP_PER_STAT + 1):
+    for sp in range(SP_CAP_PER_STAT + 1):
         s = compute_speed(_with_sp(me, "spe", sp), tailwind=me_tailwind)
         best_speed = s
         if s > target_speed or (not strict and s >= target_speed):
@@ -206,7 +205,7 @@ def min_sp_to_survive(defender: PokemonState, attacker: PokemonState,
     if _endures(base):
         return SurviveResult(True, 0, 0, 0, m.name, stat, by_endure=True)
     cap = SP_CAP_PER_STAT
-    for total in range(0, 2 * cap + 1):
+    for total in range(2 * cap + 1):
         lo = max(0, total - cap)
         hi = min(cap, total)
         for hp_sp in range(lo, hi + 1):
@@ -258,7 +257,7 @@ def min_sp_to_ko(attacker: PokemonState, defender: PokemonState,
     m = get_move(move)
     stat = "atk" if m.is_physical else "spa"
     endures = _endures(defender)
-    for sp in range(0, SP_CAP_PER_STAT + 1):
+    for sp in range(SP_CAP_PER_STAT + 1):
         trial = _with_sp(attacker, stat, sp)
         r = calculate(trial, defender, m, field, crit=crit)
         g = _effective_ko_hits(r.guaranteed_ko_hits, endures)

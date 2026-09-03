@@ -14,9 +14,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .stats import STAT_KEYS, compute_all_stats, validate_sp
 from .basestats import get_base_stats, is_known
-
+from .stats import STAT_KEYS, compute_all_stats, validate_sp
 
 # ---------------------------------------------------------------------------
 # Mon Box — Pokémon possédés (§0.3)
@@ -64,7 +63,7 @@ class PokemonState:
     item: str | None = None
     mega: bool = False                    # méga déjà déclenchée ?
     nature: str = "serious"
-    stat_points: dict[str, int] = field(default_factory=lambda: {k: 0 for k in STAT_KEYS})
+    stat_points: dict[str, int] = field(default_factory=lambda: dict.fromkeys(STAT_KEYS, 0))
     moves: list[str] = field(default_factory=list)
     current_hp_pct: float = 1.0           # 0..1 (PV restants)
     status: str | None = None             # brn/par/slp/psn/tox/frz

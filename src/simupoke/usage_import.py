@@ -50,7 +50,7 @@ _EMPTY = {"", "nothing", "none", "other"}
 
 def fetch(url: str, timeout: float = 30.0) -> str:
     """Télécharge le contenu texte d'une URL (proxy-aware via l'environnement)."""
-    with urlopen(url, timeout=timeout) as resp:  # noqa: S310 (URL fournie par l'utilisateur)
+    with urlopen(url, timeout=timeout) as resp:
         return resp.read().decode("utf-8")
 
 
@@ -66,7 +66,7 @@ def _pct(counts: dict[str, float], denom: float, *, top: int) -> dict[str, float
         if p >= _MIN_PCT:
             out.append((to_id(k), round(p, 4)))
     out.sort(key=lambda kv: -kv[1])
-    return {k: v for k, v in out[:top]}
+    return dict(out[:top])
 
 
 def _natures_from_spreads(spreads: dict[str, float], denom: float) -> dict[str, float]:
@@ -85,7 +85,7 @@ def _teammates(counts: dict[str, float], top: int) -> dict[str, float]:
         return {}
     hi = max(pos.values())
     out = sorted(((k, round(v / hi, 4)) for k, v in pos.items()), key=lambda kv: -kv[1])
-    return {k: v for k, v in out[:top]}
+    return dict(out[:top])
 
 
 def from_showdown_chaos(obj: dict) -> dict[str, dict]:
@@ -149,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     try:
         out = import_usage(args.source, args.reg, args.out)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"Échec de l'import : {exc}", file=sys.stderr)
         return 1
     doc = json.loads(out.read_text(encoding="utf-8"))

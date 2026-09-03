@@ -9,8 +9,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .basestats import get_base_stats, get_types, to_id
+from .moves import get_move
+from .moves import is_known as move_known
 from .typechart import effectiveness
-from .moves import get_move, is_known as move_known
 
 # Les 18 types « jouables » (on exclut Stellar, lié à la Téra-cristallisation).
 STANDARD_TYPES = [
@@ -98,9 +99,8 @@ def offensive_types(species: str, moves: list[str]) -> list[str]:
         if not move_known(mid):
             continue
         mv = get_move(mid)
-        if not mv.is_status and mv.base_power > 0:
-            if mv.type not in types:
-                types.append(mv.type)
+        if not mv.is_status and mv.base_power > 0 and mv.type not in types:
+            types.append(mv.type)
     if not types:                       # build sans moves connus -> proxy STAB
         types = list(get_types(species))
     return types

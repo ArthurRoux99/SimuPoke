@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from simupoke.model import PokemonState, FieldState
 from simupoke.damage import calculate, poke_round
+from simupoke.model import FieldState, PokemonState
 
 
 def mk(species, nature="serious", sp=None, item=None, ability=None,

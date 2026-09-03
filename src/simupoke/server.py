@@ -35,23 +35,27 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from .model import PokemonState, FieldState, OwnedPokemon
-from .stats import STAT_KEYS, NATURES, compute_all_stats, validate_sp
-from .basestats import get_base_stats, is_known, get_species
-from .damage import calculate, DamageResult
-from .combat import analyze_turn
+from .basestats import get_base_stats, is_known
 from .bench import (
-    speed_tiers, min_sp_to_outspeed, min_sp_to_survive, min_sp_to_ko,
+    min_sp_to_ko,
+    min_sp_to_outspeed,
+    min_sp_to_survive,
+    speed_tiers,
 )
-from .optimize import optimize_spread, Outspeed, Survive, Ko
-from .sim import Mon
-from .search import rank_actions, rank_actions_sampled
-from .nash import solve_turn
-from .showdown import parse_team as parse_showdown, format_team as format_showdown
+from .combat import analyze_turn
+from .damage import DamageResult, calculate
 from .draft import rank_lineup
+from .loaders import DATA_DIR, load_my_roster
+from .model import FieldState, OwnedPokemon, PokemonState
+from .nash import solve_turn
+from .optimize import Ko, Outspeed, Survive, optimize_spread
+from .search import rank_actions, rank_actions_sampled
+from .showdown import format_team as format_showdown
+from .showdown import parse_team as parse_showdown
+from .sim import Mon
+from .stats import NATURES, compute_all_stats, validate_sp
 from .team import analyze_team, select_team_preview
-from .usage import usage_prior, has_usage, likely_set
-from .loaders import load_my_roster, DATA_DIR
+from .usage import has_usage, likely_set, usage_prior
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WEB_DIR = REPO_ROOT / "web"
@@ -373,8 +377,9 @@ def api_preview(body: dict) -> dict:
                               _owned_list(body["opp_team"]),
                               body.get("format", "singles"),
                               use_damage=body.get("use_damage", True))
-    pick = lambda p: {"species": p.species, "value": p.value,
-                      "beats": p.beats, "threatenedBy": p.threatened_by}
+    def pick(p):
+        return {"species": p.species, "value": p.value,
+                          "beats": p.beats, "threatenedBy": p.threatened_by}
     return {"fmt": res.fmt, "bring": res.bring, "byDamage": res.by_damage,
             "picks": [pick(p) for p in res.picks],
             "bench": [pick(p) for p in res.bench],
@@ -478,7 +483,7 @@ def dispatch_json(method: str, route: str, body_json: str = "",
     except ValueError as exc:
         return json.dumps({"status": 400, "body": {"error": str(exc)}},
                           ensure_ascii=False)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return json.dumps({"status": 500, "body": {"error": str(exc)}},
                           ensure_ascii=False)
 
@@ -530,7 +535,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"error": "interdit"}, 403)
             else:
                 self._json({"error": "route inconnue"}, 404)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self._json({"error": str(exc)}, 500)
 
     def do_POST(self) -> None:
@@ -545,7 +550,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(fn(body))
         except (ValueError, KeyError) as exc:
             self._json({"error": str(exc)}, 400)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self._json({"error": str(exc)}, 500)
 
     def log_message(self, fmt, *args):  # silence par défaut

@@ -7,8 +7,8 @@ le roll max). Les valeurs base-4096 sont celles de Showdown.
 
 from __future__ import annotations
 
-from simupoke.model import PokemonState, FieldState
 from simupoke.damage import calculate
+from simupoke.model import FieldState, PokemonState
 
 
 def st(species, nature="serious", sp=None, item=None, ability=None):

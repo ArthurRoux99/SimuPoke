@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from simupoke.nash import solve_matrix, solve_bayesian, solve_turn, _sm_nash_value
+from simupoke.model import PokemonState
+from simupoke.nash import _sm_nash_value, solve_bayesian, solve_matrix, solve_turn
 from simupoke.search import _state_value
 from simupoke.sim import Mon, Side
-from simupoke.model import PokemonState
-
 
 # --- Solveur matriciel : jeux à équilibre connu ---------------------------
 
@@ -48,7 +47,7 @@ def test_bayesian_informed_opponent_is_stronger():
     U_a = [[0.0, 1.0], [1.0, 1.0]]
     U_b = [[1.0, 1.0], [1.0, 0.0]]
     worlds = [(0.5, U_a, ["x", "y"]), (0.5, U_b, ["x", "y"])]
-    my_strat, value, opp_marg, br = solve_bayesian(2, worlds, iters=6000)
+    my_strat, value, opp_marg, _br = solve_bayesian(2, worlds, iters=6000)
 
     # Jeu « moyen » (adversaire non informé) : matrice moyenne.
     U_avg = [[(U_a[i][j] + U_b[i][j]) / 2 for j in range(2)] for i in range(2)]

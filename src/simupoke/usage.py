@@ -31,14 +31,13 @@ toujours surcharger un prior dès qu'il observe une info réelle (cf. §10.3).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from functools import lru_cache
 import json
 import random
+from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 
 from .basestats import to_id
-
 from .paths import DATA_DIR
 
 USAGE_DIR = DATA_DIR / "usage"
@@ -52,7 +51,7 @@ def has_usage(reg_id: str = "reg_m_b") -> bool:
     return usage_path(reg_id).exists()
 
 
-@lru_cache(maxsize=None)
+@cache
 def load_usage(reg_id: str = "reg_m_b") -> dict[str, dict]:
     """Charge la table d'usage d'une régulation (clé = id d'espèce). {} si absent."""
     path = usage_path(reg_id)

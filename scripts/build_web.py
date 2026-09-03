@@ -60,7 +60,8 @@ def build() -> Path:
         "typechart": json.loads((DATA / "typechart.json").read_text(encoding="utf-8"))["chart"],
         "ateMap": _ate_map(),
     }
-    data_js = "window.SIMUPOKE_DATA=" + json.dumps(data, separators=(",", ":"), ensure_ascii=False) + ";"
+    payload = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+    data_js = "window.SIMUPOKE_DATA=" + payload + ";"
 
     html = (template
             .replace("/* @STYLE */", style)

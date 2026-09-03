@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from simupoke.model import OwnedPokemon
-from simupoke.loaders import load_lineup, load_my_roster
 from simupoke.draft import (
-    rank_lineup, evaluate_candidate, team_threats, DEFAULT_WEIGHTS,
+    DEFAULT_WEIGHTS,
     INVEST_THRESHOLD,
+    evaluate_candidate,
+    rank_lineup,
+    team_threats,
 )
+from simupoke.loaders import load_lineup, load_my_roster
+from simupoke.model import OwnedPokemon
 
 
 def _cand(species, **kw):

@@ -24,14 +24,15 @@ par-world de PokaiTrainer) ; profondeur 1 (un tour). Ces deux axes sont la suite
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dfield
+from dataclasses import dataclass
+from dataclasses import field as dfield
 
-from .model import PokemonState, FieldState
-from .moves import get_move, is_known as move_known
+from .belief import Particle, opponent_belief, opponent_move_support
+from .model import FieldState
+from .moves import get_move
+from .moves import is_known as move_known
+from .search import GAMMA, _child, _my_actions, _state_value, _terminal, evaluate_side
 from .sim import Mon, Side, simulate_turn_actions
-from .search import (evaluate_side, _state_value, _terminal, _my_actions,
-                     _child, GAMMA)
-from .belief import opponent_belief, opponent_move_support, Particle
 
 # Jets de dégâts représentatifs (énumération de la chance, poids uniforme).
 ROLLS = (0.15, 0.5, 0.85)

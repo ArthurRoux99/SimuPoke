@@ -15,10 +15,10 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, replace
 
-from .model import PokemonState
 from .basestats import is_known, to_id
+from .model import PokemonState
 from .moves import is_known as move_known
-from .usage import sample_set, likely_set, has_usage
+from .usage import has_usage, likely_set, sample_set
 
 
 @dataclass
@@ -59,7 +59,7 @@ def opponent_belief(opp: PokemonState, reg_id: str = "reg_m_b", *,
         if not moves:
             break                                   # espèce absente de l'usage
         # Conditionnement sur l'information révélée (rejet).
-        if observed and not set(to_id(m) for m in observed) <= set(to_id(m) for m in moves):
+        if observed and not {to_id(m) for m in observed} <= {to_id(m) for m in moves}:
             continue
         if obs_item and ls.item and to_id(ls.item) != obs_item:
             continue

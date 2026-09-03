@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from simupoke.model import PokemonState, FieldState
 from simupoke.bench import (
-    compute_speed, speed_tiers, min_sp_to_outspeed, min_sp_to_survive,
+    compute_speed,
     min_sp_to_ko,
+    min_sp_to_outspeed,
+    min_sp_to_survive,
+    speed_tiers,
 )
+from simupoke.model import PokemonState
 
 
 def mk(species, nature="serious", sp=None, moves=None, item=None,

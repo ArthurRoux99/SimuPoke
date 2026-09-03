@@ -21,16 +21,16 @@ son banc n'est pas modélisé (un actif adverse K.O. = feuille favorable).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dfield
-
-from .model import PokemonState, FieldState
-from .basestats import is_known
-from .moves import get_move, is_known as move_known
 import random
-from dataclasses import replace
+from dataclasses import dataclass, replace
+from dataclasses import field as dfield
 
+from .basestats import is_known
+from .model import FieldState
+from .moves import get_move
+from .moves import is_known as move_known
 from .sim import Mon, Side, simulate_turn_actions
-from .usage import likely_set, sample_set, has_usage
+from .usage import has_usage, likely_set, sample_set
 
 _STATUSES = ("brn", "par", "tox", "slp", "frz", "psn")
 
@@ -155,9 +155,7 @@ def _terminal(me: Side, opp: Side) -> bool:
     n'ai plus rien à envoyer."""
     if opp.active.fainted:
         return True
-    if me.active.fainted and not any(not b.fainted for b in me.bench):
-        return True
-    return False
+    return bool(me.active.fainted and not any(not b.fainted for b in me.bench))
 
 
 def _my_actions(me: Side, allow_switch: bool) -> list[tuple]:

@@ -25,12 +25,14 @@ Limites restantes (assumées) :
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dfield, replace
+from dataclasses import dataclass, replace
+from dataclasses import field as dfield
 
-from .model import PokemonState, FieldState
-from .basestats import is_known, to_id, get_species
-from .moves import get_move, is_known as move_known
-from .damage import calculate, battle_stats
+from .basestats import get_species, is_known, to_id
+from .damage import battle_stats, calculate
+from .model import FieldState, PokemonState
+from .moves import get_move
+from .moves import is_known as move_known
 from .usage import likely_set
 
 # Poids de la fonction de valeur (ajustables).
