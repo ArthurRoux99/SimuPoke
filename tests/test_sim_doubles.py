@@ -170,3 +170,42 @@ def test_foe_spread_move_spares_the_ally():
     res = simulate_turn_doubles(me, opp, (mv("rockslide"), PASS),
                                 (PASS, PASS), None)
     assert res.me.active[1].hp == res.me.active[1].max_hp
+
+
+# --- Protect / Wide Guard ---------------------------------------------------
+
+def test_protect_blocks_a_single_target_move():
+    me = side(mon("garchomp", "jolly", {"spe": 32}, moves=["dragonclaw"]),
+              mon("snorlax", "brave"))
+    opp = side(mon("tyranitar", "jolly", moves=["protect"]), mon("torkoal", "quiet"))
+    res = simulate_turn_doubles(me, opp, (mv("dragonclaw", ("foe", 0)), PASS),
+                                (mv("protect"), PASS), None)
+    assert res.opp.active[0].hp == res.opp.active[0].max_hp
+
+
+def test_wide_guard_blocks_spread_but_not_single_target():
+    def run(attack):
+        me = side(mon("garchomp", "adamant", {"atk": 31}, moves=[attack]),
+                  mon("snorlax", "brave"))
+        opp = side(mon("tyranitar", "jolly", moves=["wideguard"]),
+                   mon("torkoal", "quiet"))
+        return simulate_turn_doubles(me, opp, (mv(attack), PASS),
+                                     (mv("wideguard"), PASS), None)
+
+    zone = run("rockslide")
+    assert zone.opp.active[1].hp == zone.opp.active[1].max_hp, "zone bloquée"
+    mono = run("dragonclaw")
+    assert mono.opp.active[0].hp < mono.opp.active[0].max_hp, "mono-cible passe"
+
+
+def test_wide_guard_does_not_carry_to_the_next_turn():
+    me = side(mon("garchomp", "adamant", {"atk": 31}, moves=["rockslide"]),
+              mon("snorlax", "brave"))
+    opp = side(mon("tyranitar", "jolly", moves=["wideguard"]), mon("torkoal", "quiet"))
+    # Tour 1 : l'adversaire pose Wide Guard, je ne fais rien.
+    t1 = simulate_turn_doubles(me, opp, (PASS, PASS), (mv("wideguard"), PASS), None)
+    # Tour 2 : il ne le repose pas — la zone doit passer.
+    t2 = simulate_turn_doubles(t1.me, t1.opp, (mv("rockslide"), PASS),
+                               (PASS, PASS), None)
+    assert t2.opp.active[0].hp < t2.opp.active[0].max_hp
+    assert t2.opp.wide_guard is False

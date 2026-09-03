@@ -104,6 +104,9 @@ def action_order_doubles(me: DoublesSide, opp: DoublesSide,
 _FOE_SPREAD = "allAdjacentFoes"       # les deux adversaires
 _ALL_SPREAD = "allAdjacent"           # les deux adversaires ET l'allié
 
+# Coups d'appui résolus par le simulateur Doubles lui-même (pas par _apply_move).
+_WIDE_GUARD = "wideguard"
+
 
 def _living(mons: list[Mon]) -> list[Mon]:
     return [m for m in mons if not m.fainted]
@@ -209,12 +212,20 @@ def simulate_turn_doubles(me: DoublesSide, opp: DoublesSide,
         mid = _move_of(action)
         if attacker.fainted or mid is None:
             continue
+        if mid == _WIDE_GUARD:
+            own.wide_guard = True
+            log.append(f"{attacker.build.species} pose Wide Guard")
+            continue
         targets = resolve_targets(actor, action, own, foes)
         if not targets:
             log.append(f"{attacker.build.species} : cible K.O. — coup perdu")
             continue
         # Pénalité de zone : seulement à partir de deux cibles touchées.
         spread = len(targets) >= 2
+        if spread and foes.wide_guard:
+            log.append(f"  Wide Guard protège le camp — "
+                       f"{get_move(mid).name} bloqué")
+            continue
         for target in targets:
             _apply_move(attacker, target, mid, field, roll, log,
                         atk_side=own, def_side=foes, field_dur=field_dur,
