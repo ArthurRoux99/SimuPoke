@@ -163,6 +163,23 @@ def test_nash_endpoint_exposes_belief():
     assert all("crunch" in b["moves"] for b in out["belief"])
 
 
+def test_nash_endpoint_updates_belief_on_observed_move():
+    # Set adverse partiellement connu ; on observe Rock Slide → la croyance a
+    # posteriori ne garde que les mondes cohérents et expose le prior.
+    out = server.api_nash({
+        "me": {"species": "garchomp", "nature": "jolly",
+               "moves": ["earthquake", "dragonclaw"]},
+        "opp": {"species": "tyranitar", "moves": ["crunch"]},
+        "oppObserved": "rockslide",
+    })
+    assert out["oppObserved"] == "rockslide"
+    assert "beliefPrior" in out and len(out["beliefPrior"]) > 1
+    assert abs(sum(b["weight"] for b in out["belief"]) - 1.0) < 1e-6
+    # Après avoir vu Rock Slide, la masse se concentre sur les sets qui l'ont.
+    with_rs = sum(b["weight"] for b in out["belief"] if "rockslide" in b["moves"])
+    assert with_rs > 0.6
+
+
 def test_belief_endpoint():
     out = server.api_belief({"opp": {"species": "tyranitar", "moves": ["crunch"]}})
     assert out["belief"] and all("moves" in b for b in out["belief"])

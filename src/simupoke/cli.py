@@ -661,6 +661,7 @@ def cmd_decide(args: list[str]) -> int:
 
 def cmd_nash(args: list[str]) -> int:
     """Stratégie mixte de Nash pour le tour (jeu simultané, croyance adverse)."""
+    from .belief import update_belief
     from .nash import solve_turn
     pos, opts, _ = _split_args(args, set())
     if len(pos) != 5:
@@ -668,7 +669,7 @@ def cmd_nash(args: list[str]) -> int:
               "<opp_species> <opp_nature> [--me-sp k=v] [--opp-moves a,b,c] "
               "[--me-item X] [--opp-item X] [--me-hp 0..1] [--opp-hp 0..1] "
               "[--weather X] [--bench 'esp,nat,c1|c2 ; …'] [--iters N] "
-              "[--horizon 0..3]", file=sys.stderr)
+              "[--horizon 0..3] [--opp-observed coup]", file=sys.stderr)
         return 2
     me_sp, me_nat, me_moves, opp_sp, opp_nat = pos
     for sp in (me_sp, opp_sp):
@@ -698,10 +699,22 @@ def cmd_nash(args: list[str]) -> int:
                if len(parts) > 2 else [])
         bench.append(Mon.from_state(PokemonState(species=parts[0], nature=nat,
                                                  moves=mvs)))
+    iters = int(opts.get("iters", 2000))
+    horizon = int(opts.get("horizon", 0))
+    observed = (opts.get("opp-observed") or "").strip() or None
     try:
-        res = solve_turn(me, opp, field, my_bench=bench,
-                         iters=int(opts.get("iters", 2000)),
-                         horizon=int(opts.get("horizon", 0)))
+        res = solve_turn(me, opp, field, my_bench=bench, iters=iters,
+                         horizon=horizon)
+        if observed is not None:
+            posterior = update_belief(res.belief, observed,
+                                      world_strategies=res.opp_world_strategies)
+            print(f"{label('species', me_sp)}  vs  {label('species', opp_sp)}\n")
+            _print_belief_shift(res.belief, posterior, observed)
+            res = solve_turn(me, opp, field, my_bench=bench, iters=iters,
+                             horizon=horizon, belief=posterior)
+            for line in res.lines():
+                print(line)
+            return 0
     except (ValueError, KeyError) as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 1
@@ -709,6 +722,20 @@ def cmd_nash(args: list[str]) -> int:
     for line in res.lines():
         print(line)
     return 0
+
+
+def _print_belief_shift(prior: list, posterior: list, observed: str) -> None:
+    """Affiche le glissement de croyance après le coup adverse observé."""
+    print(f"Mise à jour de croyance — coup adverse observé : {observed}")
+    before = {tuple(sorted(p.build.moves)): p.weight for p in prior}
+    for part in posterior:
+        b = part.build
+        key = tuple(sorted(b.moves))
+        was = before.get(key)
+        arrow = (f"{was*100:4.0f} % → " if was is not None else "  (nouveau) ")
+        item = f" @ {b.item}" if b.item else ""
+        print(f"  {arrow}{part.weight*100:4.0f} %{item}  ·  {', '.join(b.moves)}")
+    print()
 
 
 def cmd_doubles(args: list[str]) -> int:

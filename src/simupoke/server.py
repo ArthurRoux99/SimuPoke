@@ -303,11 +303,24 @@ def api_nash(body: dict) -> dict:
     opp = Mon.from_state(_state(body["opp"]))
     field = FieldState(**(body.get("field") or {}))
     bench = [Mon.from_state(_state(d)) for d in (body.get("bench") or [])]
-    res = solve_turn(me, opp, field, my_bench=bench,
-                     reg_id=body.get("regulation", "reg_m_b"),
-                     iters=int(body.get("iters", 2000)),
-                     horizon=int(body.get("horizon", 0)))
-    return {
+    reg_id = body.get("regulation", "reg_m_b")
+    iters = int(body.get("iters", 2000))
+    horizon = int(body.get("horizon", 0))
+    res = solve_turn(me, opp, field, my_bench=bench, reg_id=reg_id,
+                     iters=iters, horizon=horizon)
+
+    # Mise à jour bayésienne inter-tours : si un coup adverse a été observé
+    # (`oppObserved`), on reconditionne la croyance et on re-résout le tour.
+    observed = (body.get("oppObserved") or "").strip() or None
+    prior_belief = res.belief
+    if observed is not None:
+        from .belief import update_belief
+        posterior = update_belief(res.belief, observed,
+                                  world_strategies=res.opp_world_strategies)
+        res = solve_turn(me, opp, field, my_bench=bench, reg_id=reg_id,
+                         iters=iters, horizon=horizon, belief=posterior)
+
+    out = {
         "strategy": [{"action": lbl, "prob": p} for lbl, p in res.strategy],
         "value": res.value,
         "oppActions": res.opp_actions,
@@ -318,6 +331,10 @@ def api_nash(body: dict) -> dict:
         "belief": _belief_json(res.belief),
         "lines": res.lines(),
     }
+    if observed is not None:
+        out["oppObserved"] = observed
+        out["beliefPrior"] = _belief_json(prior_belief)
+    return out
 
 
 def _belief_json(particles) -> list[dict]:

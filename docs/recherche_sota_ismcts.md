@@ -32,8 +32,9 @@ même une éval de feuille faible + une bonne recherche bat la politique seule.
 exactement dans l'esprit PokaiTrainer (sans le réseau neuronal) :
 
 1. **croyance** sur le set adverse (`simupoke.belief`) — nuage de particules
-   échantillonnées depuis l'usage (§10.3) et **filtrées bayésiennement** par
-   l'observé (coups vus, objet/talent connus) ;
+   échantillonnées depuis l'usage (§10.3), **filtrées bayésiennement** par
+   l'observé (coups vus, objet/talent connus) et **mises à jour tour après
+   tour** sur le coup adverse joué (`update_belief`, cran 3 ci-dessous) ;
 2. **matrice de gains** `U[a][b]` évaluée par le simulateur figé (`sim`) +
    l'éval d'équipe, **pondérée par la croyance** et **moyennée sur les jets**
    (énumération de la chance) ;
@@ -66,8 +67,17 @@ Par ordre d'impact / coût croissant — chaque cran rapproche de PokaiTrainer :
    récursif) — les deux camps jouent au mieux, ni adversaire moyen (expectimax)
    ni pire cas pur (minimax). Vérifié : nash ≤ expectimax, entre moyen et pire.
    Suite : budget d'expansion PUCT (au lieu d'un développement complet borné).
-3. **Mise à jour de croyance inter-tours** : rebrancher l'action jointe observée
-   à travers les mondes (contradiction ⇒ synthèse de spreads), façon PokaiTrainer.
+3. ~~**Mise à jour de croyance inter-tours**~~ **✅ fait** : `belief.update_belief`
+   reconditionne le nuage de particules sur le coup adverse observé —
+   `w'_i ∝ w_i · P(coup | monde_i)`. La vraisemblance par monde est la
+   **stratégie de Nash par monde** (`solve_turn` l'expose via
+   `opp_world_strategies`) : un monde est **remonté** en proportion de la
+   probabilité qu'il jouait ce coup, **écrasé au plancher** s'il ne le possède
+   pas (preuve dure), et le cas **contradiction** (coup dans aucun monde) est
+   traité par **synthèse de spreads** — on l'injecte plutôt que d'effondrer la
+   croyance. Exposé partout : CLI `nash --opp-observed <coup>` (glissement de
+   croyance affiché), API `/api/nash` (`oppObserved`, renvoie `beliefPrior`).
+   *Pur algo, hors-ligne, explicable.*
 4. **Réseau de valeur appris (ONNX)** — *le levier « au-delà »* : remplacer
    l'éval heuristique de feuille par un petit réseau valeur/politique entraîné en
    self-play sur `sim`, exporté en ONNX et chargé **dans le navigateur**
