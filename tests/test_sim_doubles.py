@@ -265,3 +265,48 @@ def test_lightning_rod_redirects_and_boosts():
     assert res.opp.active[0].hp == res.opp.active[0].max_hp
     assert res.opp.active[1].hp == res.opp.active[1].max_hp, "immunisé"
     assert res.opp.active[1].boosts.get("spa") == 1
+
+
+# --- Ally Switch ------------------------------------------------------------
+
+def test_ally_switch_makes_the_attack_hit_the_other_slot():
+    me = side(mon("garchomp", "adamant", {"atk": 31}, moves=["dragonclaw"]),
+              mon("snorlax", "brave"))
+    opp = side(mon("tyranitar", "jolly", moves=["allyswitch"]),
+               mon("torkoal", "quiet"))
+    res = simulate_turn_doubles(me, opp, (mv("dragonclaw", ("foe", 0)), PASS),
+                                (mv("allyswitch"), PASS), None)
+    # Après l'échange, le slot 0 est occupé par Torkoal, qui encaisse.
+    assert res.opp.active[0].build.species == "torkoal"
+    assert res.opp.active[0].hp < res.opp.active[0].max_hp
+    assert res.opp.active[1].build.species == "tyranitar"
+    assert res.opp.active[1].hp == res.opp.active[1].max_hp
+
+
+# --- Helping Hand -----------------------------------------------------------
+
+def test_helping_hand_boosts_the_ally_damage():
+    def run(support):
+        me = side(mon("clefairy", "bold", moves=["helpinghand"]),
+                  mon("garchomp", "adamant", {"atk": 31}, moves=["dragonclaw"]))
+        opp = side(mon("snorlax", "careful", {"hp": 32, "def": 32}),
+                   mon("torkoal", "quiet"))
+        first = mv("helpinghand", ("ally", 0)) if support else PASS
+        res = simulate_turn_doubles(me, opp, (first, mv("dragonclaw", ("foe", 0))),
+                                    (PASS, PASS), None)
+        return res.opp.active[0].max_hp - res.opp.active[0].hp
+
+    assert run(True) > run(False), "Helping Hand doit augmenter les dégâts"
+
+
+def test_helping_hand_is_consumed_by_a_single_move():
+    me = side(mon("clefairy", "bold", moves=["helpinghand"]),
+              mon("garchomp", "adamant", {"atk": 31}, moves=["dragonclaw"]))
+    opp = side(mon("snorlax", "careful", {"hp": 32, "def": 32}),
+               mon("torkoal", "quiet"))
+    res = simulate_turn_doubles(
+        me, opp, (mv("helpinghand", ("ally", 0)), mv("dragonclaw", ("foe", 0))),
+        (PASS, PASS), None)
+    # Le registre est local au tour : rien ne persiste dans l'état renvoyé.
+    assert not hasattr(res.me, "helping_hand")
+    assert any("soutient son allié" in line for line in res.log)

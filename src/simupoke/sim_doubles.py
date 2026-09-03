@@ -107,6 +107,9 @@ _ALL_SPREAD = "allAdjacent"           # les deux adversaires ET l'allié
 
 # Coups d'appui résolus par le simulateur Doubles lui-même (pas par _apply_move).
 _WIDE_GUARD = "wideguard"
+_ALLY_SWITCH = "allyswitch"
+_HELPING_HAND = "helpinghand"
+_HELPING_HAND_MOD = 1.5
 _REDIRECT_MOVES = {"followme", "ragepowder"}
 # Talent -> type de coup redirigé (immunité + boost d'Attaque Spéciale).
 _REDIRECT_ABILITIES = {"lightningrod": "Electric", "stormdrain": "Water"}
@@ -260,8 +263,10 @@ def simulate_turn_doubles(me: DoublesSide, opp: DoublesSide,
     order = action_order_doubles(me, opp, my_actions, opp_actions, field)
     actions_of = {"me": my_actions, "opp": opp_actions}
     side_of = {"me": me, "opp": opp}
-    # Registres locaux au tour : slot -> coup de redirection déjà joué.
+    # Registres locaux au tour : slot -> coup de redirection déjà joué, et
+    # slots dont le prochain coup offensif bénéficie de Helping Hand.
     redirectors: dict[str, dict[int, str]] = {"me": {}, "opp": {}}
+    helping: dict[str, set[int]] = {"me": set(), "opp": set()}
     for actor in order:
         key, slot = actor
         own = side_of[key]
@@ -275,10 +280,23 @@ def simulate_turn_doubles(me: DoublesSide, opp: DoublesSide,
             own.wide_guard = True
             log.append(f"{attacker.build.species} pose Wide Guard")
             continue
+        if mid == _ALLY_SWITCH:
+            if len(own.active) == 2:
+                own.active[0], own.active[1] = own.active[1], own.active[0]
+                log.append(f"{attacker.build.species} échange sa place "
+                           f"avec son allié")
+            continue
         if mid in _REDIRECT_MOVES:
             redirectors[key][slot] = mid
             log.append(f"{attacker.build.species} attire les coups "
                        f"({get_move(mid).name})")
+            continue
+        if mid == _HELPING_HAND:
+            other = 1 - slot
+            if len(own.active) == 2 and not own.active[other].fainted:
+                helping[key].add(other)
+                log.append(f"{attacker.build.species} soutient son allié "
+                           f"({get_move(mid).name})")
             continue
         targets = resolve_targets(actor, action, own, foes)
         if not targets:
@@ -295,10 +313,14 @@ def simulate_turn_doubles(me: DoublesSide, opp: DoublesSide,
             log.append(f"  Wide Guard protège le camp — "
                        f"{get_move(mid).name} bloqué")
             continue
+        # Helping Hand : consommé par le premier coup offensif du bénéficiaire.
+        power_mod = _HELPING_HAND_MOD if slot in helping[key] else 1.0
+        if power_mod != 1.0:
+            helping[key].discard(slot)
         for target in targets:
             _apply_move(attacker, target, mid, field, roll, log,
                         atk_side=own, def_side=foes, field_dur=field_dur,
-                        apply_spread=spread)
+                        apply_spread=spread, power_mod=power_mod)
 
     # 3) Fin de tour sur les quatre, puis conditions de camp.
     for camp in (me, opp):
