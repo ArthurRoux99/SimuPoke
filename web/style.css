@@ -215,3 +215,17 @@ pre.report { background: var(--panel); border: 1px solid var(--border); border-r
 .nash-belief-w { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
 .nash-belief-set { color: var(--text); }
 .nash-belief-set b { color: var(--muted); font-weight: 600; }
+
+/* ---- Onglet Doubles (matrice de menaces) ---- */
+#dbl-result:empty { display: none; }
+.dbl-target { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.dbl-target:last-child { border-bottom: none; }
+.dbl-thead { font-weight: 600; margin-bottom: 6px; }
+.dbl-focus { margin-left: 8px; font-size: 12px; color: var(--good); font-weight: 600; }
+.dbl-hit { font-size: 13px; padding: 2px 0 2px 14px; color: var(--muted); }
+.dbl-hit b { color: var(--text); font-variant-numeric: tabular-nums; }
+.dbl-atk { color: var(--text); }
+.dbl-ko { font-size: 11px; font-weight: 700; color: var(--good);
+  border: 1px solid var(--good); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+.dbl-spread-head { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border);
+  font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
