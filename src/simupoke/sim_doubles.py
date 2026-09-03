@@ -10,7 +10,10 @@ vérité. Le ciblage et les priorités sont **lus dans les données**
 (`Move.target`, `Move.priority`), jamais codés en dur.
 
 Périmètre v1 (assumé) : pas de remplacement d'un K.O. en cours de tour (le slot
-reste vide jusqu'au tour suivant), pas de Quash / Après Vous.
+reste vide jusqu'au tour suivant), pas de Quash / Après Vous. Les écrans
+consultés lors d'un coup de zone sont ceux du camp adverse, y compris pour
+l'allié touché par un `allAdjacent` : le cas est rare et l'écart est borné à un
+facteur d'écran sur le seul friendly fire.
 """
 
 from __future__ import annotations
@@ -210,9 +213,12 @@ def simulate_turn_doubles(me: DoublesSide, opp: DoublesSide,
         if not targets:
             log.append(f"{attacker.build.species} : cible K.O. — coup perdu")
             continue
+        # Pénalité de zone : seulement à partir de deux cibles touchées.
+        spread = len(targets) >= 2
         for target in targets:
             _apply_move(attacker, target, mid, field, roll, log,
-                        atk_side=own, def_side=foes, field_dur=field_dur)
+                        atk_side=own, def_side=foes, field_dur=field_dur,
+                        apply_spread=spread)
 
     # 3) Fin de tour sur les quatre, puis conditions de camp.
     for camp in (me, opp):

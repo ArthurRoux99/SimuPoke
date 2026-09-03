@@ -134,3 +134,39 @@ def test_end_of_turn_applies_to_all_four():
     for camp in (res.me, res.opp):
         for m in camp.active:
             assert m.hp > m.max_hp // 2      # Vestiges ont soigné les quatre
+
+
+# --- Coups de zone ----------------------------------------------------------
+
+def test_spread_penalty_only_with_two_targets():
+    def damage_to_slot0(second_foe_alive):
+        me = side(mon("garchomp", "adamant", {"atk": 31}, moves=["rockslide"]),
+                  mon("snorlax", "brave"))
+        opp = side(mon("tyranitar", "jolly"), mon("torkoal", "quiet"))
+        if not second_foe_alive:
+            opp.active[1].hp = 0
+        res = simulate_turn_doubles(me, opp, (mv("rockslide"), PASS),
+                                    (PASS, PASS), None)
+        return res.opp.active[0].max_hp - res.opp.active[0].hp
+
+    deux_cibles = damage_to_slot0(True)
+    une_cible = damage_to_slot0(False)
+    assert une_cible > deux_cibles, "pas de pénalité ×0.75 sur une cible unique"
+
+
+def test_all_adjacent_move_hits_the_ally():
+    me = side(mon("garchomp", "adamant", {"atk": 31}, moves=["earthquake"]),
+              mon("snorlax", "brave"))
+    opp = side(mon("tyranitar", "jolly"), mon("torkoal", "quiet"))
+    res = simulate_turn_doubles(me, opp, (mv("earthquake"), PASS),
+                                (PASS, PASS), None)
+    assert res.me.active[1].hp < res.me.active[1].max_hp, "Séisme touche l'allié"
+
+
+def test_foe_spread_move_spares_the_ally():
+    me = side(mon("garchomp", "adamant", {"atk": 31}, moves=["rockslide"]),
+              mon("snorlax", "brave"))
+    opp = side(mon("tyranitar", "jolly"), mon("torkoal", "quiet"))
+    res = simulate_turn_doubles(me, opp, (mv("rockslide"), PASS),
+                                (PASS, PASS), None)
+    assert res.me.active[1].hp == res.me.active[1].max_hp
