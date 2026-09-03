@@ -661,15 +661,19 @@ def cmd_decide(args: list[str]) -> int:
 
 def cmd_nash(args: list[str]) -> int:
     """Stratégie mixte de Nash pour le tour (jeu simultané, croyance adverse)."""
-    from .belief import update_belief
+    from .belief import update_belief, update_belief_speed
     from .nash import solve_turn
-    pos, opts, _ = _split_args(args, set())
+    pos, opts, flags = _split_args(args, {"opp-faster", "opp-slower",
+                                          "me-tailwind", "opp-tailwind",
+                                          "trick-room"})
     if len(pos) != 5:
         print("Usage : nash <me_species> <me_nature> <me_moves> "
               "<opp_species> <opp_nature> [--me-sp k=v] [--opp-moves a,b,c] "
               "[--me-item X] [--opp-item X] [--me-hp 0..1] [--opp-hp 0..1] "
               "[--weather X] [--bench 'esp,nat,c1|c2 ; …'] [--iters N] "
-              "[--horizon 0..3] [--opp-observed coup]", file=sys.stderr)
+              "[--horizon 0..3] [--opp-observed coup] "
+              "[--opp-faster|--opp-slower] [--me-tailwind] [--opp-tailwind] "
+              "[--trick-room]", file=sys.stderr)
         return 2
     me_sp, me_nat, me_moves, opp_sp, opp_nat = pos
     for sp in (me_sp, opp_sp):
@@ -702,14 +706,33 @@ def cmd_nash(args: list[str]) -> int:
     iters = int(opts.get("iters", 2000))
     horizon = int(opts.get("horizon", 0))
     observed = (opts.get("opp-observed") or "").strip() or None
+    order = ("opp-faster" in flags) - ("opp-slower" in flags)   # +1 / 0 / -1
     try:
         res = solve_turn(me, opp, field, my_bench=bench, iters=iters,
                          horizon=horizon)
-        if observed is not None:
-            posterior = update_belief(res.belief, observed,
-                                      world_strategies=res.opp_world_strategies)
-            print(f"{label('species', me_sp)}  vs  {label('species', opp_sp)}\n")
-            _print_belief_shift(res.belief, posterior, observed)
+        header = f"{label('species', me_sp)}  vs  {label('species', opp_sp)}\n"
+        if observed is not None or order:
+            prior = res.belief
+            posterior = prior
+            print(header)
+            if observed is not None:
+                posterior = update_belief(posterior, observed,
+                                          world_strategies=res.opp_world_strategies)
+                _print_belief_shift(prior, posterior,
+                                    f"coup adverse observé : {observed}")
+            if order:
+                from .bench import compute_speed
+                me_speed = compute_speed(me.build,
+                                         tailwind="me-tailwind" in flags)
+                before = posterior
+                posterior = update_belief_speed(
+                    posterior, opp_faster=(order > 0), me_speed=me_speed,
+                    opp_tailwind="opp-tailwind" in flags,
+                    trick_room="trick-room" in flags)
+                sens = "avant moi" if order > 0 else "après moi"
+                _print_belief_shift(before, posterior,
+                                    f"ordre d'action : l'adversaire agit {sens} "
+                                    f"(ma vitesse {me_speed})")
             res = solve_turn(me, opp, field, my_bench=bench, iters=iters,
                              horizon=horizon, belief=posterior)
             for line in res.lines():
@@ -718,20 +741,20 @@ def cmd_nash(args: list[str]) -> int:
     except (ValueError, KeyError) as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 1
-    print(f"{label('species', me_sp)}  vs  {label('species', opp_sp)}\n")
+    print(header)
     for line in res.lines():
         print(line)
     return 0
 
 
-def _print_belief_shift(prior: list, posterior: list, observed: str) -> None:
-    """Affiche le glissement de croyance après le coup adverse observé."""
-    print(f"Mise à jour de croyance — coup adverse observé : {observed}")
-    before = {tuple(sorted(p.build.moves)): p.weight for p in prior}
+def _print_belief_shift(prior: list, posterior: list, caption: str) -> None:
+    """Affiche le glissement de croyance (prior → posterior) après une observation."""
+    print(f"Mise à jour de croyance — {caption}")
+    before = {(p.build.item, p.build.nature, tuple(sorted(p.build.moves))): p.weight
+              for p in prior}
     for part in posterior:
         b = part.build
-        key = tuple(sorted(b.moves))
-        was = before.get(key)
+        was = before.get((b.item, b.nature, tuple(sorted(b.moves))))
         arrow = (f"{was*100:4.0f} % → " if was is not None else "  (nouveau) ")
         item = f" @ {b.item}" if b.item else ""
         print(f"  {arrow}{part.weight*100:4.0f} %{item}  ·  {', '.join(b.moves)}")

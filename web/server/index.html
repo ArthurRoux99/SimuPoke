@@ -132,6 +132,12 @@
     <label style="margin-top:8px">Coup adverse observé (Nash) — met à jour la croyance
       tour après tour <code>ex. protect</code></label>
     <input id="c-opp-observed" placeholder="laisser vide au 1ᵉʳ tour" autocomplete="off">
+    <label style="margin-top:8px">Ordre d'action observé (scouting de vitesse)</label>
+    <select id="c-opp-order">
+      <option value="">— (non observé)</option>
+      <option value="faster">l'adversaire a agi avant moi</option>
+      <option value="slower">l'adversaire a agi après moi</option>
+    </select>
     <div class="controls" style="grid-template-columns: auto auto 1fr auto; margin-top:10px; align-items:end;">
       <div><label>Profondeur</label><select id="c-depth">
         <option value="1">1 (rapide)</option><option value="2">2</option>

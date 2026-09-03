@@ -180,6 +180,20 @@ def test_nash_endpoint_updates_belief_on_observed_move():
     assert with_rs > 0.6
 
 
+def test_nash_endpoint_updates_belief_on_move_order():
+    # Rotom-Wash (106) vs Tyranitar : observer que l'adversaire agit avant moi
+    # concentre la croyance sur les mondes rapides (Choice Scarf).
+    out = server.api_nash({
+        "me": {"species": "rotomwash", "nature": "bold", "moves": ["hydropump"]},
+        "opp": {"species": "tyranitar", "moves": ["crunch"]},
+        "oppFaster": True,
+    })
+    assert out["oppFaster"] is True
+    assert "beliefPrior" in out
+    scarf = sum(b["weight"] for b in out["belief"] if b["item"] == "choicescarf")
+    assert scarf > 0.8                               # le dépassement révèle le Scarf
+
+
 def test_belief_endpoint():
     out = server.api_belief({"opp": {"species": "tyranitar", "moves": ["crunch"]}})
     assert out["belief"] and all("moves" in b for b in out["belief"])

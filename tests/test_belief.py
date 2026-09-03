@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
-from simupoke.belief import Particle, update_belief
+from simupoke.belief import Particle, update_belief, update_belief_speed
+from simupoke.bench import compute_speed
 from simupoke.model import PokemonState
 
 
 def _part(moves, weight, item=None):
     return Particle(build=PokemonState(species="tyranitar", nature="adamant",
                                        moves=list(moves), item=item),
+                    weight=weight)
+
+
+def _spart(weight, *, nature="adamant", item=None, sp=None, status=None):
+    return Particle(build=PokemonState(species="tyranitar", nature=nature,
+                                       stat_points=sp or {}, item=item,
+                                       status=status, moves=["crunch"]),
                     weight=weight)
 
 
@@ -101,3 +109,54 @@ def test_synthesis_replaces_when_set_full():
     post = update_belief(prior, "earthquake")
     assert "earthquake" in post[0].build.moves
     assert len(post[0].build.moves) == 4
+
+
+# --- Mise à jour sur l'ordre d'action (scouting de vitesse) ----------------
+
+def test_speed_update_favors_scarf_world_when_outsped():
+    # Deux mondes : sans objet vs Choice Scarf (×1.5). Si l'adversaire me
+    # dépasse alors que ma vitesse égale la sienne sans Scarf, le monde Scarf
+    # devient nettement plus probable.
+    slow = _spart(0.5)                                   # tyranitar adamant, no item
+    scarf = _spart(0.5, item="choicescarf")
+    # Ma vitesse : au-dessus de la base, en-dessous du Scarf (×1.5).
+    me_speed = compute_speed(slow.build) + 1
+    assert compute_speed(scarf.build) > me_speed
+    post = update_belief_speed([slow, scarf], opp_faster=True, me_speed=me_speed)
+    w_scarf = next(p for p in post if p.build.item == "choicescarf")
+    w_slow = next(p for p in post if p.build.item is None)
+    assert w_scarf.weight > 0.9                           # seul le Scarf me dépasse
+    assert w_slow.weight < 0.1                            # base plus lente → incohérent
+
+
+def test_speed_update_slower_observation_eliminates_scarf():
+    # Si l'adversaire agit APRÈS moi alors que je suis à sa vitesse de base,
+    # le monde Scarf (plus rapide) devient incohérent.
+    slow = _spart(0.5)
+    scarf = _spart(0.5, item="choicescarf")
+    me_speed = compute_speed(slow.build) + 1             # je suis un poil plus rapide que la base
+    post = update_belief_speed([slow, scarf], opp_faster=False, me_speed=me_speed)
+    w_scarf = next(p for p in post if p.build.item == "choicescarf")
+    assert w_scarf.weight < 0.1                           # Scarf l'aurait rendu plus rapide
+
+
+def test_speed_tie_is_consistent_with_both_orders():
+    # Vitesse exactement égale : cohérent quel que soit l'ordre observé.
+    a = _spart(0.5)
+    b = _spart(0.5)
+    me_speed = compute_speed(a.build)
+    for faster in (True, False):
+        post = update_belief_speed([a, b], opp_faster=faster, me_speed=me_speed)
+        assert abs(post[0].weight - 0.5) < 1e-9
+
+
+def test_speed_update_trick_room_inverts_order():
+    # En Trick Room, le plus LENT agit d'abord : « l'adversaire agit avant moi »
+    # favorise le monde le plus lent, pas le plus rapide.
+    slow = _spart(0.5)
+    fast = _spart(0.5, nature="jolly")                   # +Vitesse
+    me_speed = compute_speed(slow.build) + 1
+    post = update_belief_speed([slow, fast], opp_faster=True, me_speed=me_speed,
+                               trick_room=True)
+    w_slow = next(p for p in post if p.build.nature == "adamant")
+    assert w_slow.weight > 0.9                            # sous TR, le lent passe devant

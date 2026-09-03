@@ -180,3 +180,41 @@ def update_belief(particles: list[Particle], observed_move: str | None, *,
             lik = 1.0 / len(feasible) if feasible else floor
         post.append(Particle(build=p.build, weight=p.weight * lik))
     return _renorm(post)
+
+
+def update_belief_speed(particles: list[Particle], opp_faster: bool,
+                        me_speed: int, *, opp_tailwind: bool = False,
+                        trick_room: bool = False, floor: float = 0.02
+                        ) -> list[Particle]:
+    """Reconditionne la croyance sur l'**ordre d'action observé** (scouting de
+    vitesse) — l'une des inférences les plus fortes du jeu compétitif.
+
+    Observation : à **palier de priorité égal** (les deux camps ont joué un coup
+    de même priorité, cas courant), l'adversaire a agi **avant** moi
+    (`opp_faster=True`) ou **après** (`False`). `me_speed` est ma vitesse
+    effective ce tour-là.
+
+    Pour chaque monde on calcule la vitesse effective de l'adversaire (nature,
+    Choice Scarf, paralysie, Tailwind — via `bench.compute_speed`) et on garde
+    les mondes **cohérents** avec l'ordre observé, écrasant les autres au
+    plancher. Un **speed tie** (vitesses égales) est cohérent avec les deux
+    ordres. En **Trick Room**, l'ordre est inversé (le plus lent agit d'abord).
+
+    Comme la croyance échantillonne la **nature** et l'**objet** (donc Choice
+    Scarf) mais pas le détail des SP, l'inférence discrimine surtout
+    nature ±Vit et Scarf — précisément l'axe utile pour « ils m'ont dépassé ».
+    """
+    from .bench import compute_speed
+    post: list[Particle] = []
+    for p in particles:
+        opp_spe = compute_speed(p.build, tailwind=opp_tailwind)
+        if opp_spe == me_speed:
+            consistent = True                     # speed tie : les deux ordres OK
+        else:
+            faster = opp_spe > me_speed
+            if trick_room:
+                faster = not faster               # TR : le plus lent agit d'abord
+            consistent = (faster == opp_faster)
+        post.append(Particle(build=p.build,
+                             weight=p.weight * (1.0 if consistent else floor)))
+    return _renorm(post)

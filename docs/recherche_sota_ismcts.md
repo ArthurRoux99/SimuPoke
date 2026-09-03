@@ -75,9 +75,13 @@ Par ordre d'impact / coût croissant — chaque cran rapproche de PokaiTrainer :
    probabilité qu'il jouait ce coup, **écrasé au plancher** s'il ne le possède
    pas (preuve dure), et le cas **contradiction** (coup dans aucun monde) est
    traité par **synthèse de spreads** — on l'injecte plutôt que d'effondrer la
-   croyance. Exposé partout : CLI `nash --opp-observed <coup>` (glissement de
-   croyance affiché), API `/api/nash` (`oppObserved`, renvoie `beliefPrior`).
-   *Pur algo, hors-ligne, explicable.*
+   croyance. En plus du coup, l'**ordre d'action observé** est reconditionné
+   (`update_belief_speed`) — le *scouting de vitesse* : « l'adversaire m'a
+   dépassé » écrase les mondes trop lents et remonte Choice Scarf / nature +Vit
+   (Trick Room, Tailwind et paralysie pris en compte). Exposé partout : CLI
+   `nash --opp-observed <coup>` / `--opp-faster|--opp-slower` (glissement de
+   croyance affiché), API `/api/nash` (`oppObserved`, `oppFaster`, renvoie
+   `beliefPrior`), et l'onglet Combat de l'app. *Pur algo, hors-ligne, explicable.*
 4. **Réseau de valeur appris (ONNX)** — *le levier « au-delà »* : remplacer
    l'éval heuristique de feuille par un petit réseau valeur/politique entraîné en
    self-play sur `sim`, exporté en ONNX et chargé **dans le navigateur**

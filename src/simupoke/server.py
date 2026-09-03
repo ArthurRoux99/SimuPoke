@@ -309,14 +309,26 @@ def api_nash(body: dict) -> dict:
     res = solve_turn(me, opp, field, my_bench=bench, reg_id=reg_id,
                      iters=iters, horizon=horizon)
 
-    # Mise à jour bayésienne inter-tours : si un coup adverse a été observé
-    # (`oppObserved`), on reconditionne la croyance et on re-résout le tour.
+    # Mise à jour bayésienne inter-tours : coup adverse observé (`oppObserved`)
+    # et/ou ordre d'action observé (`oppFaster`) reconditionnent la croyance,
+    # puis on re-résout le tour.
     observed = (body.get("oppObserved") or "").strip() or None
+    opp_faster = body.get("oppFaster")               # True / False / None
     prior_belief = res.belief
-    if observed is not None:
-        from .belief import update_belief
-        posterior = update_belief(res.belief, observed,
-                                  world_strategies=res.opp_world_strategies)
+    if observed is not None or opp_faster is not None:
+        from .belief import update_belief, update_belief_speed
+        posterior = res.belief
+        if observed is not None:
+            posterior = update_belief(posterior, observed,
+                                      world_strategies=res.opp_world_strategies)
+        if opp_faster is not None:
+            from .bench import compute_speed
+            me_speed = compute_speed(me.build,
+                                     tailwind=bool(body.get("meTailwind")))
+            posterior = update_belief_speed(
+                posterior, opp_faster=bool(opp_faster), me_speed=me_speed,
+                opp_tailwind=bool(body.get("oppTailwind")),
+                trick_room=bool(body.get("trickRoom")))
         res = solve_turn(me, opp, field, my_bench=bench, reg_id=reg_id,
                          iters=iters, horizon=horizon, belief=posterior)
 
@@ -331,9 +343,12 @@ def api_nash(body: dict) -> dict:
         "belief": _belief_json(res.belief),
         "lines": res.lines(),
     }
-    if observed is not None:
-        out["oppObserved"] = observed
+    if observed is not None or opp_faster is not None:
         out["beliefPrior"] = _belief_json(prior_belief)
+        if observed is not None:
+            out["oppObserved"] = observed
+        if opp_faster is not None:
+            out["oppFaster"] = bool(opp_faster)
     return out
 
 
