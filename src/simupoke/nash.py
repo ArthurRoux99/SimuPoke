@@ -29,11 +29,14 @@ from dataclasses import dataclass, field as dfield
 from .model import PokemonState, FieldState
 from .moves import get_move, is_known as move_known
 from .sim import Mon, Side, simulate_turn_actions
-from .search import evaluate_side, _state_value  # éval d'équipe + lookahead
+from .search import (evaluate_side, _state_value, _terminal, _my_actions,
+                     _child, GAMMA)
 from .belief import opponent_belief, opponent_move_support, Particle
 
 # Jets de dégâts représentatifs (énumération de la chance, poids uniforme).
 ROLLS = (0.15, 0.5, 0.85)
+# Itérations de regret matching pour les nœuds internes du lookahead Nash.
+_INNER_ITERS = 500
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +101,37 @@ def _leaf_value(res, field: FieldState | None, roll: float,
                         "expected")
 
 
+def _sm_nash_value(me: Side, opp: Side, field: FieldState | None,
+                   depth: int, roll: float) -> float:
+    """Valeur **Nash** d'un état à information parfaite, à `depth` tours.
+
+    À l'intérieur d'un monde, le set adverse est connu : la continuation est un
+    jeu simultané à information parfaite. On la résout vers Nash à **chaque
+    étage** (regret matching), au lieu de l'expectimax (adversaire fixe + moi
+    glouton). C'est le cran « CFR récursif » de l'échelle SOTA.
+    """
+    if depth <= 0 or _terminal(me, opp):
+        return evaluate_side(me, opp.active)
+    my_acts = _my_actions(me, allow_switch=False)
+    opp_acts: list[str | None] = [m for m in opp.active.build.moves
+                                  if move_known(m)] or [None]
+    U = [[_sm_nash_value(*_child(me, opp, a, omv, field, roll),
+                         field=field, depth=depth - 1, roll=roll)
+          for omv in opp_acts]
+         for a in my_acts]
+    _, _, val = solve_matrix(U, iters=_INNER_ITERS)
+    return GAMMA * val
+
+
+def _leaf_value_world(res, field: FieldState | None, roll: float,
+                      horizon: int) -> float:
+    """Feuille d'un monde (adversaire connu) : éval immédiate à `horizon=0`,
+    sinon **Nash récursif** (les deux camps jouent au mieux à chaque tour)."""
+    if horizon <= 0:
+        return evaluate_side(res.me, res.opp.active)
+    return _sm_nash_value(res.me, res.opp, field, horizon, roll)
+
+
 def _payoff_matrix(me: Mon, my_bench: list[Mon], particles: list[Particle],
                    my_actions: list[tuple], opp_moves: list[str | None],
                    field: FieldState | None, horizon: int = 0
@@ -151,7 +185,7 @@ def _world_payoff(me: Mon, my_bench: list[Mon], particle: Particle,
                 res = simulate_turn_actions(
                     Side(active=me, bench=my_bench), Side(active=opp_mon),
                     action, ("move", omv), field, roll=roll, copy=True)
-                vals.append(_leaf_value(res, field, roll, opp_actions_w, horizon))
+                vals.append(_leaf_value_world(res, field, roll, horizon))
             row.append(sum(vals) / len(vals))
         matrix.append(row)
     return matrix
