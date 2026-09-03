@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from simupoke.model import FieldState, PokemonState
 from simupoke.sim import Mon
-from simupoke.sim_doubles import DoublesSide, action_order_doubles
+from simupoke.sim_doubles import (
+    DoublesSide,
+    action_order_doubles,
+    simulate_turn_doubles,
+)
 
 
 def st(species, nature="serious", sp=None, item=None, ability=None,
@@ -74,3 +78,59 @@ def test_order_is_stable_on_speed_tie():
     order = action_order_doubles(me, opp, (mv("bodyslam"), mv("bodyslam")),
                                  (mv("bodyslam"), mv("bodyslam")), None)
     assert order == [("me", 0), ("me", 1), ("opp", 0), ("opp", 1)]
+
+
+# --- Résolution du tour -----------------------------------------------------
+
+def test_single_target_hits_the_named_slot():
+    # Griffe Dragon est mono-cible (`normal`) : la cible nommée est respectée.
+    me = side(mon("garchomp", "adamant", {"atk": 31}, moves=["dragonclaw"]),
+              mon("snorlax", "brave"))
+    opp = side(mon("tyranitar", "jolly"), mon("torkoal", "quiet"))
+    res = simulate_turn_doubles(me, opp, (mv("dragonclaw", ("foe", 1)), PASS),
+                                (PASS, PASS), None)
+    assert res.opp.active[1].hp < res.opp.active[1].max_hp   # le slot 1 encaisse
+    assert res.opp.active[0].hp == res.opp.active[0].max_hp  # le slot 0 est intact
+
+
+def test_default_target_is_first_living_foe():
+    me = side(mon("garchomp", "adamant", {"atk": 31}, moves=["dragonclaw"]),
+              mon("snorlax", "brave"))
+    opp = side(mon("torkoal", "quiet"), mon("tyranitar", "jolly"))
+    res = simulate_turn_doubles(me, opp, (mv("dragonclaw"), PASS),
+                                (PASS, PASS), None)
+    assert res.opp.active[0].hp < res.opp.active[0].max_hp
+
+
+def test_fainted_target_wastes_the_move():
+    me = side(mon("garchomp", "adamant", {"atk": 31}, moves=["dragonclaw"]),
+              mon("garchomp", "adamant", {"atk": 31}, moves=["dragonclaw"]))
+    opp = side(mon("torkoal", "quiet", hp=0.02), mon("tyranitar", "jolly"))
+    # Les deux visent le slot 0 ; le premier le met K.O., le second perd son coup.
+    res = simulate_turn_doubles(
+        me, opp, (mv("dragonclaw", ("foe", 0)), mv("dragonclaw", ("foe", 0))),
+        (PASS, PASS), None)
+    assert res.opp.active[0].fainted
+    assert res.opp.active[1].hp == res.opp.active[1].max_hp
+    assert any("coup perdu" in line for line in res.log)
+
+
+def test_switch_resolves_before_moves():
+    me = side(mon("garchomp", "jolly", {"spe": 32}, moves=["dragonclaw"]),
+              mon("snorlax", "brave"),
+              bench=[mon("tyranitar", "jolly", moves=["crunch"])])
+    opp = side(mon("torkoal", "quiet", moves=["eruption"]), mon("torkoal", "quiet"))
+    res = simulate_turn_doubles(me, opp, (("switch", 0, None), PASS),
+                                (PASS, PASS), None)
+    assert res.me.active[0].build.species == "tyranitar"
+
+
+def test_end_of_turn_applies_to_all_four():
+    me = side(mon("garchomp", "jolly", item="leftovers", hp=0.5),
+              mon("snorlax", "brave", item="leftovers", hp=0.5))
+    opp = side(mon("tyranitar", "jolly", item="leftovers", hp=0.5),
+               mon("torkoal", "quiet", item="leftovers", hp=0.5))
+    res = simulate_turn_doubles(me, opp, (PASS, PASS), (PASS, PASS), None)
+    for camp in (res.me, res.opp):
+        for m in camp.active:
+            assert m.hp > m.max_hp // 2      # Vestiges ont soigné les quatre

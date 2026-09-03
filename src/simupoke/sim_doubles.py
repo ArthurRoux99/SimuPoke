@@ -21,7 +21,7 @@ from .combat import effective_speed
 from .model import FieldState
 from .moves import get_move
 from .moves import is_known as move_known
-from .sim import Mon
+from .sim import Mon, _apply_hazards, _apply_move, _end_of_turn, _tick_conditions
 
 # Une cible : ("foe", 0|1) | ("ally", 0) | ("self", 0)
 Target = tuple[str, int]
@@ -92,3 +92,131 @@ def action_order_doubles(me: DoublesSide, opp: DoublesSide,
                             _speed_key(mon, camp, field)))
     entries.sort(key=lambda e: (-e[1], -e[2]))     # tri stable
     return [actor for actor, _, _ in entries]
+
+
+# ---------------------------------------------------------------------------
+# Ciblage — piloté par la donnée (`Move.target`)
+# ---------------------------------------------------------------------------
+
+_FOE_SPREAD = "allAdjacentFoes"       # les deux adversaires
+_ALL_SPREAD = "allAdjacent"           # les deux adversaires ET l'allié
+
+
+def _living(mons: list[Mon]) -> list[Mon]:
+    return [m for m in mons if not m.fainted]
+
+
+def resolve_targets(actor: Actor, action: SlotAction, own: DoublesSide,
+                    foes: DoublesSide) -> list[Mon]:
+    """Pokémon effectivement touchés par `action`, d'après `Move.target`.
+
+    Le ciblage vient de la **donnée** : `allAdjacentFoes` frappe les deux
+    adversaires, `allAdjacent` y ajoute l'allié (Séisme, Surf), `self` et
+    `allySide` restent sur le lanceur, `adjacentAlly` vise l'allié.
+    """
+    mid = _move_of(action)
+    if not mid or not move_known(mid):
+        return []
+    _, slot = actor
+    mv = get_move(mid)
+    tgt = mv.target
+    ally = [m for i, m in enumerate(own.active) if i != slot and not m.fainted]
+
+    if tgt in ("self", "allySide"):
+        return [own.active[slot]]
+    if tgt == "adjacentAlly":
+        return ally
+    if tgt == _ALL_SPREAD:
+        return _living(foes.active) + ally
+    if tgt == _FOE_SPREAD:
+        return _living(foes.active)
+    # Mono-cible : cible explicite, sinon le premier adversaire vivant.
+    named = action[2]
+    if named and named[0] == "foe" and named[1] < len(foes.active):
+        chosen = foes.active[named[1]]
+        return [] if chosen.fainted else [chosen]
+    if named and named[0] == "ally":
+        return ally
+    living = _living(foes.active)
+    return [living[0]] if living else []
+
+
+# ---------------------------------------------------------------------------
+# Résolution d'un tour
+# ---------------------------------------------------------------------------
+
+@dataclass
+class DoublesResult:
+    me: DoublesSide
+    opp: DoublesSide
+    log: list[str]
+
+
+def _do_switch_slot(side: DoublesSide, slot: int, index: int,
+                    log: list[str]) -> None:
+    """Rappelle l'occupant de `slot` et envoie `bench[index]` à sa place."""
+    if not (0 <= index < len(side.bench)):
+        log.append("  changement invalide (indice hors banc)")
+        return
+    old = side.active[slot]
+    old.boosts = {}
+    old.protected = False
+    new = side.bench[index]
+    side.bench[index] = old
+    side.active[slot] = new
+    log.append(f"{old.build.species} est rappelé ; {new.build.species} entre")
+    _apply_hazards(side, new, log)
+
+
+def simulate_turn_doubles(me: DoublesSide, opp: DoublesSide,
+                          my_actions: SideActions, opp_actions: SideActions,
+                          field: FieldState | None = None, *,
+                          roll: float = 0.5, copy: bool = True) -> DoublesResult:
+    """Résout un tour complet en Doubles (mutation d'une copie par défaut)."""
+    if copy:
+        me, opp = _copy_side(me), _copy_side(opp)
+    src = field or FieldState()
+    field = FieldState(weather=src.weather, terrain=src.terrain,
+                       trick_room=src.trick_room, turn=src.turn)
+    field_dur: dict = {}
+    log: list[str] = []
+    for camp in (me, opp):
+        camp.wide_guard = False
+        for m in camp.active:
+            m.protected = False
+    pre = {"me": (set(me.screens), me.tailwind > 0),
+           "opp": (set(opp.screens), opp.tailwind > 0)}
+
+    # 1) Changements d'abord : l'entrant subit les pièges.
+    for camp, actions in ((me, my_actions), (opp, opp_actions)):
+        for slot, action in enumerate(actions):
+            if action and action[0] == "switch":
+                _do_switch_slot(camp, slot, action[1], log)
+
+    # 2) Coups, dans l'ordre d'action.
+    order = action_order_doubles(me, opp, my_actions, opp_actions, field)
+    actions_of = {"me": my_actions, "opp": opp_actions}
+    side_of = {"me": me, "opp": opp}
+    for actor in order:
+        key, slot = actor
+        own = side_of[key]
+        foes = side_of["opp" if key == "me" else "me"]
+        action = actions_of[key][slot]
+        attacker = own.active[slot]
+        mid = _move_of(action)
+        if attacker.fainted or mid is None:
+            continue
+        targets = resolve_targets(actor, action, own, foes)
+        if not targets:
+            log.append(f"{attacker.build.species} : cible K.O. — coup perdu")
+            continue
+        for target in targets:
+            _apply_move(attacker, target, mid, field, roll, log,
+                        atk_side=own, def_side=foes, field_dur=field_dur)
+
+    # 3) Fin de tour sur les quatre, puis conditions de camp.
+    for camp in (me, opp):
+        for m in camp.active:
+            _end_of_turn(m, field, log)
+    _tick_conditions(me, opp, pre, log)
+    return DoublesResult(me=me, opp=opp, log=log)
