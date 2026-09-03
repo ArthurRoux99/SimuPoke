@@ -209,3 +209,59 @@ def test_wide_guard_does_not_carry_to_the_next_turn():
                                (PASS, PASS), None)
     assert t2.opp.active[0].hp < t2.opp.active[0].max_hp
     assert t2.opp.wide_guard is False
+
+
+# --- Redirection ------------------------------------------------------------
+
+def test_follow_me_redirects_a_single_target_move():
+    # Redirecteur non immunisé au coup testé (Clefairy, Fée, serait immune au Dragon).
+    me = side(mon("garchomp", "jolly", {"spe": 32}, moves=["dragonclaw"]),
+              mon("snorlax", "brave"))
+    opp = side(mon("tyranitar", "jolly"),
+               mon("incineroar", "careful", moves=["followme"]))
+    res = simulate_turn_doubles(me, opp, (mv("dragonclaw", ("foe", 0)), PASS),
+                                (PASS, mv("followme")), None)
+    assert res.opp.active[1].hp < res.opp.active[1].max_hp, "le redirecteur encaisse"
+    assert res.opp.active[0].hp == res.opp.active[0].max_hp
+
+
+def test_follow_me_does_not_redirect_a_spread_move():
+    me = side(mon("garchomp", "adamant", {"atk": 31}, moves=["rockslide"]),
+              mon("snorlax", "brave"))
+    opp = side(mon("tyranitar", "jolly"),
+               mon("incineroar", "careful", moves=["followme"]))
+    res = simulate_turn_doubles(me, opp, (mv("rockslide"), PASS),
+                                (PASS, mv("followme")), None)
+    assert res.opp.active[0].hp < res.opp.active[0].max_hp, "les deux sont touchés"
+
+
+def test_rage_powder_has_no_effect_on_grass_type():
+    me = side(mon("venusaur", "modest", {"spa": 31}, moves=["sludgebomb"]),
+              mon("snorlax", "brave"))
+    opp = side(mon("tyranitar", "jolly"),
+               mon("amoonguss", "bold", moves=["ragepowder"]))
+    res = simulate_turn_doubles(me, opp, (mv("sludgebomb", ("foe", 0)), PASS),
+                                (PASS, mv("ragepowder")), None)
+    assert res.opp.active[0].hp < res.opp.active[0].max_hp, "le Plante ignore la poudre"
+
+
+def test_rage_powder_redirects_a_non_grass_attacker():
+    me = side(mon("garchomp", "jolly", {"spe": 32}, moves=["dragonclaw"]),
+              mon("snorlax", "brave"))
+    opp = side(mon("tyranitar", "jolly"),
+               mon("amoonguss", "bold", moves=["ragepowder"]))
+    res = simulate_turn_doubles(me, opp, (mv("dragonclaw", ("foe", 0)), PASS),
+                                (PASS, mv("ragepowder")), None)
+    assert res.opp.active[1].hp < res.opp.active[1].max_hp
+
+
+def test_lightning_rod_redirects_and_boosts():
+    me = side(mon("raichu", "modest", {"spa": 31}, moves=["thunderbolt"]),
+              mon("snorlax", "brave"))
+    opp = side(mon("tyranitar", "jolly"),
+               mon("rotomwash", "bold", ability="lightningrod"))
+    res = simulate_turn_doubles(me, opp, (mv("thunderbolt", ("foe", 0)), PASS),
+                                (PASS, PASS), None)
+    assert res.opp.active[0].hp == res.opp.active[0].max_hp
+    assert res.opp.active[1].hp == res.opp.active[1].max_hp, "immunisé"
+    assert res.opp.active[1].boosts.get("spa") == 1

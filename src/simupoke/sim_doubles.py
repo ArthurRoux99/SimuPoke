@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 
+from .basestats import get_species, to_id
 from .combat import effective_speed
 from .model import FieldState
 from .moves import get_move
@@ -106,6 +107,62 @@ _ALL_SPREAD = "allAdjacent"           # les deux adversaires ET l'allié
 
 # Coups d'appui résolus par le simulateur Doubles lui-même (pas par _apply_move).
 _WIDE_GUARD = "wideguard"
+_REDIRECT_MOVES = {"followme", "ragepowder"}
+# Talent -> type de coup redirigé (immunité + boost d'Attaque Spéciale).
+_REDIRECT_ABILITIES = {"lightningrod": "Electric", "stormdrain": "Water"}
+# Cibles mono-cible : les seules détournables par une redirection.
+_SINGLE_TARGETS = ("normal", "adjacentFoe", "any")
+
+
+def _powder_immune(mon: Mon) -> bool:
+    """Insensible aux poudres : type Plante, Masque de Sécurité, Peau Duvetée.
+
+    Helper local plutôt qu'un élargissement de `combat._POWDER_MOVES` : cette
+    table sert au blocage des poudres *de statut* et ne connaît que le type
+    Plante, alors que la redirection demande les trois conditions.
+    """
+    types = get_species(mon.build.species).get("types") or []
+    return ("Grass" in types
+            or to_id(mon.item or "") == "safetygoggles"
+            or to_id(mon.build.ability or "") == "overcoat")
+
+
+def redirect_target(attacker: Mon, targets: list[Mon], action: SlotAction,
+                    foes: DoublesSide, redirectors: dict[int, str],
+                    log: list[str]) -> list[Mon]:
+    """Détourne un coup **mono-cible** visant le camp adverse, si une
+    redirection est active.
+
+    `redirectors` associe un slot adverse au coup de redirection qu'il a joué
+    plus tôt dans le tour (`{1: "followme"}`). Un redirecteur *par action*
+    l'emporte sur un talent de redirection.
+    """
+    mid = _move_of(action)
+    mv = get_move(mid)
+    if mv.target not in _SINGLE_TARGETS or mv.is_status or len(targets) != 1:
+        return targets
+    if targets[0] not in foes.active:          # coup sur soi ou sur l'allié
+        return targets
+    # 1) Redirecteur actif (Follow Me / Rage Powder).
+    for slot, red_move in sorted(redirectors.items()):
+        cand = foes.active[slot]
+        if cand.fainted or cand is targets[0]:
+            continue
+        if red_move == "ragepowder" and _powder_immune(attacker):
+            continue                             # l'attaquant ignore la poudre
+        log.append(f"  coup détourné vers {cand.build.species}")
+        return [cand]
+    # 2) Talent de redirection (Paratonnerre / Lisse-Flot) : immunité + boost.
+    for cand in foes.active:
+        if cand.fainted or cand is targets[0]:
+            continue
+        ab = to_id(cand.build.ability or "")
+        if _REDIRECT_ABILITIES.get(ab) == mv.type:
+            cand.boosts["spa"] = min(6, cand.boosts.get("spa", 0) + 1)
+            log.append(f"  {cand.build.species} absorbe le coup "
+                       f"({ab}) et gagne +1 A.Spé")
+            return []                            # immunisé : aucun dégât
+    return targets
 
 
 def _living(mons: list[Mon]) -> list[Mon]:
@@ -203,6 +260,8 @@ def simulate_turn_doubles(me: DoublesSide, opp: DoublesSide,
     order = action_order_doubles(me, opp, my_actions, opp_actions, field)
     actions_of = {"me": my_actions, "opp": opp_actions}
     side_of = {"me": me, "opp": opp}
+    # Registres locaux au tour : slot -> coup de redirection déjà joué.
+    redirectors: dict[str, dict[int, str]] = {"me": {}, "opp": {}}
     for actor in order:
         key, slot = actor
         own = side_of[key]
@@ -216,9 +275,19 @@ def simulate_turn_doubles(me: DoublesSide, opp: DoublesSide,
             own.wide_guard = True
             log.append(f"{attacker.build.species} pose Wide Guard")
             continue
+        if mid in _REDIRECT_MOVES:
+            redirectors[key][slot] = mid
+            log.append(f"{attacker.build.species} attire les coups "
+                       f"({get_move(mid).name})")
+            continue
         targets = resolve_targets(actor, action, own, foes)
         if not targets:
             log.append(f"{attacker.build.species} : cible K.O. — coup perdu")
+            continue
+        foe_key = "opp" if key == "me" else "me"
+        targets = redirect_target(attacker, targets, action, foes,
+                                  redirectors[foe_key], log)
+        if not targets:
             continue
         # Pénalité de zone : seulement à partir de deux cibles touchées.
         spread = len(targets) >= 2
