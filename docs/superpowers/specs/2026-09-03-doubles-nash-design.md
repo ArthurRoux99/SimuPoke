@@ -34,10 +34,19 @@ L'objectif de la Phase 5 est de porter cette machinerie en 2v2 : décider une
 ### 3.1 Réutilisation, pas de réécriture
 
 Le module réutilise `sim.Mon`, `_apply_move`, `_end_of_turn`, `_apply_hazards`,
-`_tick_conditions` et `combat.effective_speed`. **`sim.py` n'est pas modifié** :
-`_apply_move` n'accède aux camps que par `.screens`, `.tailwind` et `.hazards`,
-que le conteneur Doubles expose aussi. Aucune régression possible sur les tests
-existants, et aucun impact sur la parité JS.
+`_tick_conditions` et `combat.effective_speed`. `_apply_move` n'accède aux camps
+que par `.screens`, `.tailwind` et `.hazards`, que le conteneur Doubles expose
+aussi : le passage en 2v2 se fait donc **par duck typing**, sans conteneur
+commun ni hiérarchie de classes.
+
+`sim.py` n'est touché que sur un point : `_apply_move` appelle aujourd'hui
+`calculate(...)` sans `apply_spread`, si bien que ni les coups de zone ni
+Helping Hand ne peuvent transiter par lui. Il reçoit donc **deux paramètres
+optionnels, neutres par défaut** — `apply_spread: bool = False` et
+`power_mod: float = 1.0` — simplement relayés au calc. Aucun appelant existant
+ne les passe, donc le comportement Singles est inchangé et les 311 tests
+actuels restent verts. L'alternative — recopier `_apply_move` dans le module
+Doubles — violerait la source de vérité unique (invariant #2) et est écartée.
 
 ### 3.2 Structures
 
@@ -116,9 +125,9 @@ offensif de l'allié **ce tour**. Seul élément qui touche le moteur figé :
   deux moteurs ne divergent pas), même si la page autonome ne l'utilise pas
   encore.
 - Un **34ᵉ vecteur de parité** avec Helping Hand est ajouté à
-  `scripts/calc_reference.mjs` si `@smogon/calc` expose le drapeau
-  (`field.attackerSide.isHelpingHand`) ; sinon le paramètre reste couvert par les
-  seuls tests Python, et le fait est noté dans le module.
+  `scripts/calc_reference.mjs` : `@smogon/calc` expose le drapeau
+  `field.attackerSide.isHelpingHand`, donc le multiplicateur est vérifié contre
+  la référence, comme le reste du calc.
 - Côté simulateur, l'effet est porté par un drapeau `helping_hand` sur le `Mon`
   bénéficiaire, consommé par son premier coup offensif du tour.
 
