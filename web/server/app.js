@@ -215,6 +215,41 @@
     } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
   }
 
+  // ---------- Doubles ----------
+  function dblSample() {
+    builders.dblMine.setEntries(entriesFrom(SAMPLES.team, 'team').slice(0, 2));
+    builders.dblOpp.setEntries(entriesFrom(SAMPLES.opponent, 'team').slice(0, 2));
+  }
+  async function runDoubles() {
+    const out = $('dbl-result');
+    out.innerHTML = '<div class="muted">Calcul des menaces…</div>';
+    try {
+      const r = await api('/api/doubles', {
+        mine: builders.dblMine.getEntries(),
+        opp: builders.dblOpp.getEntries(),
+        field: { weather: $('dbl-weather').value, terrain: $('dbl-terrain').value },
+      });
+      const tgts = r.targets.map((t) => {
+        const badge = t.focusKo ? '<span class="dbl-focus">⚡ FOCUS FIRE — KO garanti</span>' : '';
+        const hits = t.hits.map((h) => {
+          const ko = h.ko ? ' <span class="dbl-ko">KO</span>' : '';
+          return `<div class="dbl-hit"><span class="dbl-atk">${esc(h.attacker)}</span> · ${esc(h.move)} `
+            + `<b>${h.minPct.toFixed(0)}–${h.maxPct.toFixed(0)} %</b>${ko}</div>`;
+        }).join('') || '<div class="muted">aucun coup offensif</div>';
+        return `<div class="dbl-target"><div class="dbl-thead">▸ ${esc(t.target)} `
+          + `<span class="muted">(${t.hp} PV)</span> ${badge}</div>${hits}</div>`;
+      }).join('');
+      let spreads = '';
+      if (r.spreads.length) {
+        spreads = '<div class="dbl-spread-head">Coups de zone (×0.75)</div>'
+          + r.spreads.map((s) => `<div class="dbl-hit">${esc(s.attacker)} · ${esc(s.move)} : `
+            + s.perTarget.map((p) => `${esc(p.target)} ${p.minPct.toFixed(0)}–${p.maxPct.toFixed(0)} %`).join(' / ')
+            + '</div>').join('');
+      }
+      out.innerHTML = tgts + spreads || '<div class="muted">Renseigne des Pokémon des deux côtés.</div>';
+    } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
+  }
+
   // ---------- Tirage ----------
   async function runDraft() {
     const out = $('draft-result');
@@ -391,11 +426,14 @@
     builders.prevMine = makeBuilder($('prev-mine'));
     builders.prevOpp = makeBuilder($('prev-opp'));
     builders.box = makeBuilder($('box-builder'), { withSP: true, withRarity: true });
+    builders.dblMine = makeBuilder($('dbl-mine'), { withSP: true });
+    builders.dblOpp = makeBuilder($('dbl-opp'), { withSP: true });
 
     builders.draft.setEntries(entriesFrom(SAMPLES.lineup, 'lineup'));
     builders.team.setEntries(entriesFrom(SAMPLES.team, 'team'));
     builders.prevMine.setEntries(entriesFrom(SAMPLES.team, 'team'));
     builders.prevOpp.setEntries(entriesFrom(SAMPLES.opponent, 'team'));
+    dblSample();
 
     // Listeners
     $('tab-damage').querySelectorAll('input, select').forEach((el) => {
@@ -418,6 +456,8 @@
       builders.prevMine.setEntries(entriesFrom(SAMPLES.team, 'team'));
       builders.prevOpp.setEntries(entriesFrom(SAMPLES.opponent, 'team'));
     });
+    $('dbl-run').addEventListener('click', runDoubles);
+    $('dbl-sample').addEventListener('click', dblSample);
     $('os-run').addEventListener('click', runOutspeed);
     $('sv-run').addEventListener('click', runSurvive);
     $('ko-run').addEventListener('click', runKo);

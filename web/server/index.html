@@ -19,6 +19,7 @@
   <button data-tab="draft">Tirage (B2)</button>
   <button data-tab="team">Équipe (B3)</button>
   <button data-tab="preview">Team preview</button>
+  <button data-tab="doubles">Doubles</button>
   <button data-tab="bench">Seuils</button>
   <button data-tab="box">Mon Box</button>
 </div>
@@ -278,6 +279,30 @@
       </div>
       <div class="result" id="sp-result"></div>
     </div>
+  </section>
+
+  <!-- ===== DOUBLES ===== -->
+  <section class="tab-panel" id="tab-doubles">
+    <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Plateau 2v2 : qui KO
+      quoi, focus fire (deux attaquants combinant un KO garanti) et coups de zone.
+      Réutilise le calc figé — n'inclut pas encore l'ordre d'action / Protect.</p>
+    <div class="grid-2">
+      <div class="panel attacker"><h2>Mes actifs (2)</h2><div class="builder" id="dbl-mine"></div></div>
+      <div class="panel defender"><h2>Actifs adverses (2)</h2><div class="builder" id="dbl-opp"></div></div>
+    </div>
+    <div class="controls" style="grid-template-columns: 1fr 1fr auto auto;">
+      <div><label>Météo</label><select id="dbl-weather">
+        <option value="">aucune</option><option value="sun">soleil</option>
+        <option value="rain">pluie</option><option value="sand">sable</option>
+        <option value="snow">neige</option></select></div>
+      <div><label>Terrain</label><select id="dbl-terrain">
+        <option value="">aucun</option><option value="electric">électrique</option>
+        <option value="grassy">herbu</option><option value="psychic">psychique</option>
+        <option value="misty">brumeux</option></select></div>
+      <button id="dbl-sample">Charger les exemples</button>
+      <button class="primary" id="dbl-run">Analyser les menaces</button>
+    </div>
+    <div class="result" id="dbl-result"></div>
   </section>
 
   <!-- ===== MON BOX ===== -->
