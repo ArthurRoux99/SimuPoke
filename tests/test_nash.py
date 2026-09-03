@@ -165,3 +165,80 @@ def test_recursive_nash_below_expectimax():
     exp = _state_value(me, opp, None, 1, 0.5, opp_moves, "expected")
     assert nash <= exp + 1e-6
     assert abs(nash - exp) > 0.03                 # le raffinement Nash change la valeur
+
+
+# --- Budget d'expansion (shortlist d'actions) ------------------------------
+
+def _wide_pair():
+    """Deux camps à 4 coups : le développement complet coûte 16^profondeur."""
+    me = Side(active=_mon("garchomp", "jolly",
+                          ["earthquake", "dragonclaw", "stoneedge", "swordsdance"],
+                          {"atk": 32, "spe": 32}))
+    opp = Side(active=_mon("landorustherian", "jolly",
+                           ["earthquake", "uturn", "stoneedge", "swordsdance"],
+                           {"atk": 32, "spe": 32}))
+    return me, opp
+
+
+def test_width_above_action_count_is_a_noop():
+    # Un budget >= au nombre d'actions ne restreint rien : valeur identique au
+    # développement complet.
+    me, opp = _wide_pair()
+    full = _sm_nash_value(me, opp, None, 2, 0.5, None)
+    wide = _sm_nash_value(me, opp, None, 2, 0.5, 4)
+    assert wide == full
+
+
+def test_width_reduces_expansions_and_keeps_value_close():
+    # Le budget doit couper franchement le nombre de développements tout en
+    # gardant une valeur proche de la référence complète.
+    from simupoke import nash
+
+    me, opp = _wide_pair()
+    orig = nash._child
+    calls = {"n": 0}
+
+    def counting(*a, **k):
+        calls["n"] += 1
+        return orig(*a, **k)
+
+    nash._child = counting
+    try:
+        calls["n"] = 0
+        full = _sm_nash_value(me, opp, None, 3, 0.5, None)
+        n_full = calls["n"]
+        calls["n"] = 0
+        budgeted = _sm_nash_value(me, opp, None, 3, 0.5, 2)
+        n_budget = calls["n"]
+    finally:
+        nash._child = orig
+
+    assert n_budget < n_full / 5              # coupe d'au moins 5x
+    assert abs(budgeted - full) < 0.05        # valeur préservée
+
+
+def test_width_is_deterministic():
+    me, opp = _wide_pair()
+    a = _sm_nash_value(me, opp, None, 3, 0.5, 2)
+    b = _sm_nash_value(me, opp, None, 3, 0.5, 2)
+    assert a == b
+
+
+def test_width_makes_deep_recursion_tractable():
+    # Le budget rend la profondeur 5 atteignable : hors budget, le développement
+    # complet coûte 16^5. On vérifie que la valeur reste finie et bornée.
+    me, opp = _wide_pair()
+    v4 = _sm_nash_value(me, opp, None, 4, 0.5, 2)
+    v5 = _sm_nash_value(me, opp, None, 5, 0.5, 2)
+    assert isinstance(v5, float)
+    assert abs(v5 - v4) < 1e-6               # la valeur a convergé en profondeur
+
+
+def test_solve_turn_accepts_width():
+    # Plumbing : `width` traverse solve_turn et donne une distribution valide.
+    me = _mon("garchomp", "jolly", ["earthquake", "dragonclaw"],
+              {"atk": 32, "spe": 32})
+    opp = _mon("tyranitar", "adamant", ["crunch", "rockslide", "protect"])
+    res = solve_turn(me, opp, horizon=2, width=2)
+    assert abs(sum(p for _, p in res.strategy) - 1.0) < 1e-6
+    assert res.best_response in {lbl for lbl, _ in res.strategy}
