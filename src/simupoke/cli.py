@@ -39,6 +39,7 @@ from __future__ import annotations
 import contextlib
 import os
 import sys
+from pathlib import Path
 
 from .basestats import is_known
 from .bench import (
@@ -710,6 +711,43 @@ def cmd_nash(args: list[str]) -> int:
     return 0
 
 
+def cmd_doubles(args: list[str]) -> int:
+    """Matrice de menaces Doubles 2v2 depuis un JSON {"mine":[…],"opp":[…]}."""
+    import json as _json
+
+    from .doubles import analyze_doubles
+    pos, opts, _ = _split_args(args, set())
+    if len(pos) != 1:
+        print("Usage : doubles <board.json>   # {\"mine\":[…], \"opp\":[…]} "
+              "(entrées : species, nature, moves, sp, item…) [--weather X]",
+              file=sys.stderr)
+        return 2
+    try:
+        board = _json.loads(Path(pos[0]).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"Erreur de lecture : {exc}", file=sys.stderr)
+        return 1
+
+    def _mk(d: dict) -> PokemonState:
+        return PokemonState(
+            species=d["species"], nature=d.get("nature", "serious"),
+            stat_points=d.get("stat_points", d.get("sp", {})) or {},
+            item=d.get("item"), ability=d.get("ability"),
+            moves=d.get("moves", []) or [],
+            current_hp_pct=float(d.get("current_hp_pct", d.get("hp", 1.0))))
+
+    mine = [_mk(d) for d in board.get("mine", [])]
+    opp = [_mk(d) for d in board.get("opp", [])]
+    for m in mine + opp:
+        if not is_known(m.species):
+            print(f"Espèce inconnue : {m.species!r}", file=sys.stderr)
+            return 1
+    field = FieldState(weather=opts.get("weather"), terrain=opts.get("terrain"))
+    for line in analyze_doubles(mine, opp, field).lines():
+        print(line)
+    return 0
+
+
 def cmd_paste(args: list[str]) -> int:
     pos, _, flags = _split_args(args, {"json"})
     if len(pos) != 1:
@@ -799,6 +837,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_decide(rest)
     if cmd == "nash":
         return cmd_nash(rest)
+    if cmd == "doubles":
+        return cmd_doubles(rest)
     if cmd == "paste":
         return cmd_paste(rest)
     print(f"Commande inconnue : {cmd!r}", file=sys.stderr)
