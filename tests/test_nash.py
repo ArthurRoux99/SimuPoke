@@ -75,6 +75,19 @@ def _mon(species, nature="serious", moves=None, sp=None, hp=1.0, item=None):
         moves=moves or [], item=item, current_hp_pct=hp))
 
 
+def test_solve_turn_exposes_belief():
+    # Set adverse partiellement connu (1 coup) → croyance à plusieurs particules.
+    me = _mon("garchomp", "jolly", ["earthquake", "dragonclaw"],
+              {"atk": 32, "spe": 32})
+    opp = _mon("tyranitar", "jolly", ["crunch"])
+    res = solve_turn(me, opp)
+    assert len(res.belief) > 1
+    assert all(0.0 <= p.weight <= 1.0 for p in res.belief)
+    assert abs(sum(p.weight for p in res.belief) - 1.0) < 1e-6
+    # Chaque particule reste cohérente avec le coup observé.
+    assert all("crunch" in p.build.moves for p in res.belief)
+
+
 def test_solve_turn_returns_valid_distribution():
     me = _mon("garchomp", "jolly", ["earthquake", "dragonclaw", "stoneedge"],
               {"atk": 32, "spe": 32})

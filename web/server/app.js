@@ -196,11 +196,21 @@
       const opp3 = r.oppStrategy.filter((o) => o.prob >= 0.02)
         .map((o) => `${o.move == null ? 'inactif' : esc(o.move)} ${(o.prob * 100).toFixed(0)}%`)
         .join(' · ');
+      let beliefHtml = '';
+      if (r.belief && r.belief.length > 1) {
+        const rows = r.belief.map((p) => {
+          const item = p.item ? ` @ ${esc(p.item)}` : '';
+          return `<div class="nash-belief-row"><span class="nash-belief-w">${(p.weight * 100).toFixed(0)}%</span>`
+            + `<span class="nash-belief-set"><b>${item ? esc(p.item) : '—'}</b> · ${esc((p.moves || []).join(', '))}</span></div>`;
+        }).join('');
+        beliefHtml = `<div class="nash-belief"><div class="nash-belief-head">Croyance sur le set adverse (usage)</div>${rows}</div>`;
+      }
       out.innerHTML =
         `<div class="nash-head">Stratégie mixte de Nash — jeu simultané, croyance sur l'adversaire</div>`
         + `<div class="nash-strat">${bars}</div>`
         + `<div class="nash-meta">Adversaire (modèle Nash) : ${opp3 || '—'}`
         + ` &nbsp;·&nbsp; Valeur du jeu : <b>${r.value >= 0 ? '+' : ''}${r.value.toFixed(2)}</b></div>`
+        + beliefHtml
         + `<div class="nash-reco">➤ ${esc(r.recommendation)}</div>`;
     } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
   }
