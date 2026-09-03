@@ -160,7 +160,7 @@ changement par membre vivant du banc) sont scorées par une passe rapide et seul
 les **k meilleures** sont retenues (défaut `k = 3`, paramétrable) :
 
 - coup offensif → dégâts attendus sur la cible, majorés si le coup met K.O. ;
-- coup de soutien → note de `combat.score_support`, déjà utilisée par le mode
+- coup de soutien → note de `combat._evaluate_support`, déjà utilisée par le mode
   analyse (setup / statut / protection / soin) ;
 - changement → note de l'entrant par `search.evaluate_side`.
 
