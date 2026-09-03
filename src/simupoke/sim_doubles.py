@@ -307,12 +307,18 @@ def simulate_turn_doubles(me: DoublesSide, opp: DoublesSide,
                                   redirectors[foe_key], log)
         if not targets:
             continue
+        # Wide Guard ne couvre que le camp qui l'a posé : un coup `allAdjacent`
+        # continue de toucher l'allié du lanceur (friendly fire).
+        if len(targets) >= 2 and foes.wide_guard:
+            shielded = [t for t in targets if t in foes.active]
+            if shielded:
+                targets = [t for t in targets if t not in shielded]
+                log.append(f"  Wide Guard protège le camp adverse — "
+                           f"{get_move(mid).name} bloqué")
+            if not targets:
+                continue
         # Pénalité de zone : seulement à partir de deux cibles touchées.
         spread = len(targets) >= 2
-        if spread and foes.wide_guard:
-            log.append(f"  Wide Guard protège le camp — "
-                       f"{get_move(mid).name} bloqué")
-            continue
         # Helping Hand : consommé par le premier coup offensif du bénéficiaire.
         power_mod = _HELPING_HAND_MOD if slot in helping[key] else 1.0
         if power_mod != 1.0:

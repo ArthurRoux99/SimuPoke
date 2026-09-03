@@ -310,3 +310,17 @@ def test_helping_hand_is_consumed_by_a_single_move():
     # Le registre est local au tour : rien ne persiste dans l'état renvoyé.
     assert not hasattr(res.me, "helping_hand")
     assert any("soutient son allié" in line for line in res.log)
+
+
+def test_wide_guard_does_not_shield_the_attacker_own_ally():
+    # Séisme (allAdjacent) : Wide Guard adverse protège les deux adversaires,
+    # mais l'allié du lanceur encaisse quand même le friendly fire.
+    me = side(mon("garchomp", "adamant", {"atk": 31}, moves=["earthquake"]),
+              mon("snorlax", "brave"))
+    opp = side(mon("tyranitar", "jolly", moves=["wideguard"]),
+               mon("torkoal", "quiet"))
+    res = simulate_turn_doubles(me, opp, (mv("earthquake"), PASS),
+                                (mv("wideguard"), PASS), None)
+    assert res.opp.active[0].hp == res.opp.active[0].max_hp, "camp protégé"
+    assert res.opp.active[1].hp == res.opp.active[1].max_hp, "camp protégé"
+    assert res.me.active[1].hp < res.me.active[1].max_hp, "l'allié encaisse"

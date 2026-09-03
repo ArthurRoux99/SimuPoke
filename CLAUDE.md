@@ -62,6 +62,7 @@ pytest                       # tests (le vrai gate ; la CI rejoue lint+tests sur
 python -m simupoke.cli roster|stats|damage|draft|team|preview|analyze
 python -m simupoke.cli speed|outspeed|survive|ko|spread     # seuils & optimiseur de SP
 python -m simupoke.cli sim|decide|nash                      # simulateur + recherche + Nash (Phase 4)
+python -m simupoke.cli doubles|simd                         # menaces 2v2 + rejeu d'un tour Doubles (Phase 5)
 python -m simupoke.cli paste                                # import/export Showdown paste
 
 # UI — page HTML autonome (hors-ligne, un seul fichier) :
@@ -86,7 +87,7 @@ cd scripts && npm install && npm run gen:all
 ## Feuille de route
 
 Phases 0–3 ✅, Phase 4 🟡 (simulateur + recherche multi-tours ; **ISMCTS
-complet** à venir), Phase 5 Doubles ⏳, Phase 6 apprentissage ⏳. Cap technique :
+complet** à venir), Phase 5 🟡 (simulateur 2v2 fait ; Nash joint à venir), Phase 6 apprentissage ⏳. Cap technique :
 **moteur unique via Pyodide** (retire le port JS), **frontend PWA** (React/TS),
 profondeur IA (ISMCTS, Doubles). Le tableau d'état détaillé est en tête du
 [README](README.md).

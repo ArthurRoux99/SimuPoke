@@ -25,7 +25,7 @@ Le modèle de stats Champions est **figé et vérifié en jeu** (Tyranocif Jovia
 | — | UI — serveur local (tous les modules + recherche) | ✅ |
 | — | Modèle d'usage + import Showdown paste + i18n FR/EN | ✅ |
 | 4 | B1 — Mode simultané : simulateur + recherche multi-tours + **solveur de Nash** (croyance par-monde + regret matching, profondeur CFR récursive, **mise à jour de croyance inter-tours**) | ✅ |
-| 5 | Doubles | ⏳ |
+| 5 | Doubles | 🟡 (simulateur de tour 2v2 ✅ ; Nash joint à venir) |
 | 6 | (optionnel) Apprentissage | ⏳ |
 
 ## Décisions actées (§0 du document socle)
@@ -81,6 +81,7 @@ SimuPoke/
 │   ├── team.py                  # B3 — analyse d'équipe + assistant team preview
 │   ├── combat.py                # B1 — assistant de combat (mode analyse, 1 tour)
 │   ├── sim.py                   # simulateur de tour (ordre, dégâts, statut, fin de tour) — fondation Phase 4
+│   ├── sim_doubles.py           # simulateur de tour Doubles 2v2 (ciblage, zone, appui) — Phase 5
 │   ├── search.py                # recherche à coups simultanés (§10.2) : multi-tours, switchs, minimax, déterminisation
 │   ├── bench.py                 # seuils & optimiseur de SP (speed tiers, outspeed/survive/ko)
 │   ├── optimize.py              # optimiseur de spread complet (objectifs combinés → SP)
