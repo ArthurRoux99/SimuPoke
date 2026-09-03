@@ -47,7 +47,7 @@ def test_bayesian_informed_opponent_is_stronger():
     U_a = [[0.0, 1.0], [1.0, 1.0]]
     U_b = [[1.0, 1.0], [1.0, 0.0]]
     worlds = [(0.5, U_a, ["x", "y"]), (0.5, U_b, ["x", "y"])]
-    my_strat, value, opp_marg, _br = solve_bayesian(2, worlds, iters=6000)
+    my_strat, value, opp_marg, _br, world_strat = solve_bayesian(2, worlds, iters=6000)
 
     # Jeu « moyen » (adversaire non informé) : matrice moyenne.
     U_avg = [[(U_a[i][j] + U_b[i][j]) / 2 for j in range(2)] for i in range(2)]
@@ -57,11 +57,14 @@ def test_bayesian_informed_opponent_is_stronger():
     assert abs(value - 0.5) < 0.05               # valeur bayésienne attendue
     assert abs(sum(my_strat) - 1.0) < 1e-6
     assert abs(sum(p for _, p in opp_marg) - 1.0) < 1e-6
+    # Stratégie adverse PAR MONDE : une distribution par monde, normalisée.
+    assert len(world_strat) == 2
+    assert all(abs(sum(ws) - 1.0) < 1e-6 for ws in world_strat)
 
 
 def test_bayesian_single_world_matches_matrix():
     U = [[0.7, -0.2], [0.1, 0.4]]
-    ms, val, _, _ = solve_bayesian(2, [(1.0, U, ["a", "b"])], iters=4000)
+    ms, val, _, _, _ = solve_bayesian(2, [(1.0, U, ["a", "b"])], iters=4000)
     rst, _, mval = solve_matrix(U, iters=4000)
     assert abs(val - mval) < 0.02
     assert abs(ms[0] - rst[0]) < 0.05

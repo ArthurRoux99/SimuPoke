@@ -185,8 +185,14 @@
         hpPct: parseFloat($('c-me-hp').value || '100') / 100 };
       const opp = { species: $('c-opp-species').value, nature: $('c-opp-nature').value,
         moves: splitMoves($('c-opp-moves').value), hpPct: parseFloat($('c-opp-hp').value || '100') / 100 };
+      const observed = ($('c-opp-observed').value || '').trim();
+      const order = $('c-opp-order').value;   // '' | 'faster' | 'slower'
+      const meDmg = ($('c-me-damage').value || '').trim();
       const r = await api('/api/nash', { me, opp, bench: parseBench($('c-bench').value),
-        field: { weather: $('c-weather').value, terrain: $('c-terrain').value } });
+        field: { weather: $('c-weather').value, terrain: $('c-terrain').value },
+        oppObserved: observed || undefined,
+        oppFaster: order ? (order === 'faster') : undefined,
+        meDamagePct: (meDmg !== '' && observed) ? parseFloat(meDmg) : undefined });
       const bars = r.strategy.filter((s) => s.prob >= 0.005).map((s) => {
         const pct = (s.prob * 100).toFixed(0);
         return `<div class="nash-row"><span class="nash-lbl">${esc(s.action)}</span>`
@@ -198,12 +204,28 @@
         .join(' · ');
       let beliefHtml = '';
       if (r.belief && r.belief.length > 1) {
+        // Poids a priori (avant mise à jour) indexés par set, pour montrer le glissement.
+        const priorW = {};
+        (r.beliefPrior || []).forEach((p) => {
+          priorW[[...(p.moves || [])].sort().join('|')] = p.weight;
+        });
         const rows = r.belief.map((p) => {
           const item = p.item ? ` @ ${esc(p.item)}` : '';
-          return `<div class="nash-belief-row"><span class="nash-belief-w">${(p.weight * 100).toFixed(0)}%</span>`
+          const updated = r.oppObserved || r.oppFaster != null || r.meDamagePct != null;
+          const was = priorW[[...(p.moves || [])].sort().join('|')];
+          const shift = (updated && was != null)
+            ? `<span class="nash-belief-shift">${(was * 100).toFixed(0)}% →</span> ` : '';
+          return `<div class="nash-belief-row"><span class="nash-belief-w">${shift}${(p.weight * 100).toFixed(0)}%</span>`
             + `<span class="nash-belief-set"><b>${item ? esc(p.item) : '—'}</b> · ${esc((p.moves || []).join(', '))}</span></div>`;
         }).join('');
-        beliefHtml = `<div class="nash-belief"><div class="nash-belief-head">Croyance sur le set adverse (usage)</div>${rows}</div>`;
+        const bits = [];
+        if (r.oppObserved) bits.push(`coup observé : <b>${esc(r.oppObserved)}</b>`);
+        if (r.oppFaster != null) bits.push(`ordre : l'adversaire agit <b>${r.oppFaster ? 'avant' : 'après'}</b> moi`);
+        if (r.meDamagePct != null) bits.push(`dégâts subis : <b>${r.meDamagePct}%</b>`);
+        const head = bits.length
+          ? `Croyance mise à jour — ${bits.join(' · ')}`
+          : 'Croyance sur le set adverse (usage)';
+        beliefHtml = `<div class="nash-belief"><div class="nash-belief-head">${head}</div>${rows}</div>`;
       }
       out.innerHTML =
         `<div class="nash-head">Stratégie mixte de Nash — jeu simultané, croyance sur l'adversaire</div>`

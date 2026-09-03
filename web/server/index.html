@@ -129,6 +129,18 @@
     <label style="margin-top:8px">Mon banc (évalue les changements) —
       <code>espèce,nature,capa1|capa2 ; espèce2,…</code></label>
     <input id="c-bench" placeholder="rotomwash,bold,hydropump|voltswitch ; skarmory,impish,bravebird" autocomplete="off">
+    <label style="margin-top:8px">Coup adverse observé (Nash) — met à jour la croyance
+      tour après tour <code>ex. protect</code></label>
+    <input id="c-opp-observed" placeholder="laisser vide au 1ᵉʳ tour" autocomplete="off">
+    <label style="margin-top:8px">Ordre d'action observé (scouting de vitesse)</label>
+    <select id="c-opp-order">
+      <option value="">— (non observé)</option>
+      <option value="faster">l'adversaire a agi avant moi</option>
+      <option value="slower">l'adversaire a agi après moi</option>
+    </select>
+    <label style="margin-top:8px">Dégâts subis du coup observé (% de mes PV) —
+      révèle l'investissement offensif adverse <code>ex. 42</code></label>
+    <input id="c-me-damage" type="number" min="0" max="100" placeholder="vide si non observé">
     <div class="controls" style="grid-template-columns: auto auto 1fr auto; margin-top:10px; align-items:end;">
       <div><label>Profondeur</label><select id="c-depth">
         <option value="1">1 (rapide)</option><option value="2">2</option>

@@ -93,3 +93,170 @@ def opponent_move_support(particles: list[Particle]) -> list[str]:
             if move_known(m):
                 seen.setdefault(m, None)
     return list(seen.keys())
+
+
+# ---------------------------------------------------------------------------
+# Mise à jour bayésienne inter-tours (§10.2, cran 3 de l'échelle SOTA)
+# ---------------------------------------------------------------------------
+# À l'état de l'art (PokaiTrainer), la croyance ne se construit pas seulement à
+# partir de l'information révélée statique : elle se **met à jour tour après
+# tour** en rebranchant l'action jointe observée. Voir l'adversaire jouer un coup
+# est une observation dont on tire une vraisemblance par monde :
+#
+#     w'_i  ∝  w_i · P(coup observé | monde_i)
+#
+# On élimine (au plancher) les mondes où le coup n'existe pas — preuve dure — et,
+# parmi les survivants, on **remonte** ceux dont la stratégie (de Nash, si
+# fournie) jouait le plus ce coup. Si le coup n'appartient à AUCUN monde (croyance
+# prise en défaut), on **synthétise** en l'injectant plutôt que d'effondrer la
+# croyance sur le plancher.
+
+def _has_move(build: PokemonState, mid: str) -> bool:
+    return any(to_id(m) == mid for m in build.moves)
+
+
+def _renorm(parts: list[Particle]) -> list[Particle]:
+    tot = sum(p.weight for p in parts)
+    if tot <= 0:                                  # tout au plancher : uniforme
+        n = max(1, len(parts))
+        return [Particle(build=p.build, weight=1.0 / n) for p in parts]
+    return [Particle(build=p.build, weight=p.weight / tot) for p in parts]
+
+
+def _strat_prob(strat: dict, mid: str) -> float:
+    for k, v in strat.items():
+        if k is not None and to_id(str(k)) == mid:
+            return max(float(v), 0.0)
+    return 0.0
+
+
+def _inject_move(build: PokemonState, move: str) -> PokemonState:
+    moves = [m for m in build.moves if move_known(m)]
+    if any(to_id(m) == to_id(move) for m in moves):
+        return build
+    if len(moves) >= 4:                           # set plein : remplace le dernier
+        moves = moves[:3]
+    return replace(build, moves=[*moves, move])
+
+
+def update_belief(particles: list[Particle], observed_move: str | None, *,
+                  world_strategies: list[dict] | None = None,
+                  floor: float = 0.02) -> list[Particle]:
+    """Reconditionne la croyance après avoir vu l'adversaire jouer un coup.
+
+    `observed_move` : l'id du coup adverse effectivement joué ce tour. ``None``
+    (l'adversaire a changé ou était inactif) n'apprend rien sur le set actif :
+    la croyance est renvoyée inchangée.
+
+    `world_strategies` : optionnel, une stratégie par particule (``{coup: proba}``,
+    typiquement la stratégie de Nash par monde de `nash.solve_turn`). Si fournie,
+    la vraisemblance d'un monde qui possède le coup est sa **probabilité
+    stratégique** de le jouer (plancher `floor`) ; sinon une vraisemblance
+    **uniforme** ``1/|coups|`` (le monde joue au hasard).
+
+    Renvoie une nouvelle liste de particules (poids a posteriori, normalisés).
+    """
+    if not particles:
+        return []
+    if observed_move is None or not move_known(observed_move):
+        return [Particle(build=p.build, weight=p.weight) for p in particles]
+
+    mid = to_id(observed_move)
+    present = [_has_move(p.build, mid) for p in particles]
+
+    if not any(present):                          # contradiction → synthèse
+        synth = [Particle(build=_inject_move(p.build, observed_move), weight=p.weight)
+                 for p in particles]
+        return _renorm(synth)
+
+    post: list[Particle] = []
+    for i, p in enumerate(particles):
+        if not present[i]:
+            lik = floor                           # preuve dure : monde impossible
+        elif world_strategies is not None and i < len(world_strategies):
+            lik = max(_strat_prob(world_strategies[i], mid), floor)
+        else:
+            feasible = [m for m in p.build.moves if move_known(m)]
+            lik = 1.0 / len(feasible) if feasible else floor
+        post.append(Particle(build=p.build, weight=p.weight * lik))
+    return _renorm(post)
+
+
+def update_belief_speed(particles: list[Particle], opp_faster: bool,
+                        me_speed: int, *, opp_tailwind: bool = False,
+                        trick_room: bool = False, floor: float = 0.02
+                        ) -> list[Particle]:
+    """Reconditionne la croyance sur l'**ordre d'action observé** (scouting de
+    vitesse) — l'une des inférences les plus fortes du jeu compétitif.
+
+    Observation : à **palier de priorité égal** (les deux camps ont joué un coup
+    de même priorité, cas courant), l'adversaire a agi **avant** moi
+    (`opp_faster=True`) ou **après** (`False`). `me_speed` est ma vitesse
+    effective ce tour-là.
+
+    Pour chaque monde on calcule la vitesse effective de l'adversaire (nature,
+    Choice Scarf, paralysie, Tailwind — via `bench.compute_speed`) et on garde
+    les mondes **cohérents** avec l'ordre observé, écrasant les autres au
+    plancher. Un **speed tie** (vitesses égales) est cohérent avec les deux
+    ordres. En **Trick Room**, l'ordre est inversé (le plus lent agit d'abord).
+
+    Comme la croyance échantillonne la **nature** et l'**objet** (donc Choice
+    Scarf) mais pas le détail des SP, l'inférence discrimine surtout
+    nature ±Vit et Scarf — précisément l'axe utile pour « ils m'ont dépassé ».
+    """
+    from .bench import compute_speed
+    post: list[Particle] = []
+    for p in particles:
+        opp_spe = compute_speed(p.build, tailwind=opp_tailwind)
+        if opp_spe == me_speed:
+            consistent = True                     # speed tie : les deux ordres OK
+        else:
+            faster = opp_spe > me_speed
+            if trick_room:
+                faster = not faster               # TR : le plus lent agit d'abord
+            consistent = (faster == opp_faster)
+        post.append(Particle(build=p.build,
+                             weight=p.weight * (1.0 if consistent else floor)))
+    return _renorm(post)
+
+
+def update_belief_damage(particles: list[Particle], other: PokemonState,
+                         move: str, observed_frac: float, *,
+                         opp_role: str = "defender", field=None,
+                         tol: float = 0.035, floor: float = 0.02,
+                         crit: bool = False) -> list[Particle]:
+    """Reconditionne la croyance sur les **dégâts observés** d'un coup — révèle
+    l'investissement défensif (ou offensif) et l'objet adverse.
+
+    - `opp_role="defender"` : **j'ai attaqué l'adversaire** ; `other` est mon
+      attaquant (`PokemonState`), `move` mon coup, `observed_frac` la fraction
+      des **PV max adverses** infligée (0..1). Discrimine bulk/nature défensive,
+      Assault Vest, baie de résistance…
+    - `opp_role="attacker"` : **l'adversaire m'a attaqué** ; `other` est mon
+      défenseur, `move` le coup adverse observé, `observed_frac` la fraction de
+      **mes** PV max subie. Discrimine attaque/nature offensive, Choice Band,
+      Life Orb…
+
+    Pour chaque monde on calcule l'intervalle de dégâts (`min_pct`..`max_pct`) et
+    on garde ceux dont `[min-tol, max+tol]` contient `observed_frac` ; les autres
+    passent au plancher. Une marge `tol` absorbe l'imprécision de lecture. Un
+    monde dont le coup n'inflige pas de dégâts direct (puissance variable, statut)
+    n'est **pas évaluable** : il est laissé tel quel (vraisemblance 1).
+    """
+    from .damage import calculate
+    post: list[Particle] = []
+    for p in particles:
+        try:
+            if opp_role == "attacker":
+                res = calculate(p.build, other, move, field, crit=crit)
+            else:
+                res = calculate(other, p.build, move, field, crit=crit)
+        except (ValueError, KeyError):
+            post.append(Particle(build=p.build, weight=p.weight))  # non évaluable
+            continue
+        lo = res.min_pct / 100.0 - tol
+        hi = res.max_pct / 100.0 + tol
+        consistent = lo <= observed_frac <= hi
+        post.append(Particle(build=p.build,
+                             weight=p.weight * (1.0 if consistent else floor)))
+    return _renorm(post)

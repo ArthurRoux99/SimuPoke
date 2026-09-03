@@ -17,9 +17,11 @@ Ce module :
    **regret matching** — qui converge vers Nash sur un jeu matriciel — et renvoie
    ma **stratégie mixte**, la valeur du jeu et la stratégie adverse.
 
-Limite assumée v1 : l'adversaire est traité comme un type « moyen » sur la
-croyance (une stratégie de colonne unique), pas une stratégie par monde (seat-2
-par-world de PokaiTrainer) ; profondeur 1 (un tour). Ces deux axes sont la suite.
+État (échelle SOTA de `docs/recherche_sota_ismcts.md`) : adversaire **par monde**
+(seat-2 par-world de PokaiTrainer, `solve_bayesian`), **profondeur** par CFR
+récursif (`horizon`, `_sm_nash_value`), et **mise à jour de croyance inter-tours**
+sur le coup observé (`belief.update_belief`, alimentée par `opp_world_strategies`
+exposé ici). Restent : budget d'expansion PUCT et évaluateur de feuille appris.
 """
 
 from __future__ import annotations
@@ -195,7 +197,7 @@ def _world_payoff(me: Mon, my_bench: list[Mon], particle: Particle,
 def solve_bayesian(my_n: int, worlds: list[tuple[float, list[list[float]],
                    list[str | None]]], iters: int = 2000
                    ) -> tuple[list[float], float, list[tuple[str | None, float]],
-                              int]:
+                              int, list[list[float]]]:
     """Résout le jeu bayésien : je maximise une stratégie **unique** (`my_n`
     actions) ; dans chaque monde `w` (poids, matrice `U_w`, libellés adverses)
     l'adversaire minimise avec sa **propre** stratégie. Regret matching :
@@ -203,7 +205,8 @@ def solve_bayesian(my_n: int, worlds: list[tuple[float, list[list[float]],
     bayésien ex-ante).
 
     Renvoie (ma stratégie moyenne, valeur, stratégie adverse **marginale**
-    (label → proba), indice de ma meilleure réponse pure).
+    (label → proba), indice de ma meilleure réponse pure, **stratégie adverse
+    par monde** (une distribution sur les colonnes de chaque `U_w`)).
     """
     r1 = [0.0] * my_n
     s1 = [0.0] * my_n
@@ -259,7 +262,7 @@ def solve_bayesian(my_n: int, worlds: list[tuple[float, list[list[float]],
              key=lambda a: sum(pw * sum(world_strat[w][b] * U[a][b]
                                         for b in range(len(U[0])))
                                for w, (pw, U, _) in enumerate(worlds)))
-    return my_strat, value, opp_marginal, br
+    return my_strat, value, opp_marginal, br, world_strat
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +279,9 @@ class NashResult:
     recommendation: str
     notes: list[str] = dfield(default_factory=list)
     belief: list[Particle] = dfield(default_factory=list)  # croyance sur le set adverse
+    # Stratégie adverse par monde (alignée sur `belief`) : {coup: proba}. Sert à
+    # la mise à jour bayésienne inter-tours (`belief.update_belief`).
+    opp_world_strategies: list[dict] = dfield(default_factory=list)
 
     def lines(self) -> list[str]:
         out = ["Stratégie mixte de Nash (jeu simultané, croyance sur l'adversaire) :"]
@@ -313,6 +319,7 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
                my_bench: list[Mon] | None = None, reg_id: str = "reg_m_b",
                iters: int = 2000, belief_samples: int = 80,
                per_world: bool = True, horizon: int = 0,
+               belief: list[Particle] | None = None,
                seed: int | None = 0) -> NashResult:
     """Résout le tour courant vers Nash et renvoie ma stratégie mixte.
 
@@ -324,10 +331,15 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
     (info privée) et joue au mieux **dans chaque monde** de la croyance ; je
     committe une stratégie unique (robuste). `per_world=False` : adversaire
     « moyen » (une stratégie de colonne unique sur la croyance).
+
+    `belief` : croyance **déjà maintenue** (particules pondérées) à résoudre
+    telle quelle, au lieu de la reconstruire depuis `opp`. Sert à chaîner la
+    mise à jour bayésienne inter-tours (`belief.update_belief`).
     """
     bench = my_bench or []
-    particles = opponent_belief(opp.build, reg_id, n_samples=belief_samples,
-                                seed=seed)
+    particles = (belief if belief is not None
+                 else opponent_belief(opp.build, reg_id,
+                                      n_samples=belief_samples, seed=seed))
     opp_moves: list[str | None] = list(opponent_move_support(particles)) or [None]
 
     my_actions: list[tuple] = [("move", m) for m in me.build.moves if move_known(m)]
@@ -337,6 +349,7 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
     labels = [_label(a, me, bench) for a in my_actions]
 
     horizon = max(0, min(3, horizon))            # borne de sécurité (coût/ply)
+    world_strategies: list[dict] = []
     if per_world and len(particles) > 1:
         worlds = []
         for part in particles:
@@ -344,8 +357,10 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
                                        if move_known(m)] or [None]
             U_w = _world_payoff(me, bench, part, my_actions, opp_w, field, horizon)
             worlds.append((part.weight, U_w, opp_w))
-        rst, val, opp_strat, br_idx = solve_bayesian(len(my_actions), worlds,
-                                                     iters=iters)
+        rst, val, opp_strat, br_idx, world_strat = solve_bayesian(
+            len(my_actions), worlds, iters=iters)
+        world_strategies = [dict(zip(worlds[w][2], world_strat[w]))
+                            for w in range(len(worlds))]
     else:
         U = _payoff_matrix(me, bench, particles, my_actions, opp_moves, field,
                            horizon)
@@ -354,6 +369,8 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
         br_idx = max(range(len(my_actions)),
                      key=lambda i: sum(cst[j] * U[i][j]
                                        for j in range(len(opp_moves))))
+        # Un seul monde : la stratégie de colonne s'applique à chaque particule.
+        world_strategies = [dict(zip(opp_moves, cst)) for _ in particles]
 
     strat = sorted(zip(labels, rst), key=lambda t: t[1], reverse=True)
     best_response = labels[br_idx]
@@ -370,7 +387,8 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
         notes.append(f"croyance : {len(particles)} builds adverses pondérés")
     return NashResult(strategy=strat, value=val, opp_actions=opp_moves,
                       opp_strategy=opp_strat, best_response=best_response,
-                      recommendation=reco, notes=notes, belief=particles)
+                      recommendation=reco, notes=notes, belief=particles,
+                      opp_world_strategies=world_strategies)
 
 
 def _phrase_label(label: str) -> str:

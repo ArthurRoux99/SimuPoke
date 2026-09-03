@@ -661,14 +661,20 @@ def cmd_decide(args: list[str]) -> int:
 
 def cmd_nash(args: list[str]) -> int:
     """Stratégie mixte de Nash pour le tour (jeu simultané, croyance adverse)."""
+    from .belief import update_belief, update_belief_speed
     from .nash import solve_turn
-    pos, opts, _ = _split_args(args, set())
+    pos, opts, flags = _split_args(args, {"opp-faster", "opp-slower",
+                                          "me-tailwind", "opp-tailwind",
+                                          "trick-room"})
     if len(pos) != 5:
         print("Usage : nash <me_species> <me_nature> <me_moves> "
               "<opp_species> <opp_nature> [--me-sp k=v] [--opp-moves a,b,c] "
               "[--me-item X] [--opp-item X] [--me-hp 0..1] [--opp-hp 0..1] "
               "[--weather X] [--bench 'esp,nat,c1|c2 ; …'] [--iters N] "
-              "[--horizon 0..3]", file=sys.stderr)
+              "[--horizon 0..3] [--opp-observed coup] "
+              "[--opp-faster|--opp-slower] [--me-tailwind] [--opp-tailwind] "
+              "[--trick-room] [--me-damage %] [--opp-damage % --my-move coup]",
+              file=sys.stderr)
         return 2
     me_sp, me_nat, me_moves, opp_sp, opp_nat = pos
     for sp in (me_sp, opp_sp):
@@ -698,17 +704,80 @@ def cmd_nash(args: list[str]) -> int:
                if len(parts) > 2 else [])
         bench.append(Mon.from_state(PokemonState(species=parts[0], nature=nat,
                                                  moves=mvs)))
+    iters = int(opts.get("iters", 2000))
+    horizon = int(opts.get("horizon", 0))
+    observed = (opts.get("opp-observed") or "").strip() or None
+    order = ("opp-faster" in flags) - ("opp-slower" in flags)   # +1 / 0 / -1
+    me_dmg = opts.get("me-damage")               # % de MES PV subis (rôle attaquant)
+    opp_dmg = opts.get("opp-damage")             # % des PV adverses infligés (défenseur)
+    my_move = (opts.get("my-move") or "").strip() or None
     try:
-        res = solve_turn(me, opp, field, my_bench=bench,
-                         iters=int(opts.get("iters", 2000)),
-                         horizon=int(opts.get("horizon", 0)))
+        res = solve_turn(me, opp, field, my_bench=bench, iters=iters,
+                         horizon=horizon)
+        header = f"{label('species', me_sp)}  vs  {label('species', opp_sp)}\n"
+        if observed is not None or order or me_dmg or opp_dmg:
+            from .belief import update_belief_damage
+            prior = res.belief
+            posterior = prior
+            print(header)
+            if observed is not None:
+                posterior = update_belief(posterior, observed,
+                                          world_strategies=res.opp_world_strategies)
+                _print_belief_shift(prior, posterior,
+                                    f"coup adverse observé : {observed}")
+            if order:
+                from .bench import compute_speed
+                me_speed = compute_speed(me.build,
+                                         tailwind="me-tailwind" in flags)
+                before = posterior
+                posterior = update_belief_speed(
+                    posterior, opp_faster=(order > 0), me_speed=me_speed,
+                    opp_tailwind="opp-tailwind" in flags,
+                    trick_room="trick-room" in flags)
+                sens = "avant moi" if order > 0 else "après moi"
+                _print_belief_shift(before, posterior,
+                                    f"ordre d'action : l'adversaire agit {sens} "
+                                    f"(ma vitesse {me_speed})")
+            if me_dmg and observed is not None:
+                before = posterior
+                posterior = update_belief_damage(
+                    posterior, me.build, observed, float(me_dmg) / 100.0,
+                    opp_role="attacker", field=field)
+                _print_belief_shift(before, posterior,
+                                    f"dégâts subis : {observed} m'a infligé {me_dmg} %")
+            if opp_dmg and my_move is not None:
+                before = posterior
+                posterior = update_belief_damage(
+                    posterior, me.build, my_move, float(opp_dmg) / 100.0,
+                    opp_role="defender", field=field)
+                _print_belief_shift(before, posterior,
+                                    f"dégâts infligés : mon {my_move} a fait {opp_dmg} %")
+            res = solve_turn(me, opp, field, my_bench=bench, iters=iters,
+                             horizon=horizon, belief=posterior)
+            for line in res.lines():
+                print(line)
+            return 0
     except (ValueError, KeyError) as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 1
-    print(f"{label('species', me_sp)}  vs  {label('species', opp_sp)}\n")
+    print(header)
     for line in res.lines():
         print(line)
     return 0
+
+
+def _print_belief_shift(prior: list, posterior: list, caption: str) -> None:
+    """Affiche le glissement de croyance (prior → posterior) après une observation."""
+    print(f"Mise à jour de croyance — {caption}")
+    before = {(p.build.item, p.build.nature, tuple(sorted(p.build.moves))): p.weight
+              for p in prior}
+    for part in posterior:
+        b = part.build
+        was = before.get((b.item, b.nature, tuple(sorted(b.moves))))
+        arrow = (f"{was*100:4.0f} % → " if was is not None else "  (nouveau) ")
+        item = f" @ {b.item}" if b.item else ""
+        print(f"  {arrow}{part.weight*100:4.0f} %{item}  ·  {', '.join(b.moves)}")
+    print()
 
 
 def cmd_doubles(args: list[str]) -> int:
