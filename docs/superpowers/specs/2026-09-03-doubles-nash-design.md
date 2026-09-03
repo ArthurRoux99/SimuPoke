@@ -98,8 +98,10 @@ gratuit en 2v2, y compris contre les coups de zone.
   camp du redirecteur est détourné vers lui, s'il est vivant et a agi plus tôt
   dans le tour. Les coups de zone, les coups sur soi et sur l'allié sont exclus.
 - **Rage Powder** est inopérant sur les types Plante, les porteurs de Masque de
-  Sécurité et le talent Peau Duvetée : `combat._POWDER_MOVES` couvre déjà
-  l'immunité Plante, `ragepowder` y est ajouté.
+  Sécurité et le talent Peau Duvetée. L'immunité est un helper local au module
+  Doubles plutôt qu'un élargissement de `combat._POWDER_MOVES` : cette table sert
+  au blocage des poudres *de statut* et ne connaît que le type Plante, alors que
+  la redirection demande les trois conditions. `combat.py` reste inchangé.
 - **Talents Paratonnerre / Lisse-Flot** : redirigent les coups Électrik / Eau du
   camp adverse vers le porteur, qui est **immunisé** et gagne +1 en Attaque
   Spéciale. Actif sans action, donc résolu avant la redirection par coup.
