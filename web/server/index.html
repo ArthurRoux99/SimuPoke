@@ -295,9 +295,12 @@
 
   <!-- ===== DOUBLES ===== -->
   <section class="tab-panel" id="tab-doubles">
-    <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Plateau 2v2 : qui KO
-      quoi, focus fire (deux attaquants combinant un KO garanti) et coups de zone.
-      Réutilise le calc figé — n'inclut pas encore l'ordre d'action / Protect.</p>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Plateau 2v2. La
+      <b>lecture</b> donne qui KO quoi, le focus fire et les coups de zone. La
+      <b>décision</b> résout le tour vers Nash : elle simule l'ordre d'action, le
+      ciblage, Protect, la redirection, Wide Guard, Ally Switch et Helping Hand,
+      puis renvoie une <b>paire d'actions mixte</b> sur une croyance jointe des
+      deux sets adverses.</p>
     <div class="grid-2">
       <div class="panel attacker"><h2>Mes actifs (2)</h2><div class="builder" id="dbl-mine"></div></div>
       <div class="panel defender"><h2>Actifs adverses (2)</h2><div class="builder" id="dbl-opp"></div></div>
@@ -312,7 +315,17 @@
         <option value="grassy">herbu</option><option value="psychic">psychique</option>
         <option value="misty">brumeux</option></select></div>
       <button id="dbl-sample">Charger les exemples</button>
-      <button class="primary" id="dbl-run">Analyser les menaces</button>
+      <button id="dbl-run">Lecture — menaces</button>
+      <button class="primary" id="dbl-nash">Décision — Nash 2v2</button>
+    </div>
+    <div class="controls" style="grid-template-columns: auto auto auto 1fr;">
+      <div><label>Options par slot (k)</label>
+        <select id="dbl-k"><option value="2">2 — rapide</option>
+        <option value="3" selected>3 — équilibré</option>
+        <option value="4">4 — large</option></select></div>
+      <div><label>Mondes adverses</label>
+        <select id="dbl-worlds"><option value="6">6</option>
+        <option value="12" selected>12</option><option value="24">24</option></select></div>
     </div>
     <div class="result" id="dbl-result"></div>
   </section>

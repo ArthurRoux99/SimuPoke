@@ -57,11 +57,12 @@ const cases = [
   ['purifyingsalt', mk('gengar', 'modest', { spa: 31 }), mk('garchomp', 'careful', {}, { ability: 'purifyingsalt' }), 'shadowball', {}, 39, 46],
   ['eq_band_reflect', mk('garchomp', 'adamant', { atk: 31 }, { item: 'choiceband' }), mk('tyranitar', 'jolly'), 'earthquake', { screen: 'reflect' }, 129, 153],
   ['fireblast_lightscreen', mk('charizard', 'modest', { spa: 31 }), mk('tyranitar', 'jolly'), 'fireblast', { screen: 'lightscreen' }, 22, 27],
+  ['eq_helpinghand', mk('garchomp', 'adamant', { atk: 31 }), mk('tyranitar', 'jolly'), 'earthquake', { powerMod: 1.5 }, 260, 308],
 ];
 
 let pass = 0, fail = 0;
 for (const [name, a, d, mv, opts, emin, emax] of cases) {
-  const r = E.calculate(a, d, mv, opts.field, { crit: opts.crit, applySpread: opts.applySpread, screen: opts.screen });
+  const r = E.calculate(a, d, mv, opts.field, { crit: opts.crit, applySpread: opts.applySpread, screen: opts.screen, powerMod: opts.powerMod });
   if (r.min === emin && r.max === emax) pass++;
   else { fail++; console.log('FAIL', name, 'got', r.min, r.max, 'exp', emin, emax); }
 }

@@ -87,4 +87,9 @@ add('plain_hypervoice', { species: 'Sylveon', nature: 'Modest', evs: { spa: 248 
   ability: 'Cute Charm' },
   { species: 'Garchomp', nature: 'Jolly', evs: { hp: 0 } }, { name: 'Hyper Voice' });
 
+// 19. Helping Hand (Doubles) : x1.5 sur la puissance de base
+add('eq_helpinghand', { species: 'Garchomp', nature: 'Adamant', evs: { atk: 248 } },
+  { species: 'Tyranitar', nature: 'Jolly', evs: {} }, { name: 'Earthquake' },
+  { attackerSide: { isHelpingHand: true } });
+
 console.log(JSON.stringify(scen, null, 1));

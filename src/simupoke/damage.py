@@ -252,13 +252,16 @@ _SCREENS = {"reflect", "lightscreen", "auroraveil"}
 def calculate(attacker: PokemonState, defender: PokemonState,
               move: str | Move, field: FieldState | None = None, *,
               crit: bool = False, apply_spread: bool = False,
-              screen: str | None = None) -> DamageResult:
+              screen: str | None = None, power_mod: float = 1.0) -> DamageResult:
     """Calcule les dégâts d'un `move` de `attacker` sur `defender`.
 
     `apply_spread` : pénalité ×0.75 des attaques de zone en doubles.
     `screen` : écran côté défenseur ('reflect' = physique, 'lightscreen' =
     spécial, 'auroraveil' = les deux). Divise les dégâts (×0.5 en singles,
     ×0.667 en doubles) ; **ignoré par un coup critique** (le crit passe l'écran).
+    `power_mod` : multiplicateur externe de **puissance de base** (Helping Hand
+    ×1.5 en doubles). Neutre à 1.0 ; converti en modificateur 4096ᵉ et chaîné
+    avec les autres modificateurs de puissance.
     """
     mv = move if isinstance(move, Move) else get_move(move)
     if mv.is_status or mv.base_power <= 0:
@@ -350,6 +353,8 @@ def calculate(attacker: PokemonState, defender: PokemonState,
     if atk_ability == "sandforce" and weather == "sand" \
             and move_type in ("Ground", "Rock", "Steel"):
         bp_mods.append(5325)               # Sand Force : ×1.3 (Sol/Roche/Acier) sous sable
+    if power_mod != 1.0:
+        bp_mods.append(round(power_mod * 4096))   # Helping Hand (doubles) : ×1.5
     if bp_mods:
         base_power = max(1, _apply_mod(base_power, _chain_mods(bp_mods)))
 
