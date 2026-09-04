@@ -130,6 +130,7 @@
     function calculate(attacker, defender, moveId, field, opts) {
       opts = opts || {};
       const crit = !!opts.crit, applySpread = !!opts.applySpread;
+      const powerMod = opts.powerMod === undefined ? 1 : opts.powerMod;
       field = field || {};
       const mv = move(moveId);
       if (mv.category === 'Status' || mv.basePower <= 0)
@@ -203,6 +204,7 @@
       if (atkItem === 'wiseglasses' && !physical) bpMods.push(4506);
       if (atkAb === 'sandforce' && weather === 'sand'
           && (moveType === 'Ground' || moveType === 'Rock' || moveType === 'Steel')) bpMods.push(5325);
+      if (powerMod !== 1) bpMods.push(Math.round(powerMod * 4096));  // Helping Hand (doubles)
       if (bpMods.length) bp = Math.max(1, applyMod(bp, chainMods(bpMods)));
 
       // Dégâts de base

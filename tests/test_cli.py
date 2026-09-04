@@ -20,3 +20,25 @@ def test_draft_with_usage_outputs_bullets(capsys):
     assert cli.main(["draft", "data/sample_lineup.json", "--usage"]) == 0
     out = capsys.readouterr().out
     assert "prior d'usage" in out
+
+
+def test_simd_prints_a_turn_log(tmp_path, capsys):
+    import json
+    board = tmp_path / "board.json"
+    board.write_text(json.dumps({
+        "mine": [
+            {"species": "garchomp", "nature": "adamant",
+             "sp": {"atk": 31}, "moves": ["dragonclaw"]},
+            {"species": "snorlax", "nature": "brave", "moves": ["bodyslam"]},
+        ],
+        "opp": [
+            {"species": "tyranitar", "nature": "jolly", "moves": ["crunch"]},
+            {"species": "torkoal", "nature": "quiet", "moves": ["protect"]},
+        ],
+    }), encoding="utf-8")
+    rc = cli.main(["simd", str(board), "--me", "dragonclaw@0,bodyslam",
+                   "--opp", "crunch,protect"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "utilise" in out                  # le log du tour est imprimé
+    assert "se protège" in out               # Protect du slot 1 adverse

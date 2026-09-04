@@ -59,6 +59,10 @@ CASES = [
      mk("garchomp", "jolly"), "hypervoice", {}, 206, 246),
     ("plain_hypervoice",   mk("sylveon", "modest", {"spa": 31}, ability="cutecharm"),
      mk("garchomp", "jolly"), "hypervoice", {}, 57, 68),
+    # Helping Hand : ×1.5 sur la puissance de base (référence @smogon/calc,
+    # field.attackerSide.isHelpingHand).
+    ("eq_helpinghand",     CHOMP_AD(), TTAR(), "earthquake",
+     {"power_mod": 1.5}, 260, 308),
 ]
 
 
