@@ -27,6 +27,7 @@ Endpoints :
     POST /api/nash              stratégie mixte de Nash (croyance + regret matching)
     POST /api/belief            croyance sur le set adverse (§10.3)
     POST /api/doubles           matrice de menaces Doubles 2v2 (Phase 5)
+    POST /api/doubles_nash      paire mixte de Nash en Doubles (Phase 5)
     POST /api/paste             importe un paste Showdown (EV -> SP)
     POST /api/export            regénère un paste Showdown (SP -> EV)
 """
@@ -404,6 +405,33 @@ def api_doubles(body: dict) -> dict:
     }
 
 
+def api_doubles_nash(body: dict) -> dict:
+    """Paire mixte de Nash en Doubles (Phase 5) : élagage par slot + croyance
+    jointe sur les deux sets adverses."""
+    from .nash_doubles import solve_turn_doubles
+    from .sim import Mon
+    from .sim_doubles import DoublesSide
+    field = FieldState(**(body.get("field") or {}))
+    me = DoublesSide(
+        active=[Mon.from_state(_state(d)) for d in body.get("mine", [])[:2]],
+        bench=[Mon.from_state(_state(d)) for d in body.get("bench", [])])
+    opp = DoublesSide(
+        active=[Mon.from_state(_state(d)) for d in body.get("opp", [])[:2]])
+    res = solve_turn_doubles(me, opp, field, k=int(body.get("k", 3)),
+                             n_worlds=int(body.get("worlds", 12)),
+                             iters=int(body.get("iters", 800)))
+    return {
+        "strategy": [{"label": lbl, "p": p} for lbl, p in res.strategy],
+        "oppStrategy": [{"label": lbl, "p": p} for lbl, p in res.opp_strategy],
+        "value": float(res.value),
+        "bestResponse": res.best_response,
+        "recommendation": res.recommendation,
+        "considered": res.considered,
+        "notes": res.notes,
+        "lines": res.lines(),
+    }
+
+
 def api_paste(body: dict) -> dict:
     """Parse un paste Showdown en entrées d'équipe (EV -> SP Champions)."""
     team = parse_showdown(body.get("paste", ""))
@@ -517,7 +545,7 @@ _POST_ROUTES = {
     "/api/speed": api_speed, "/api/outspeed": api_outspeed,
     "/api/survive": api_survive, "/api/ko": api_ko, "/api/spread": api_spread,
     "/api/decide": api_decide, "/api/nash": api_nash, "/api/belief": api_belief,
-    "/api/doubles": api_doubles,
+    "/api/doubles": api_doubles, "/api/doubles_nash": api_doubles_nash,
     "/api/paste": api_paste, "/api/export": api_export,
 }
 _GET_API = {"/api/meta": api_meta, "/api/samples": api_samples,

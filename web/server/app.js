@@ -272,6 +272,36 @@
     } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
   }
 
+  async function runDoublesNash() {
+    const out = $('dbl-result');
+    out.innerHTML = '<div class="muted">Résolution vers Nash (simulation du tour 2v2)…</div>';
+    try {
+      const r = await api('/api/doubles_nash', {
+        mine: builders.dblMine.getEntries(),
+        opp: builders.dblOpp.getEntries(),
+        field: { weather: $('dbl-weather').value, terrain: $('dbl-terrain').value },
+        k: Number($('dbl-k').value), worlds: Number($('dbl-worlds').value),
+      });
+      const rows = r.strategy.filter((s) => s.p >= 0.005).map((s) => {
+        const pct = (s.p * 100).toFixed(1);
+        return `<div class="dbl-hit"><span class="dbl-atk">${esc(s.label)}</span>`
+          + `<b style="float:right">${pct} %</b>`
+          + `<div class="nash-bar"><i style="width:${Math.round(s.p * 100)}%"></i></div></div>`;
+      }).join('');
+      const considered = r.considered.map((opts, i) =>
+        `<div class="dbl-hit"><span class="muted">slot ${i}</span> · ${opts.map(esc).join(', ')}</div>`).join('');
+      const opp = r.oppStrategy.filter((s) => s.p >= 0.02).slice(0, 3)
+        .map((s) => `${esc(s.label)} ${(s.p * 100).toFixed(0)}%`).join(', ');
+      out.innerHTML = '<div class="dbl-target"><div class="dbl-thead">Paire mixte de Nash</div>'
+        + rows + '</div>'
+        + '<div class="dbl-target"><div class="dbl-thead">Options considérées par slot (élagage)</div>'
+        + considered + '</div>'
+        + `<div class="dbl-hit">Adversaire (modèle Nash) : ${opp || '—'}</div>`
+        + `<div class="dbl-hit">Valeur du jeu : <b>${r.value >= 0 ? '+' : ''}${r.value.toFixed(2)}</b></div>`
+        + `<div class="dbl-spread-head">➤ ${esc(r.recommendation)}</div>`;
+    } catch (e) { out.innerHTML = `<div class="error">⚠ ${e.message}</div>`; }
+  }
+
   // ---------- Tirage ----------
   async function runDraft() {
     const out = $('draft-result');
@@ -479,6 +509,7 @@
       builders.prevOpp.setEntries(entriesFrom(SAMPLES.opponent, 'team'));
     });
     $('dbl-run').addEventListener('click', runDoubles);
+    $('dbl-nash').addEventListener('click', runDoublesNash);
     $('dbl-sample').addEventListener('click', dblSample);
     $('os-run').addEventListener('click', runOutspeed);
     $('sv-run').addEventListener('click', runSurvive);

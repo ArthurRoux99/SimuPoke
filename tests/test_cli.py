@@ -42,3 +42,26 @@ def test_simd_prints_a_turn_log(tmp_path, capsys):
     assert rc == 0
     assert "utilise" in out                  # le log du tour est imprimé
     assert "se protège" in out               # Protect du slot 1 adverse
+
+
+def test_nash2_prints_a_mixed_pair_strategy(tmp_path, capsys):
+    import json
+    board = tmp_path / "board.json"
+    board.write_text(json.dumps({
+        "mine": [
+            {"species": "garchomp", "nature": "adamant",
+             "sp": {"atk": 31}, "moves": ["earthquake", "rockslide", "protect"]},
+            {"species": "incineroar", "nature": "careful",
+             "moves": ["flareblitz", "followme"]},
+        ],
+        "opp": [
+            {"species": "tyranitar", "nature": "jolly", "moves": ["rockslide"]},
+            {"species": "torkoal", "nature": "quiet", "moves": ["eruption"]},
+        ],
+    }), encoding="utf-8")
+    rc = cli.main(["nash2", str(board), "--k", "2", "--worlds", "2"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "Stratégie mixte de Nash" in out
+    assert "considérées par slot" in out
+    assert "Valeur du jeu" in out
