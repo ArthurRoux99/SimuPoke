@@ -132,9 +132,18 @@ def slot_candidates(me: DoublesSide, opp: DoublesSide, slot: int, *,
             scored.append((float(note), ("move", mid, None)))
             continue
         if mv.is_spread:
-            best = max((_score_offensive(mon, opp.active[i], mid, field)
-                        for i in foes), default=-1.0)
-            scored.append((best * 1.5, ("move", mid, None)))   # touche les deux
+            hits = [_score_offensive(mon, opp.active[i], mid, field)
+                    for i in foes]
+            score = sum(h for h in hits if h > 0) * 0.75    # pénalité de zone
+            # Friendly fire : un `allAdjacent` (Séisme, Surf) frappe aussi mon
+            # allié vivant — on le décompte, sinon l'élagage garde un coup que
+            # la simulation rejettera.
+            ally = [m for i, m in enumerate(me.active)
+                    if i != slot and not m.fainted]
+            if mv.target == "allAdjacent" and ally:
+                score -= sum(max(0.0, _score_offensive(mon, a, mid, field))
+                             for a in ally) * 0.75
+            scored.append((score, ("move", mid, None)))
             continue
         for i in foes:
             scored.append((_score_offensive(mon, opp.active[i], mid, field),

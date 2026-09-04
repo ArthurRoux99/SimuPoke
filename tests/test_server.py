@@ -361,3 +361,24 @@ def test_likely_endpoint():
     assert isinstance(out["item"], str) and out["item"]
     assert out["ability"] == "intimidate"     # vrai quelle que soit la source
     assert server.api_likely("magikarp")["known"] is False
+
+
+def test_doubles_nash_returns_a_pair_strategy():
+    out = server.api_doubles_nash({
+        "mine": [
+            {"species": "garchomp", "nature": "adamant",
+             "sp": {"atk": 31}, "moves": ["earthquake", "rockslide", "protect"]},
+            {"species": "incineroar", "nature": "careful",
+             "moves": ["flareblitz", "followme"]},
+        ],
+        "opp": [
+            {"species": "tyranitar", "nature": "jolly", "moves": ["rockslide"]},
+            {"species": "torkoal", "nature": "quiet", "moves": ["eruption"]},
+        ],
+        "k": 2, "worlds": 2, "iters": 200,
+    })
+    assert abs(sum(s["p"] for s in out["strategy"]) - 1.0) < 1e-6
+    assert out["strategy"][0]["label"]
+    assert len(out["considered"]) == 2
+    assert isinstance(out["value"], float)
+    assert out["recommendation"]

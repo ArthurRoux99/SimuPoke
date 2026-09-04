@@ -125,3 +125,16 @@ def test_report_lines_mention_the_pruning():
                                          iters=200).lines())
     assert "considérées par slot" in lines
     assert "Valeur du jeu" in lines
+
+
+def test_pruning_penalises_friendly_fire():
+    # Séisme frappe fort mais touche l'allié vivant : à k=1, une frappe
+    # mono-cible comparable doit passer devant.
+    me = side(mon("garchomp", "adamant", {"atk": 31},
+                  moves=["earthquake", "dragonclaw"]),
+              mon("incineroar", "careful", moves=["flareblitz"]))
+    opp = side(mon("tyranitar", "jolly"), mon("torkoal", "quiet"))
+    assert slot_candidates(me, opp, 0, k=1)[0][1] == "dragonclaw"
+    # Allié déjà K.O. : plus de friendly fire, Séisme redevient le meilleur.
+    me.active[1].hp = 0
+    assert slot_candidates(me, opp, 0, k=1)[0][1] == "earthquake"

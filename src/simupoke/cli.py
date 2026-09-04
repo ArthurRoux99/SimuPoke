@@ -34,6 +34,8 @@ Usage (option globale : [--lang fr|en] ou SIMUPOKE_LANG) :
         # classe mes actions ; --depth ≥2 = multi-tours ; --cautious = pire cas ; --samples N = build adverse échantillonné (usage)
     python -m simupoke.cli simd <board.json> --me "<a>,<b>" --opp "<a>,<b>" [--weather X]
         # rejoue un tour DOUBLES (2v2) et imprime le log ; cible : move@0 / move@1
+    python -m simupoke.cli nash2 <board.json> [--k 3] [--worlds 12] [--iters 800]
+        # DOUBLES : paire mixte de Nash (élagage par slot + croyance jointe)
 """
 
 from __future__ import annotations
@@ -883,6 +885,54 @@ def cmd_simd(args: list[str]) -> int:
     return 0
 
 
+def cmd_nash2(args: list[str]) -> int:
+    """Stratégie mixte de Nash en Doubles (paires d'actions) depuis un board."""
+    import json as _json
+
+    from .nash_doubles import solve_turn_doubles
+    from .sim import Mon
+    from .sim_doubles import DoublesSide
+    pos, opts, _ = _split_args(args, set())
+    if len(pos) != 1:
+        print("Usage : nash2 <board.json> [--k 3] [--worlds 12] [--iters 800] "
+              "[--weather X]   # paire mixte de Nash en Doubles", file=sys.stderr)
+        return 2
+    try:
+        board = _json.loads(Path(pos[0]).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"Erreur de lecture : {exc}", file=sys.stderr)
+        return 1
+
+    def _mk(d: dict) -> PokemonState:
+        return PokemonState(
+            species=d["species"], nature=d.get("nature", "serious"),
+            stat_points=d.get("stat_points", d.get("sp", {})) or {},
+            item=d.get("item"), ability=d.get("ability"),
+            moves=d.get("moves", []) or [],
+            current_hp_pct=float(d.get("current_hp_pct", d.get("hp", 1.0))))
+
+    mine = [_mk(d) for d in board.get("mine", [])[:2]]
+    opp_states = [_mk(d) for d in board.get("opp", [])[:2]]
+    for m in mine + opp_states:
+        if not is_known(m.species):
+            print(f"Espèce inconnue : {m.species!r}", file=sys.stderr)
+            return 1
+    if len(mine) < 2 or len(opp_states) < 2:
+        print("Il faut deux actifs de chaque côté.", file=sys.stderr)
+        return 2
+    field = FieldState(weather=opts.get("weather"), terrain=opts.get("terrain"))
+    me = DoublesSide(active=[Mon.from_state(s) for s in mine],
+                     bench=[Mon.from_state(_mk(d))
+                            for d in board.get("bench", [])])
+    opp = DoublesSide(active=[Mon.from_state(s) for s in opp_states])
+    res = solve_turn_doubles(me, opp, field, k=int(opts.get("k", 3)),
+                             n_worlds=int(opts.get("worlds", 12)),
+                             iters=int(opts.get("iters", 800)))
+    for line in res.lines():
+        print(line)
+    return 0
+
+
 def cmd_paste(args: list[str]) -> int:
     pos, _, flags = _split_args(args, {"json"})
     if len(pos) != 1:
@@ -976,6 +1026,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_doubles(rest)
     if cmd == "simd":
         return cmd_simd(rest)
+    if cmd == "nash2":
+        return cmd_nash2(rest)
     if cmd == "paste":
         return cmd_paste(rest)
     print(f"Commande inconnue : {cmd!r}", file=sys.stderr)
