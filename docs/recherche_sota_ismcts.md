@@ -66,7 +66,17 @@ Par ordre d'impact / coût croissant — chaque cran rapproche de PokaiTrainer :
    est résolue **vers Nash à chaque étage** (`_sm_nash_value`, regret matching
    récursif) — les deux camps jouent au mieux, ni adversaire moyen (expectimax)
    ni pire cas pur (minimax). Vérifié : nash ≤ expectimax, entre moyen et pire.
-   Suite : budget d'expansion PUCT (au lieu d'un développement complet borné).
+   **Budget d'expansion ✅ fait** : le développement complet coûte
+   `(|A|·|B|)^horizon`, d'où un horizon bridé à 3. `_shortlist` classe les
+   actions par une éval **1 ply** (moyenne sur les réponses du camp d'en face) et
+   ne développe que les `width` meilleures de chaque côté — la **shortlist
+   d'actions** de PokéChamp, avec une heuristique déterministe au lieu d'un LLM.
+   Le nœud reste résolu **exactement vers Nash**, sur un jeu restreint : coût
+   `(width²)^horizon`, horizon autorisé jusqu'à **5**. Mesuré (4 coups par camp,
+   `width=2`) : profondeur 3, 3632 → 280 développements (13×, 1,65 s → 0,07 s) ;
+   profondeur 4, 12,2 s → 0,08 s (150×) — valeur identique à 1e-3 près.
+   Exposé : `solve_turn(width=…)`, CLI `nash --width N`, API `/api/nash`
+   (`width`).
 3. ~~**Mise à jour de croyance inter-tours**~~ **✅ fait** : `belief.update_belief`
    reconditionne le nuage de particules sur le coup adverse observé —
    `w'_i ∝ w_i · P(coup | monde_i)`. La vraisemblance par monde est la

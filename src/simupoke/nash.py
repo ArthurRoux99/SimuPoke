@@ -21,7 +21,8 @@ Ce module :
 (seat-2 par-world de PokaiTrainer, `solve_bayesian`), **profondeur** par CFR
 récursif (`horizon`, `_sm_nash_value`), et **mise à jour de croyance inter-tours**
 sur le coup observé (`belief.update_belief`, alimentée par `opp_world_strategies`
-exposé ici). Restent : budget d'expansion PUCT et évaluateur de feuille appris.
+exposé ici) et **budget d'expansion** (`width`, `_shortlist` — horizon jusqu'à 5).
+Reste : l'évaluateur de feuille appris.
 """
 
 from __future__ import annotations
@@ -104,22 +105,62 @@ def _leaf_value(res, field: FieldState | None, roll: float,
                         "expected")
 
 
+def _immediate(me: Side, opp: Side, a, omv, field: FieldState | None,
+               roll: float) -> float:
+    """Valeur du couple d'actions après UN tour (éval 1 ply, sans récursion)."""
+    child_me, child_opp = _child(me, opp, a, omv, field, roll)
+    return evaluate_side(child_me, child_opp.active)
+
+
+def _shortlist(me: Side, opp: Side, field: FieldState | None, roll: float,
+               my_acts: list, opp_acts: list, width: int | None):
+    """Restreint chaque camp à ses `width` meilleures actions (budget d'expansion).
+
+    Le développement complet coûte ``(|A|·|B|)^depth`` — d'où un horizon bridé.
+    On classe donc les actions par une **éval immédiate à 1 ply** (moyenne sur
+    les réponses adverses) et on ne développe que les `width` meilleures de
+    chaque côté : c'est la **shortlist d'actions** de PokéChamp, appliquée ici
+    avec une heuristique déterministe au lieu d'un LLM. Le nœud reste résolu
+    **exactement vers Nash**, simplement sur un jeu restreint.
+
+    Coût : ``|A|·|B|`` évals à 1 ply (bon marché) puis ``width²`` récursions —
+    soit ``(width²)^depth`` au lieu de ``(|A|·|B|)^depth``.
+    """
+    if width is None or width <= 0:
+        return my_acts, opp_acts
+    if len(my_acts) <= width and len(opp_acts) <= width:
+        return my_acts, opp_acts
+    M = [[_immediate(me, opp, a, b, field, roll) for b in opp_acts]
+         for a in my_acts]
+    n, m = len(my_acts), len(opp_acts)
+    # Moi : je maximise (moyenne sur les réponses adverses).
+    keep_a = sorted(sorted(range(n), key=lambda i: -sum(M[i]) / m)[:width])
+    # Adversaire : il minimise (moyenne sur mes actions).
+    keep_b = sorted(sorted(range(m),
+                           key=lambda j: sum(M[i][j] for i in range(n)) / n)[:width])
+    return [my_acts[i] for i in keep_a], [opp_acts[j] for j in keep_b]
+
+
 def _sm_nash_value(me: Side, opp: Side, field: FieldState | None,
-                   depth: int, roll: float) -> float:
+                   depth: int, roll: float, width: int | None = None) -> float:
     """Valeur **Nash** d'un état à information parfaite, à `depth` tours.
 
     À l'intérieur d'un monde, le set adverse est connu : la continuation est un
     jeu simultané à information parfaite. On la résout vers Nash à **chaque
     étage** (regret matching), au lieu de l'expectimax (adversaire fixe + moi
     glouton). C'est le cran « CFR récursif » de l'échelle SOTA.
+
+    `width` : budget d'expansion (shortlist d'actions par camp, cf. `_shortlist`).
+    ``None`` = développement complet (comportement historique, sans régression).
     """
     if depth <= 0 or _terminal(me, opp):
         return evaluate_side(me, opp.active)
     my_acts = _my_actions(me, allow_switch=False)
     opp_acts: list[str | None] = [m for m in opp.active.build.moves
                                   if move_known(m)] or [None]
+    my_acts, opp_acts = _shortlist(me, opp, field, roll, my_acts, opp_acts, width)
     U = [[_sm_nash_value(*_child(me, opp, a, omv, field, roll),
-                         field=field, depth=depth - 1, roll=roll)
+                         field=field, depth=depth - 1, roll=roll, width=width)
           for omv in opp_acts]
          for a in my_acts]
     _, _, val = solve_matrix(U, iters=_INNER_ITERS)
@@ -127,12 +168,12 @@ def _sm_nash_value(me: Side, opp: Side, field: FieldState | None,
 
 
 def _leaf_value_world(res, field: FieldState | None, roll: float,
-                      horizon: int) -> float:
+                      horizon: int, width: int | None = None) -> float:
     """Feuille d'un monde (adversaire connu) : éval immédiate à `horizon=0`,
     sinon **Nash récursif** (les deux camps jouent au mieux à chaque tour)."""
     if horizon <= 0:
         return evaluate_side(res.me, res.opp.active)
-    return _sm_nash_value(res.me, res.opp, field, horizon, roll)
+    return _sm_nash_value(res.me, res.opp, field, horizon, roll, width)
 
 
 def _payoff_matrix(me: Mon, my_bench: list[Mon], particles: list[Particle],
@@ -176,7 +217,8 @@ def _payoff_matrix(me: Mon, my_bench: list[Mon], particles: list[Particle],
 
 def _world_payoff(me: Mon, my_bench: list[Mon], particle: Particle,
                   my_actions: list[tuple], opp_actions_w: list[str | None],
-                  field: FieldState | None, horizon: int = 0) -> list[list[float]]:
+                  field: FieldState | None, horizon: int = 0,
+                  width: int | None = None) -> list[list[float]]:
     """Matrice de gains DANS un monde : U[a][b] moyennée sur les jets."""
     opp_mon = Mon.from_state(particle.build)
     matrix: list[list[float]] = []
@@ -188,7 +230,7 @@ def _world_payoff(me: Mon, my_bench: list[Mon], particle: Particle,
                 res = simulate_turn_actions(
                     Side(active=me, bench=my_bench), Side(active=opp_mon),
                     action, ("move", omv), field, roll=roll, copy=True)
-                vals.append(_leaf_value_world(res, field, roll, horizon))
+                vals.append(_leaf_value_world(res, field, roll, horizon, width))
             row.append(sum(vals) / len(vals))
         matrix.append(row)
     return matrix
@@ -319,7 +361,7 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
                my_bench: list[Mon] | None = None, reg_id: str = "reg_m_b",
                iters: int = 2000, belief_samples: int = 80,
                per_world: bool = True, horizon: int = 0,
-               belief: list[Particle] | None = None,
+               belief: list[Particle] | None = None, width: int | None = None,
                seed: int | None = 0) -> NashResult:
     """Résout le tour courant vers Nash et renvoie ma stratégie mixte.
 
@@ -348,14 +390,18 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
         my_actions = [("move", None)]
     labels = [_label(a, me, bench) for a in my_actions]
 
-    horizon = max(0, min(3, horizon))            # borne de sécurité (coût/ply)
+    # Borne de sécurité (coût/ply). Le développement complet explose en
+    # (|A|·|B|)^horizon ; avec un budget d'expansion (`width`) le coût retombe à
+    # (width²)^horizon, ce qui autorise un horizon plus profond.
+    horizon = max(0, min(5 if width else 3, horizon))
     world_strategies: list[dict] = []
     if per_world and len(particles) > 1:
         worlds = []
         for part in particles:
             opp_w: list[str | None] = [m for m in part.build.moves
                                        if move_known(m)] or [None]
-            U_w = _world_payoff(me, bench, part, my_actions, opp_w, field, horizon)
+            U_w = _world_payoff(me, bench, part, my_actions, opp_w, field,
+                                horizon, width)
             worlds.append((part.weight, U_w, opp_w))
         rst, val, opp_strat, br_idx, world_strat = solve_bayesian(
             len(my_actions), worlds, iters=iters)
