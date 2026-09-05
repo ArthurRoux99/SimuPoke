@@ -66,7 +66,18 @@ Par ordre d'impact / coût croissant — chaque cran rapproche de PokaiTrainer :
    est résolue **vers Nash à chaque étage** (`_sm_nash_value`, regret matching
    récursif) — les deux camps jouent au mieux, ni adversaire moyen (expectimax)
    ni pire cas pur (minimax). Vérifié : nash ≤ expectimax, entre moyen et pire.
-   Suite : budget d'expansion PUCT (au lieu d'un développement complet borné).
+
+   ~~Suite : budget d'expansion~~ **✅ fait** : `ismcts.sm_mcts_value` remplace le
+   développement complet par un **SM-MCTS avec regret matching** (Lisý et al.,
+   NeurIPS 2013) — à chaque nœud, les deux camps tirent leur action selon une
+   stratégie de regret matching, la même primitive que `solve_matrix`. Le coût
+   passe d'**exponentiel** (`(|A|·|B|)^profondeur`) à **linéaire**
+   (`budget × profondeur`), et l'horizon de `solve_turn` monte de 3 à 8 tours
+   dès qu'un `budget` est donné. Mesuré sur un plateau 4 coups contre 4 coups :
+   profondeur 3 en **0,58 s** pour l'exact contre **0,02 s** pour la recherche
+   échantillonnée (écart de valeur 0,012) ; profondeur 4 en **9,9 s** contre
+   **0,02 s**. SM-MCTS-RM est retenu plutôt que DUCT (UCB découplé) parce que
+   lui **converge vers l'équilibre de Nash** du jeu à coups simultanés.
 3. ~~**Mise à jour de croyance inter-tours**~~ **✅ fait** : `belief.update_belief`
    reconditionne le nuage de particules sur le coup adverse observé —
    `w'_i ∝ w_i · P(coup | monde_i)`. La vraisemblance par monde est la

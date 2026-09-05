@@ -86,8 +86,9 @@ cd scripts && npm install && npm run gen:all
 
 ## Feuille de route
 
-Phases 0–3 ✅, Phase 4 🟡 (simulateur + recherche multi-tours ; **ISMCTS
-complet** à venir), Phase 5 ✅ (simulateur 2v2 + Nash joint), Phase 6 apprentissage ⏳. Cap technique :
-**moteur unique via Pyodide** (retire le port JS), **frontend PWA** (React/TS),
-profondeur IA (ISMCTS, Doubles). Le tableau d'état détaillé est en tête du
+Phases 0–5 ✅ (Phase 4 close par la **recherche sous budget** — SM-MCTS avec
+regret matching, `ismcts.py` ; Phase 5 : simulateur 2v2 + Nash joint),
+Phase 6 apprentissage ⏳. Cap technique : **moteur unique via Pyodide**
+(retire le port JS), **frontend PWA** (React/TS), **évaluateur de feuille
+appris** (ONNX, cran 4 de l'échelle SOTA). Le tableau d'état détaillé est en tête du
 [README](README.md).

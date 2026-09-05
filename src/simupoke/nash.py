@@ -127,11 +127,20 @@ def _sm_nash_value(me: Side, opp: Side, field: FieldState | None,
 
 
 def _leaf_value_world(res, field: FieldState | None, roll: float,
-                      horizon: int) -> float:
+                      horizon: int, budget: int | None = None) -> float:
     """Feuille d'un monde (adversaire connu) : éval immédiate à `horizon=0`,
-    sinon **Nash récursif** (les deux camps jouent au mieux à chaque tour)."""
+    sinon **Nash récursif** (les deux camps jouent au mieux à chaque tour).
+
+    `budget` bascule sur la recherche **échantillonnée** (`ismcts`, SM-MCTS avec
+    regret matching) : coût linéaire en `budget × horizon` au lieu
+    d'exponentiel, donc un horizon bien au-delà des 3 tours du calcul exact.
+    """
     if horizon <= 0:
         return evaluate_side(res.me, res.opp.active)
+    if budget:
+        from .ismcts import sm_mcts_value
+        return sm_mcts_value(res.me, res.opp, field, depth=horizon, roll=roll,
+                             budget=budget)
     return _sm_nash_value(res.me, res.opp, field, horizon, roll)
 
 
@@ -176,7 +185,8 @@ def _payoff_matrix(me: Mon, my_bench: list[Mon], particles: list[Particle],
 
 def _world_payoff(me: Mon, my_bench: list[Mon], particle: Particle,
                   my_actions: list[tuple], opp_actions_w: list[str | None],
-                  field: FieldState | None, horizon: int = 0) -> list[list[float]]:
+                  field: FieldState | None, horizon: int = 0,
+                  budget: int | None = None) -> list[list[float]]:
     """Matrice de gains DANS un monde : U[a][b] moyennée sur les jets."""
     opp_mon = Mon.from_state(particle.build)
     matrix: list[list[float]] = []
@@ -188,7 +198,8 @@ def _world_payoff(me: Mon, my_bench: list[Mon], particle: Particle,
                 res = simulate_turn_actions(
                     Side(active=me, bench=my_bench), Side(active=opp_mon),
                     action, ("move", omv), field, roll=roll, copy=True)
-                vals.append(_leaf_value_world(res, field, roll, horizon))
+                vals.append(_leaf_value_world(res, field, roll, horizon,
+                                              budget))
             row.append(sum(vals) / len(vals))
         matrix.append(row)
     return matrix
@@ -320,6 +331,7 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
                iters: int = 2000, belief_samples: int = 80,
                per_world: bool = True, horizon: int = 0,
                belief: list[Particle] | None = None,
+               budget: int | None = None,
                seed: int | None = 0) -> NashResult:
     """Résout le tour courant vers Nash et renvoie ma stratégie mixte.
 
@@ -335,6 +347,11 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
     `belief` : croyance **déjà maintenue** (particules pondérées) à résoudre
     telle quelle, au lieu de la reconstruire depuis `opp`. Sert à chaîner la
     mise à jour bayésienne inter-tours (`belief.update_belief`).
+
+    `budget` : nombre d'itérations de la recherche **échantillonnée**
+    (`ismcts`). Sans lui, le lookahead développe tout l'arbre et `horizon` est
+    bridé à 3 tours (coût exponentiel) ; avec lui, le coût devient linéaire et
+    l'horizon monte jusqu'à 8.
     """
     bench = my_bench or []
     particles = (belief if belief is not None
@@ -348,14 +365,17 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
         my_actions = [("move", None)]
     labels = [_label(a, me, bench) for a in my_actions]
 
-    horizon = max(0, min(3, horizon))            # borne de sécurité (coût/ply)
+    # Sans budget, le lookahead est exhaustif : coût exponentiel par ply, donc
+    # horizon bridé à 3. Avec budget, il est échantillonné : coût linéaire.
+    horizon = max(0, min(8 if budget else 3, horizon))
     world_strategies: list[dict] = []
     if per_world and len(particles) > 1:
         worlds = []
         for part in particles:
             opp_w: list[str | None] = [m for m in part.build.moves
                                        if move_known(m)] or [None]
-            U_w = _world_payoff(me, bench, part, my_actions, opp_w, field, horizon)
+            U_w = _world_payoff(me, bench, part, my_actions, opp_w, field,
+                                horizon, budget)
             worlds.append((part.weight, U_w, opp_w))
         rst, val, opp_strat, br_idx, world_strat = solve_bayesian(
             len(my_actions), worlds, iters=iters)
@@ -385,6 +405,9 @@ def solve_turn(me: Mon, opp: Mon, field: FieldState | None = None, *,
     notes = []
     if len(particles) > 1:
         notes.append(f"croyance : {len(particles)} builds adverses pondérés")
+    if budget and horizon:
+        notes.append(f"lookahead sous budget : {budget} itérations SM-MCTS "
+                     f"sur {horizon} tours")
     return NashResult(strategy=strat, value=val, opp_actions=opp_moves,
                       opp_strategy=opp_strat, best_response=best_response,
                       recommendation=reco, notes=notes, belief=particles,
