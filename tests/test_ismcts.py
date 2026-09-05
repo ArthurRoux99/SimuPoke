@@ -107,3 +107,35 @@ def test_a_lethal_action_gets_most_of_the_mass():
     top = max(strat, key=lambda t: t[1])
     assert top[0] == ("move", "dragonclaw"), strat
     assert top[1] > 0.6, strat
+
+
+# --- Composition des deux leviers de budget --------------------------------
+
+def test_width_composes_with_the_sampling_budget():
+    """`width` restreint les actions de chaque nœud visité par la recherche :
+    l'arbre exploré est plus petit à budget égal."""
+    def run(width):
+        me = side("garchomp", "adamant", {"atk": 31},
+                  moves=["dragonclaw", "earthquake", "rockslide", "protect"])
+        opp = side("tyranitar", "jolly",
+                   moves=["crunch", "rockslide", "protect", "stealthrock"])
+        stats = SearchStats()
+        value = sm_mcts_value(me, opp, None, depth=3, roll=0.5, budget=200,
+                              width=width, stats=stats)
+        return stats.simulations, value
+
+    full, v_full = run(None)
+    narrow, v_narrow = run(2)
+    assert narrow < full, f"width devrait réduire l'arbre : {narrow} vs {full}"
+    assert abs(v_narrow - v_full) < 0.5      # même ordre de grandeur
+
+
+def test_width_larger_than_the_action_count_changes_nothing():
+    def run(width):
+        me = side("garchomp", "adamant", {"atk": 31},
+                  moves=["dragonclaw", "protect"])
+        opp = side("tyranitar", "jolly", moves=["crunch", "protect"])
+        return sm_mcts_value(me, opp, None, depth=2, roll=0.5, budget=150,
+                             width=width)
+
+    assert run(9) == run(None)

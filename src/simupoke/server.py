@@ -307,10 +307,12 @@ def api_nash(body: dict) -> dict:
     reg_id = body.get("regulation", "reg_m_b")
     iters = int(body.get("iters", 2000))
     horizon = int(body.get("horizon", 0))
-    # `budget` : lookahead échantillonné (SM-MCTS) — horizon jusqu'à 8 tours.
+    # `width` : largeur bridée (Nash exact sur un jeu restreint, horizon <= 5).
+    # `budget` : lookahead échantillonné (SM-MCTS, horizon <= 8). Combinables.
+    width = int(body["width"]) if body.get("width") else None
     budget = int(body["budget"]) if body.get("budget") else None
     res = solve_turn(me, opp, field, my_bench=bench, reg_id=reg_id,
-                     iters=iters, horizon=horizon, budget=budget)
+                     iters=iters, horizon=horizon, budget=budget, width=width)
 
     # Mise à jour bayésienne inter-tours : coup adverse observé (`oppObserved`)
     # et/ou ordre d'action observé (`oppFaster`) reconditionnent la croyance,
@@ -346,7 +348,7 @@ def api_nash(body: dict) -> dict:
                 opp_role="defender", field=field)
         res = solve_turn(me, opp, field, my_bench=bench, reg_id=reg_id,
                          iters=iters, horizon=horizon, budget=budget,
-                         belief=posterior)
+                         width=width, belief=posterior)
 
     out = {
         "strategy": [{"action": lbl, "prob": p} for lbl, p in res.strategy],

@@ -32,7 +32,13 @@ from .sim import Side
 
 @dataclass
 class SearchStats:
-    """Compteurs d'une recherche — sert aux tests et au diagnostic de coût."""
+    """Compteurs d'une recherche — sert aux tests et au diagnostic de coût.
+
+    `simulations` ne compte que les transitions de l'arbre de recherche. Avec
+    `width`, la shortlist consomme en plus `|A|·|B|` évaluations à 1 ply par
+    nœud créé, qui ne sont pas comptées ici : le compteur mesure la taille de
+    l'arbre, pas le coût total.
+    """
     iterations: int = 0
     simulations: int = 0
     nodes: int = 0
@@ -78,16 +84,27 @@ def _opp_actions(opp: Side) -> list[str | None]:
     return [m for m in opp.active.build.moves if move_known(m)] or [None]
 
 
-def _make_node(me: Side, opp: Side, stats: SearchStats | None) -> _Node:
+def _make_node(me: Side, opp: Side, stats: SearchStats | None,
+               field: FieldState | None = None, roll: float = 0.5,
+               width: int | None = None) -> _Node:
+    """Crée un nœud. `width` restreint les actions retenues à ce nœud via la
+    shortlist de `nash` — les deux leviers de budget se composent : on
+    échantillonne un arbre déjà réduit en largeur."""
     if stats is not None:
         stats.nodes += 1
-    return _Node(my_actions=_my_actions(me, allow_switch=False),
-                 opp_actions=_opp_actions(opp))
+    my_acts = _my_actions(me, allow_switch=False)
+    opp_acts = _opp_actions(opp)
+    if width:
+        # Import local : `nash` importe `ismcts` à la demande, on évite le cycle.
+        from .nash import _shortlist
+        my_acts, opp_acts = _shortlist(me, opp, field, roll, my_acts, opp_acts,
+                                       width)
+    return _Node(my_actions=my_acts, opp_actions=opp_acts)
 
 
 def _iterate(node: _Node, me: Side, opp: Side, field: FieldState | None,
              depth: int, roll: float, rng: random.Random,
-             stats: SearchStats | None) -> float:
+             stats: SearchStats | None, width: int | None = None) -> float:
     """Une descente : tire une paire d'actions, récurse, remonte la valeur.
 
     Les regrets sont mis à jour **contrefactuellement** sur l'action adverse
@@ -111,7 +128,7 @@ def _iterate(node: _Node, me: Side, opp: Side, field: FieldState | None,
     my_utils: list[float] = []
     for a in range(len(node.my_actions)):
         value = _child_value(node, me, opp, field, a, j, depth, roll, rng, stats,
-                             expand=(a == i))
+                             width, expand=(a == i))
         my_utils.append(value)
     played = my_utils[i]
 
@@ -123,7 +140,7 @@ def _iterate(node: _Node, me: Side, opp: Side, field: FieldState | None,
         else:
             opp_utils.append(
                 _child_value(node, me, opp, field, i, b, depth, roll, rng,
-                             stats, expand=False))
+                             stats, width, expand=False))
 
     for a in range(len(node.my_actions)):
         node.my_regret[a] += my_utils[a] - played
@@ -134,7 +151,8 @@ def _iterate(node: _Node, me: Side, opp: Side, field: FieldState | None,
 
 def _child_value(node: _Node, me: Side, opp: Side, field: FieldState | None,
                  i: int, j: int, depth: int, roll: float, rng: random.Random,
-                 stats: SearchStats | None, *, expand: bool) -> float:
+                 stats: SearchStats | None, width: int | None = None, *,
+                 expand: bool) -> float:
     """Valeur de l'enfant `(i, j)`. `expand` : on descend récursivement (branche
     effectivement jouée) ; sinon on se contente de l'évaluation immédiate, qui
     sert de baseline aux regrets sans coûter une descente complète."""
@@ -151,15 +169,15 @@ def _child_value(node: _Node, me: Side, opp: Side, field: FieldState | None,
     if not expand or depth <= 1 or _terminal(child_me, child_opp):
         return evaluate_side(child_me, child_opp.active)
     if child_node is None:
-        child_node = _make_node(child_me, child_opp, stats)
+        child_node = _make_node(child_me, child_opp, stats, field, roll, width)
         entry[2] = child_node
     return _iterate(child_node, child_me, child_opp, field, depth - 1, roll,
-                    rng, stats)
+                    rng, stats, width)
 
 
 def sm_mcts_strategy(me: Side, opp: Side, field: FieldState | None = None, *,
                      depth: int = 3, roll: float = 0.5, budget: int = 400,
-                     seed: int | None = 0,
+                     seed: int | None = 0, width: int | None = None,
                      stats: SearchStats | None = None
                      ) -> tuple[list[tuple[tuple, float]], float]:
     """Recherche sous budget et renvoie (stratégie racine, valeur du jeu).
@@ -172,10 +190,10 @@ def sm_mcts_strategy(me: Side, opp: Side, field: FieldState | None = None, *,
         value = evaluate_side(me, opp.active)
         actions = _my_actions(me, allow_switch=False)
         return [(a, 1.0 / len(actions)) for a in actions], value
-    root = _make_node(me, opp, stats)
+    root = _make_node(me, opp, stats, field, roll, width)
     total = 0.0
     for _ in range(max(1, budget)):
-        total += _iterate(root, me, opp, field, depth, roll, rng, stats)
+        total += _iterate(root, me, opp, field, depth, roll, rng, stats, width)
         if stats is not None:
             stats.iterations += 1
     norm = sum(root.my_sum) or 1.0
@@ -186,7 +204,7 @@ def sm_mcts_strategy(me: Side, opp: Side, field: FieldState | None = None, *,
 
 def sm_mcts_value(me: Side, opp: Side, field: FieldState | None = None, *,
                   depth: int = 3, roll: float = 0.5, budget: int = 400,
-                  seed: int | None = 0,
+                  seed: int | None = 0, width: int | None = None,
                   stats: SearchStats | None = None) -> float:
     """Valeur d'un état à coups simultanés, estimée sous budget.
 
@@ -194,5 +212,6 @@ def sm_mcts_value(me: Side, opp: Side, field: FieldState | None = None, *,
     camps jouent au mieux), coût linéaire au lieu d'exponentiel.
     """
     _, value = sm_mcts_strategy(me, opp, field, depth=depth, roll=roll,
-                                budget=budget, seed=seed, stats=stats)
+                                budget=budget, seed=seed, width=width,
+                                stats=stats)
     return value
