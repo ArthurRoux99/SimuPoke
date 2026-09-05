@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from simupoke.belief import Particle
 from simupoke.model import PokemonState
 from simupoke.nash import _sm_nash_value, solve_bayesian, solve_matrix, solve_turn
 from simupoke.search import _state_value
@@ -242,3 +243,39 @@ def test_solve_turn_accepts_width():
     res = solve_turn(me, opp, horizon=2, width=2)
     assert abs(sum(p for _, p in res.strategy) - 1.0) < 1e-6
     assert res.best_response in {lbl for lbl, _ in res.strategy}
+
+
+# --- Lookahead sous budget (SM-MCTS) ---------------------------------------
+# Jeux volontairement minuscules (un ou deux coups par camp, croyance à une
+# particule) : ces tests vérifient le CÂBLAGE du budget, pas la qualité de la
+# recherche — celle-ci est couverte par tests/test_ismcts.py. Un jeu réaliste
+# rendrait le lookahead exhaustif du cas « sans budget » ruineux.
+
+def _tiny(moves_me, moves_opp):
+    me = _mon("garchomp", "adamant", sp={"atk": 31}, moves=moves_me)
+    opp = _mon("tyranitar", "jolly", moves=moves_opp)
+    return me, opp
+
+
+def test_budget_lifts_the_horizon_cap_and_is_reported():
+    from simupoke.nash import solve_turn
+    me, opp = _tiny(["dragonclaw"], ["crunch"])
+    # Sans budget : lookahead exhaustif, horizon bridé à 3, aucune note.
+    shallow = solve_turn(me, opp, horizon=9, belief=[Particle(opp.build, 1.0)])
+    assert not any("budget" in n for n in shallow.notes)
+    # Avec budget : recherche échantillonnée, horizon porté à 8.
+    deep = solve_turn(me, opp, horizon=9, budget=30,
+                      belief=[Particle(opp.build, 1.0)])
+    assert any("8 tours" in n for n in deep.notes), deep.notes
+    assert abs(sum(p for _, p in deep.strategy) - 1.0) < 1e-6
+
+
+def test_budgeted_solve_is_deterministic():
+    from simupoke.nash import solve_turn
+
+    def run():
+        me, opp = _tiny(["dragonclaw", "protect"], ["crunch", "protect"])
+        return solve_turn(me, opp, horizon=2, budget=30,
+                          belief=[Particle(opp.build, 1.0)])
+
+    assert run().strategy == run().strategy

@@ -675,10 +675,13 @@ def cmd_nash(args: list[str]) -> int:
               "<opp_species> <opp_nature> [--me-sp k=v] [--opp-moves a,b,c] "
               "[--me-item X] [--opp-item X] [--me-hp 0..1] [--opp-hp 0..1] "
               "[--weather X] [--bench 'esp,nat,c1|c2 ; …'] [--iters N] "
-              "[--horizon 0..3] [--opp-observed coup] "
+              "[--horizon N : 0..3, 0..5 avec --width, 0..8 avec --budget] "
+              "[--width N] [--budget N]   # budget d'expansion, combinables "
+              "(--width = largeur bridée, Nash exact ; --budget = arbre "
+              "échantillonné) "
+              "[--opp-observed coup] "
               "[--opp-faster|--opp-slower] [--me-tailwind] [--opp-tailwind] "
-              "[--trick-room] [--me-damage %] [--opp-damage % --my-move coup] "
-              "[--width N]   # budget d'expansion : horizon jusqu'à 5",
+              "[--trick-room] [--me-damage %] [--opp-damage % --my-move coup]",
               file=sys.stderr)
         return 2
     me_sp, me_nat, me_moves, opp_sp, opp_nat = pos
@@ -711,7 +714,12 @@ def cmd_nash(args: list[str]) -> int:
                                                  moves=mvs)))
     iters = int(opts.get("iters", 2000))
     horizon = int(opts.get("horizon", 0))
+    # Deux leviers de budget, combinables :
+    #   --width N  : ne développe que les N meilleures actions par camp (le nœud
+    #                reste résolu exactement vers Nash) — horizon jusqu'à 5.
+    #   --budget N : lookahead échantillonné (SM-MCTS) — horizon jusqu'à 8.
     width = int(opts["width"]) if opts.get("width") else None
+    budget = int(opts["budget"]) if opts.get("budget") else None
     observed = (opts.get("opp-observed") or "").strip() or None
     order = ("opp-faster" in flags) - ("opp-slower" in flags)   # +1 / 0 / -1
     me_dmg = opts.get("me-damage")               # % de MES PV subis (rôle attaquant)
@@ -719,7 +727,7 @@ def cmd_nash(args: list[str]) -> int:
     my_move = (opts.get("my-move") or "").strip() or None
     try:
         res = solve_turn(me, opp, field, my_bench=bench, iters=iters,
-                         horizon=horizon, width=width)
+                         horizon=horizon, budget=budget, width=width)
         header = f"{label('species', me_sp)}  vs  {label('species', opp_sp)}\n"
         if observed is not None or order or me_dmg or opp_dmg:
             from .belief import update_belief_damage
@@ -759,7 +767,8 @@ def cmd_nash(args: list[str]) -> int:
                 _print_belief_shift(before, posterior,
                                     f"dégâts infligés : mon {my_move} a fait {opp_dmg} %")
             res = solve_turn(me, opp, field, my_bench=bench, iters=iters,
-                             horizon=horizon, belief=posterior, width=width)
+                             horizon=horizon, budget=budget, width=width,
+                             belief=posterior)
             for line in res.lines():
                 print(line)
             return 0
