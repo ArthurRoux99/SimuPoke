@@ -66,17 +66,30 @@ Par ordre d'impact / coût croissant — chaque cran rapproche de PokaiTrainer :
    est résolue **vers Nash à chaque étage** (`_sm_nash_value`, regret matching
    récursif) — les deux camps jouent au mieux, ni adversaire moyen (expectimax)
    ni pire cas pur (minimax). Vérifié : nash ≤ expectimax, entre moyen et pire.
-   **Budget d'expansion ✅ fait** : le développement complet coûte
-   `(|A|·|B|)^horizon`, d'où un horizon bridé à 3. `_shortlist` classe les
-   actions par une éval **1 ply** (moyenne sur les réponses du camp d'en face) et
-   ne développe que les `width` meilleures de chaque côté — la **shortlist
-   d'actions** de PokéChamp, avec une heuristique déterministe au lieu d'un LLM.
-   Le nœud reste résolu **exactement vers Nash**, sur un jeu restreint : coût
-   `(width²)^horizon`, horizon autorisé jusqu'à **5**. Mesuré (4 coups par camp,
-   `width=2`) : profondeur 3, 3632 → 280 développements (13×, 1,65 s → 0,07 s) ;
-   profondeur 4, 12,2 s → 0,08 s (150×) — valeur identique à 1e-3 près.
-   Exposé : `solve_turn(width=…)`, CLI `nash --width N`, API `/api/nash`
-   (`width`).
+   **Budget d'expansion ✅ fait**, à **deux leviers complémentaires** — l'un
+   réduit la largeur en restant exact, l'autre échantillonne en profondeur :
+
+   - **Largeur bridée** (`width`, `nash._shortlist`) : les actions sont classées
+     par une éval **1 ply** (moyenne sur les réponses du camp d'en face) et seules
+     les `width` meilleures de chaque côté sont développées — la **shortlist
+     d'actions** de PokéChamp, avec une heuristique déterministe au lieu d'un LLM.
+     Le nœud reste résolu **exactement vers Nash**, sur un jeu restreint : coût
+     `(width²)^horizon`, horizon jusqu'à **5**. Mesuré (4 coups par camp,
+     `width=2`) : profondeur 3, 3632 → 280 développements (13×, 1,65 s → 0,07 s) ;
+     profondeur 4, 12,2 s → 0,08 s (150×) — valeur identique à 1e-3 près.
+   - **Arbre échantillonné** (`budget`, `ismcts.sm_mcts_value`) : à chaque nœud
+     les deux camps tirent leur action selon une stratégie de **regret matching**
+     — la même primitive que `solve_matrix`. C'est le **SM-MCTS-RM** de Lisý,
+     Kovařík et Bošanský (NeurIPS 2013), retenu plutôt que DUCT (UCB découplé)
+     parce que lui **converge vers l'équilibre de Nash** du jeu à coups
+     simultanés. Le coût devient **linéaire** (`budget × profondeur`), horizon
+     jusqu'à **8**. Mesuré (4 coups par camp) : profondeur 3, 0,58 s → **0,02 s**
+     (écart de valeur 0,012) ; profondeur 4, 9,9 s → **0,02 s**.
+
+   Les deux se **composent** : avec `width` *et* `budget`, la recherche
+   échantillonne un arbre déjà réduit en largeur. Exposé partout :
+   `solve_turn(width=…, budget=…)`, CLI `nash --width N --budget N`, API
+   `/api/nash` (`width`, `budget`).
 3. ~~**Mise à jour de croyance inter-tours**~~ **✅ fait** : `belief.update_belief`
    reconditionne le nuage de particules sur le coup adverse observé —
    `w'_i ∝ w_i · P(coup | monde_i)`. La vraisemblance par monde est la

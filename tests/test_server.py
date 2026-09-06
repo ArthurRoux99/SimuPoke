@@ -382,3 +382,15 @@ def test_doubles_nash_returns_a_pair_strategy():
     assert len(out["considered"]) == 2
     assert isinstance(out["value"], float)
     assert out["recommendation"]
+
+
+def test_nash_endpoint_accepts_a_search_budget():
+    body = {
+        "me": {"species": "garchomp", "nature": "adamant",
+               "sp": {"atk": 31}, "moves": ["dragonclaw"]},
+        "opp": {"species": "tyranitar", "nature": "jolly", "moves": ["crunch"]},
+        "horizon": 9, "budget": 30,
+    }
+    out = server.api_nash(body)
+    assert abs(sum(s["prob"] for s in out["strategy"]) - 1.0) < 1e-6
+    assert any("8 tours" in n for n in out["notes"]), out["notes"]
